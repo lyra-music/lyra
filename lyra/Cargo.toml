@@ -1,0 +1,31 @@
+[package]
+name = "lyra"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "lyra"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.17.3", features = ["extension-module"] }
+
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+itertools = "0.10.5"
+
+[dependencies.kmeans_colors]
+version = "0.5.0"
+features = ["palette_color"]
+default-features = false
+
+[dependencies.image]
+version = "0.24.5"
+features = ["jpeg", "png", "gif", "tiff"]
+default-features = false
+
+[dependencies.palette]
+version = "0.6.1"
+features = ["std"]
+default-features = false
