@@ -1,0 +1,8 @@
+uvloop
+python-dotenv
+PyYaML
+hikari
+hikari-tanjun
+tanchan
+alluka
+lavalink
