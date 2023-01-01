@@ -127,3 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# ---
+config.yml
+
+lyra/typings/lavalink
+
+lavalink/java
+lavalink/plugins
+lavalink/Lavalink.jar
+lavalink/..application.yml

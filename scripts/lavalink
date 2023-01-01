@@ -1,0 +1,53 @@
+#!/bin/bash
+# For starting the lavalink server (Linux)
+
+R='\033[0;31m'
+Y='\033[0;33m'
+B='\033[0;34m'
+r='\033[0m'
+
+ENV_F=".env"
+APP_F="application.yml"
+_APP_F="..application.yml"
+LVLJ_F="Lavalink.jar"
+JAVA_F="java"
+LVLL_D="lavalink"
+
+ALL_F=true
+
+if [ ! -f $ENV_F ]; then
+    echo -e "${R}error:${r} ${Y}${ENV_F}${r} not found in ${B}.${r}"
+    ALL_F=false
+fi
+
+if [ ! -d $LVLL_D ]; then
+    echo -e "${R}error:${r} ${Y}${LVLL_D}${r} not found in ${B}.${r}"
+    ALL_F=false
+fi
+
+for _f in $APP_F $LVLJ_F $JAVA_F; do
+    if [[ ! -f "$LVLL_D/${_f}" ]]; then
+        echo -e "${R}error:${r} ${Y}${_f}${r} not found in ${B}${LVLL_D}${r}"
+        ALL_F=false
+    fi
+done
+
+if ! $ALL_F; then 
+    echo "Please change the working directory and/or create all the missing files then rerun this script"
+    exit
+fi
+
+(
+    cd "${LVLL_D}" &&
+    cp "${APP_F}" "${_APP_F}" &&
+    set -a && source "../${ENV_F}" &&
+    set +a && envsubst < "${_APP_F}" > "${APP_F}" &&
+#    sudo chattr +i "${APP_F}" &&
+    ./"${JAVA_F}" -jar "${LVLJ_F}"
+)
+(
+    cd "${LVLL_D}" &&
+#    sudo chattr -i "${APP_F}" &&
+    rm "${APP_F}" &&
+    mv "${_APP_F}" "${APP_F}"
+)
