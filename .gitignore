@@ -131,6 +131,7 @@ dmypy.json
 # ---
 config.yml
 
+lyra/python/tmp
 lyra/typings/lavalink
 
 lavalink/java
