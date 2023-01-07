@@ -5,12 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "__main__",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/python/__main__.py",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
         }
     ]
 }

@@ -1,6 +1,7 @@
 use image;
 use kmeans_colors::{get_kmeans_hamerly, Sort};
 use palette::{rgb::channels::Rgba, FromColor, IntoColor, Lab, Pixel, Srgb, Srgba};
+use rayon::prelude::*;
 
 pub fn get_dominant_palette_from_image_impl(
     image: &image::DynamicImage,
@@ -18,7 +19,7 @@ pub fn get_dominant_palette_from_image_impl(
     let img_vec = img.into_raw();
 
     let lab = Srgba::from_raw_slice(&img_vec)
-        .iter()
+        .par_iter()
         .filter(|x| x.alpha == 255)
         .map(|x| x.into_format::<_, f32>().into_color())
         .collect::<Vec<Lab>>();
@@ -40,7 +41,7 @@ pub fn get_dominant_palette_from_image_impl(
     let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
     res.sort_unstable_by(|a, b| (b.percentage).partial_cmp(&a.percentage).unwrap());
     let rgb = res
-        .iter()
+        .par_iter()
         .map(|x| {
             Srgb::from_color(x.centroid)
                 .into_format::<u8>()
