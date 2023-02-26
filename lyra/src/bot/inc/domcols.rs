@@ -3,7 +3,7 @@ use kmeans_colors::{get_kmeans_hamerly, Sort};
 use palette::{rgb::channels::Rgba, FromColor, IntoColor, Lab, Pixel, Srgb, Srgba};
 use rayon::prelude::*;
 
-pub fn get_dominant_palette_from_image_impl(
+pub fn get_dominant_palette_from_image(
     image: &image::DynamicImage,
     palette_size: usize,
 ) -> Vec<u32> {
@@ -35,11 +35,11 @@ pub fn get_dominant_palette_from_image_impl(
                 RANDOM_SEED + i as u64,
             )
         })
-        .max_by(|k1, k2| k1.score.partial_cmp(&k2.score).unwrap())
-        .unwrap();
+        .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
+        .expect("expected `RUNS` to be greater or equal to 1");
 
     let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
-    res.sort_unstable_by(|a, b| (b.percentage).partial_cmp(&a.percentage).unwrap());
+    res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));
     let rgb = res
         .par_iter()
         .map(|x| {

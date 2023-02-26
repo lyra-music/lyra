@@ -1,9 +1,0 @@
-uvloop
-python-dotenv
-PyYaML
-returns
-hikari
-hikari-tanjun
-tanchan
-alluka
-lavalink

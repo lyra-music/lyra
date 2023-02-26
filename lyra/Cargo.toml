@@ -4,20 +4,29 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "lyra"
-crate-type = ["cdylib"]
 
 [dependencies]
-lyra_macros = { path = "./lyra_macros" }
+dotenv = "0.15.0"
 
-pyo3 = { version = "0.17.3", features = ["extension-module"] }
-
+anyhow = "1.0.69"
+tokio = { version = "1.25.0", features = ["full"] }
+hyper = "0.14.24"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
+serde_json = "1.0.93"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 itertools = "0.10.5"
 rayon = "1.6.1"
 cached = "0.42.0"
+
+twilight = "0.15.0"
+twilight-cache-inmemory = "0.15.0"
+twilight-gateway = "0.15.0"
+twilight-http = "0.15.0"
+twilight-model = "0.15.0"
+twilight-standby = "0.15.0"
+twilight-lavalink = "0.15.0"
 
 [dependencies.kmeans_colors]
 version = "0.5.0"

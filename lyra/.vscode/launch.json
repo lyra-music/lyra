@@ -5,20 +5,41 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
-            "type": "python",
+            "type": "lldb",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": true
+            "name": "Debug executable 'lyra'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=lyra",
+                    "--package=lyra"
+                ],
+                "filter": {
+                    "name": "lyra",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         },
         {
-            "name": "__main__",
-            "type": "python",
+            "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/python/__main__.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
+            "name": "Debug unit tests in executable 'lyra'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=lyra",
+                    "--package=lyra"
+                ],
+                "filter": {
+                    "name": "lyra",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
