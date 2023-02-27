@@ -11,8 +11,8 @@ plugins:
       # deezer: true # Enable Deezer source
       # yandexmusic: true # Enable Yandex Music source
     spotify:
-      clientId: "ae60313044614ed0a3b0132e5915f9f8"
-      clientSecret: "7d0bdf02768240e6aa3a6c7370e50040"
+      clientId: $SPOTIFY_CLIENT_ID
+      clientSecret: $SPOTIFY_CLIENT_SECRET
       countryCode: "US" # the country code you want to use for filtering the artists top tracks. See https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
     # applemusic:
     #   countryCode: "US" # the country code you want to use for filtering the artists top tracks and language. See https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
@@ -30,7 +30,7 @@ lavalink:
     - dependency: "com.github.TopiSenpai.LavaSrc:lavasrc-plugin:3.1.7"
       repository: "https://jitpack.io"
   server:
-    password: 4YA6bsxFJKtJ6JKFCX92NRFwWn0GDULI60qpqG42tZPbPBLxLulK60tbRCerKuRDhskKia7sGi5uVPKpxrsm3gfg8SDfLx79roKuyeq6BGfiJGFKkRJ9RgPFfGDYndvn
+    password: $LAVALINK_AUTH
     sources:
       youtube: true
       bandcamp: true

@@ -744,6 +744,7 @@ dependencies = [
  "twilight-cache-inmemory",
  "twilight-gateway",
  "twilight-http",
+ "twilight-interactions",
  "twilight-lavalink",
  "twilight-model",
  "twilight-standby",
@@ -1594,6 +1595,27 @@ dependencies = [
  "http",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "twilight-interactions"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1d6cba546be2569994ddaae632e02cb1b8d610ebbd3ade7432868e66844ad5"
+dependencies = [
+ "twilight-interactions-derive",
+ "twilight-model",
+]
+
+[[package]]
+name = "twilight-interactions-derive"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4908f7fbf5f05168b9bff307ef5ac5fc823efe4659121e651bee9bab8f17624e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
