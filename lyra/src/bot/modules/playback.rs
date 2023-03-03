@@ -25,7 +25,7 @@ pub async fn pause(ctx: Context) -> anyhow::Result<()> {
 }
 
 pub async fn seek(ctx: Context) -> anyhow::Result<()> {
-    let state = ctx.state();
+    let bot = ctx.bot();
     let (author, channel_id) = (ctx.author(), *ctx.channel_id());
 
     tracing::debug!("seek command in channel {} by {}", channel_id, author.name);
@@ -35,7 +35,7 @@ pub async fn seek(ctx: Context) -> anyhow::Result<()> {
         .await?;
 
     let author_id = author.id;
-    let msg = state
+    let msg = bot
         .standby
         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
             new_msg.author.id == author_id

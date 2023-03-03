@@ -5,7 +5,7 @@ use twilight_model::gateway::payload::incoming::MessageCreate;
 use crate::bot::lib::models::Context;
 
 pub async fn play(ctx: Context) -> anyhow::Result<()> {
-    let state = ctx.state();
+    let bot = ctx.bot();
     let (author, channel_id) = (ctx.author(), *ctx.channel_id());
 
     tracing::debug!("play command in channel {} by {}", channel_id, author.name);
@@ -14,7 +14,7 @@ pub async fn play(ctx: Context) -> anyhow::Result<()> {
         .await?;
 
     let author_id = author.id;
-    let msg = state
+    let msg = bot
         .standby
         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
             new_msg.author.id == author_id
@@ -30,7 +30,7 @@ pub async fn play(ctx: Context) -> anyhow::Result<()> {
     )?
     .into_parts();
     let req = Request::from_parts(parts, Body::from(body));
-    let res = state.hyper.request(req).await?;
+    let res = bot.hyper.request(req).await?;
     let response_bytes = hyper::body::to_bytes(res.into_body()).await?;
 
     let loaded = serde_json::from_slice::<LoadedTracks>(&response_bytes)?;

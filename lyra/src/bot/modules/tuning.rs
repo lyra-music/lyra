@@ -17,7 +17,7 @@ pub async fn volume(ctx: Context) -> anyhow::Result<()> {
 
     let author_id = author.id;
     let msg = ctx
-        .state()
+        .bot()
         .standby
         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
             new_msg.author.id == author_id
