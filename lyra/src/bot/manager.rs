@@ -1,20 +1,16 @@
 use std::sync::Arc;
-use twilight_gateway::{Event, Intents, Shard, ShardId};
+use std::sync::Mutex;
 
+use twilight_gateway::{Intents, Shard, ShardId};
+
+use super::events;
+use super::lib::logging;
+use super::lib::models::LyraBot;
 use super::lib::models::LyraConfig;
-use super::modules::connections::{join, leave};
-use super::modules::playback::{pause, seek, stop};
-use super::modules::queue::play;
-use super::modules::tuning::volume;
-use super::{
-    events::message_creates,
-    lib::models::{Context, LyraBot},
-};
-use crate::bot::lib::logging::spawn;
 
 pub struct LyraBotManager {
     config: LyraConfig,
-    pub shard: Shard,
+    shard: Arc<Mutex<Shard>>,
 }
 
 impl LyraBotManager {
@@ -24,18 +20,24 @@ impl LyraBotManager {
         let intents: Intents =
             Intents::GUILD_MESSAGES | Intents::GUILD_VOICE_STATES | Intents::MESSAGE_CONTENT;
         let shard_id = ShardId::ONE;
-        let shard = Shard::new(shard_id, token.clone(), intents);
+        let shard = Mutex::new(Shard::new(shard_id, token.clone(), intents)).into();
 
         Self { config, shard }
     }
 
     pub async fn build_bot(&self) -> anyhow::Result<LyraBot> {
-        Ok(LyraBot::new(&self.config, &self.shard).await?)
+        Ok(LyraBot::new(&self.config, self.shard.clone()).await?)
     }
 
-    pub async fn handle_events(&mut self, bot: Arc<LyraBot>) -> anyhow::Result<()> {
+    pub async fn handle_events(&self, bot: Arc<LyraBot>) -> anyhow::Result<()> {
         loop {
-            let event = match self.shard.next_event().await {
+            let event = match self
+                .shard
+                .lock()
+                .expect("another user of `self.shard` must not panick while holding it")
+                .next_event()
+                .await
+            {
                 Ok(event) => event,
                 Err(source) => {
                     tracing::warn!(?source, "error receiving event");
@@ -48,14 +50,11 @@ impl LyraBotManager {
                 }
             };
 
-            bot.standby.process(&event);
-            bot.lavalink.process(&event).await?;
-            bot.cache.update(&event);
+            bot.cache().update(&event);
+            bot.standby().process(&event);
+            bot.lavalink().process(&event).await?;
 
-            match event {
-                Event::MessageCreate(msg) => message_creates::handle!(msg, bot),
-                _ => {}
-            }
+            logging::spawn(events::handle(event, bot.clone()))
         }
 
         Ok(())

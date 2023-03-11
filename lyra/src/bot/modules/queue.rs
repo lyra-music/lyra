@@ -2,20 +2,18 @@ use hyper::{Body, Request};
 use twilight_lavalink::{http::LoadedTracks, model::Play};
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
-use crate::bot::lib::models::Context;
+use crate::bot::commands::models::Context;
 
 pub async fn play(ctx: Context) -> anyhow::Result<()> {
     let bot = ctx.bot();
-    let (author, channel_id) = (ctx.author(), *ctx.channel_id());
+    let (author, channel_id) = (ctx.author(), ctx.channel_id());
 
     tracing::debug!("play command in channel {} by {}", channel_id, author.name);
-    ctx.respond()
-        .content("What's the URL of the audio to play?")?
-        .await?;
+    ctx.respond("What's the URL of the audio to play?").await?;
 
     let author_id = author.id;
     let msg = bot
-        .standby
+        .standby()
         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
             new_msg.author.id == author_id
         })
@@ -30,7 +28,7 @@ pub async fn play(ctx: Context) -> anyhow::Result<()> {
     )?
     .into_parts();
     let req = Request::from_parts(parts, Body::from(body));
-    let res = bot.hyper.request(req).await?;
+    let res = bot.hyper().request(req).await?;
     let response_bytes = hyper::body::to_bytes(res.into_body()).await?;
 
     let loaded = serde_json::from_slice::<LoadedTracks>(&response_bytes)?;
@@ -42,9 +40,9 @@ pub async fn play(ctx: Context) -> anyhow::Result<()> {
             "Playing **{:?}** by **{:?}**",
             track.info.title, track.info.author
         );
-        ctx.respond().content(&content)?.await?;
+        ctx.respond(&content).await?;
     } else {
-        ctx.respond().content("Didn't find any results")?.await?;
+        ctx.respond("Didn't find any results").await?;
     }
 
     Ok(())

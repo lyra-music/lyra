@@ -40,9 +40,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.64"
+version = "0.1.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cd7fce9ba8c3c042128ce72d8b2ddbf3a05747efb67ea0313c635e10bda47a2"
+checksum = "b84f9ebcc6c1f5b8cb160f6990096a5c127f423fcb6e1ccc46c370cbdfb75dfc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -797,6 +797,7 @@ name = "lyra"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "cached",
  "dotenv",
  "ed25519-dalek",
@@ -805,6 +806,7 @@ dependencies = [
  "image",
  "itertools",
  "kmeans_colors",
+ "lyra_proc",
  "once_cell",
  "palette",
  "rand 0.8.5",
@@ -822,6 +824,15 @@ dependencies = [
  "twilight-lavalink",
  "twilight-model",
  "twilight-standby",
+ "twilight-util",
+]
+
+[[package]]
+name = "lyra_proc"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1819,6 +1830,16 @@ dependencies = [
  "tokio",
  "tracing",
  "twilight-model",
+]
+
+[[package]]
+name = "twilight-util"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daea8f367a2c57b351543a0bbaaf366c2439da4b2d9c6fc34a01f0d190ff7301"
+dependencies = [
+ "twilight-model",
+ "twilight-validate",
 ]
 
 [[package]]

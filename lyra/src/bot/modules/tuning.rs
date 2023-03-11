@@ -1,24 +1,23 @@
 use twilight_lavalink::model::Volume;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
-use crate::bot::lib::models::Context;
+use crate::bot::commands::models::Context;
 
 pub async fn volume(ctx: Context) -> anyhow::Result<()> {
-    let (author, channel_id) = (ctx.author(), *ctx.channel_id());
+    let (author, channel_id) = (ctx.author(), ctx.channel_id());
 
     tracing::debug!(
         "volume command in channel {} by {}",
         channel_id,
         author.name
     );
-    ctx.respond()
-        .content("What's the volume you want to set (0-1000, 100 being the default)?")?
+    ctx.respond("What's the volume you want to set (0-1000, 100 being the default)?")
         .await?;
 
     let author_id = author.id;
     let msg = ctx
         .bot()
-        .standby
+        .standby()
         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
             new_msg.author.id == author_id
         })
@@ -27,7 +26,7 @@ pub async fn volume(ctx: Context) -> anyhow::Result<()> {
     let volume = msg.content.parse::<i64>()?;
 
     if !(0..=1000).contains(&volume) {
-        ctx.respond().content("That's more than 1000")?.await?;
+        ctx.respond("That's more than 1000").await?;
 
         return Ok(());
     }
@@ -35,9 +34,7 @@ pub async fn volume(ctx: Context) -> anyhow::Result<()> {
     let player = ctx.lavalink().player(guild_id).await.unwrap();
     player.send(Volume::from((guild_id, volume)))?;
 
-    ctx.respond()
-        .content(&format!("Set the volume to {volume}"))?
-        .await?;
+    ctx.respond(&format!("Set the volume to {volume}")).await?;
 
     Ok(())
 }
