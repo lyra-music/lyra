@@ -1,16 +1,17 @@
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 use twilight_gateway::{Intents, Shard, ShardId};
 
 use super::events;
+use super::events::models::EventHandlerContext;
 use super::lib::logging;
 use super::lib::models::LyraBot;
 use super::lib::models::LyraConfig;
 
 pub struct LyraBotManager {
     config: LyraConfig,
-    shard: Arc<Mutex<Shard>>,
+    shard: Arc<RwLock<Shard>>,
 }
 
 impl LyraBotManager {
@@ -20,7 +21,7 @@ impl LyraBotManager {
         let intents: Intents =
             Intents::GUILD_MESSAGES | Intents::GUILD_VOICE_STATES | Intents::MESSAGE_CONTENT;
         let shard_id = ShardId::ONE;
-        let shard = Mutex::new(Shard::new(shard_id, token.clone(), intents)).into();
+        let shard = RwLock::new(Shard::new(shard_id, token.clone(), intents)).into();
 
         Self { config, shard }
     }
@@ -29,12 +30,12 @@ impl LyraBotManager {
         Ok(LyraBot::new(&self.config, self.shard.clone()).await?)
     }
 
-    pub async fn handle_events(&self, bot: Arc<LyraBot>) -> anyhow::Result<()> {
+    pub async fn handle_events(&mut self, bot: Arc<LyraBot>) -> anyhow::Result<()> {
         loop {
             let event = match self
                 .shard
-                .lock()
-                .expect("another user of `self.shard` must not panick while holding it")
+                .write()
+                .expect("`self.shard` must not be poisoned")
                 .next_event()
                 .await
             {
@@ -54,9 +55,10 @@ impl LyraBotManager {
             bot.standby().process(&event);
             bot.lavalink().process(&event).await?;
 
-            logging::spawn(events::handle(event, bot.clone()))
-        }
+            let ctx = EventHandlerContext::new(event, bot.clone(), self.shard.clone());
 
+            logging::spawn(events::handle(ctx))
+        }
         Ok(())
     }
 }

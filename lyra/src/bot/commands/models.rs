@@ -4,15 +4,16 @@ use std::{marker::PhantomData, sync::Arc};
 use async_trait::async_trait;
 use twilight_http::{Client as HttpClient, Response};
 use twilight_lavalink::Lavalink;
-use twilight_model::application::interaction::Interaction;
-use twilight_model::channel::message::{AllowedMentions, MessageFlags};
-use twilight_model::channel::Message;
-use twilight_model::gateway::payload::incoming::InteractionCreate;
-use twilight_model::http::interaction::{
-    InteractionResponse, InteractionResponseData, InteractionResponseType,
-};
 use twilight_model::{
-    application::interaction::{InteractionData, InteractionType},
+    application::interaction::{
+        application_command::CommandData, Interaction, InteractionData, InteractionType,
+    },
+    channel::{
+        message::{AllowedMentions, MessageFlags},
+        Message,
+    },
+    gateway::payload::incoming::InteractionCreate,
+    http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
         marker::{ChannelMarker, GuildMarker},
         Id,
@@ -44,9 +45,9 @@ pub trait ContextKind {}
 type RespondResult = anyhow::Result<Response<Message>>;
 
 impl Context<App> {
-    pub fn command_name(&self) -> String {
+    pub fn command_data(&self) -> CommandData {
         if let InteractionData::ApplicationCommand(data) = self.interaction_data() {
-            return data.name.clone();
+            return *data.clone();
         }
         unreachable!()
     }

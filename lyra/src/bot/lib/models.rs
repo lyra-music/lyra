@@ -1,11 +1,11 @@
 use std::{
     env,
     net::SocketAddr,
-    ops::Deref,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
 };
 
+use chrono::{DateTime, Duration, Utc};
 use hyper::client::{Client as HyperClient, HttpConnector};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::{Latency, MessageSender, Shard};
@@ -17,7 +17,7 @@ use twilight_lavalink::Lavalink;
 use twilight_model::{channel::message::AllowedMentions, oauth::Application};
 use twilight_standby::Standby;
 
-use crate::bot::commands::define::COMMANDS;
+use crate::bot::commands::declare::COMMANDS;
 
 pub struct LyraConfig {
     pub token: String,
@@ -53,14 +53,15 @@ pub struct LyraBot {
     http: HttpClient,
     lavalink: Lavalink,
     hyper: HyperClient<HttpConnector>,
-    shard: Arc<Mutex<Shard>>,
     standby: Standby,
+    sender: MessageSender,
+    latency: Arc<RwLock<Latency>>,
+    started: DateTime<Utc>,
 }
 
 impl LyraBot {
-    pub async fn new(config: &LyraConfig, shard: Arc<Mutex<Shard>>) -> anyhow::Result<Self> {
+    pub async fn new(config: &LyraConfig, shard: Arc<RwLock<Shard>>) -> anyhow::Result<Self> {
         let shard_count = 1u64;
-        let shard = Arc::clone(&shard);
 
         let (token, lavalink_addr, lavalink_auth) = config.as_tuple();
 
@@ -73,22 +74,30 @@ impl LyraBot {
         let lavalink = Lavalink::new(user_id, shard_count);
         lavalink.add(lavalink_addr, lavalink_auth).await?;
 
+        let sender = shard.read().expect("`shard` must not be poisoned").sender();
+        let latency = RwLock::new(
+            shard
+                .read()
+                .expect("`shard` must not be poisoned")
+                .latency()
+                .clone(),
+        )
+        .into();
+
         Ok(Self {
             cache: InMemoryCache::new(),
             http,
             lavalink,
             hyper: HyperClient::new(),
-            shard,
             standby: Standby::new(),
+            sender,
+            latency,
+            started: Utc::now(),
         })
     }
 
     pub fn cache(&self) -> &InMemoryCache {
         &self.cache
-    }
-
-    pub fn shard(&self) -> Arc<Mutex<Shard>> {
-        self.shard.clone()
     }
 
     pub fn http(&self) -> &HttpClient {
@@ -107,19 +116,30 @@ impl LyraBot {
         &self.standby
     }
 
-    pub fn sender(&self) -> MessageSender {
-        self.shard()
-            .lock()
-            .expect("another user of `self.shard` must not panick while holding it")
-            .sender()
+    pub fn sender(&self) -> &MessageSender {
+        &self.sender
+    }
+
+    pub fn started(&self) -> &DateTime<Utc> {
+        &self.started
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        Utc::now() - self.started
     }
 
     pub fn latency(&self) -> Latency {
-        self.shard()
-            .lock()
-            .expect("another user of `self.shard` must not panick while holding it")
-            .latency()
+        self.latency
+            .read()
+            .expect("`self.latency` must not be poisoned")
             .clone()
+    }
+
+    pub fn update_latency(&self, latency: Latency) {
+        *self
+            .latency
+            .write()
+            .expect("`self.latency` must not be poisoned") = latency;
     }
 
     pub async fn app(&self) -> anyhow::Result<Application> {
@@ -131,13 +151,9 @@ impl LyraBot {
     }
 
     pub async fn register_app_commands(&self) -> anyhow::Result<()> {
-        let commands = COMMANDS
-            .iter()
-            .map(|(_, c)| c.deref().clone())
-            .collect::<Vec<_>>();
-        let inter_client = self.interaction_client().await?;
+        let client = self.interaction_client().await?;
 
-        inter_client.set_global_commands(&commands).await?;
+        client.set_global_commands(COMMANDS.as_ref()).await?;
 
         Ok(())
     }

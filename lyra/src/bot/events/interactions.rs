@@ -1,8 +1,7 @@
-use crate::bot::commands::{define::COMMANDS, models::Context};
+use crate::bot::commands::{declare::handle_commands, models::Context};
 
-pub async fn handle(ctx: Context) -> anyhow::Result<()> {
-    if let Some((c, _)) = COMMANDS.iter().find(|(_, c)| c.name == ctx.command_name()) {
-        c.callback(ctx).await?;
-    }
+pub async fn handle_app(ctx: Context) -> anyhow::Result<()> {
+    handle_commands(ctx).await?;
+
     Ok(())
 }

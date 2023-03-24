@@ -7,7 +7,7 @@ pub async fn run() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let config = LyraConfig::from_env();
-    let bot_manager = LyraBotManager::new(config);
+    let mut bot_manager = LyraBotManager::new(config);
     let bot = Arc::new(bot_manager.build_bot().await?);
 
     bot.register_app_commands().await?;
