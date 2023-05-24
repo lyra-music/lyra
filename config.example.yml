@@ -1,5 +1,1 @@
-prefixes:
-- # your bot's prefixes - minimum of one prefix is needed
-- # second prefix
-- # third prefix, and so on
 emoji_guild: 777069316247126036 # your bot's emoji guild - change this if you want to add your own custom emojis

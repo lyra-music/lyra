@@ -4,7 +4,6 @@ use twilight_interactions::command::CommandModel;
 use twilight_interactions::command::CreateCommand;
 use twilight_model::application::command::Command;
 
-use crate::bot::commands::models::App;
 use crate::bot::commands::models::Context;
 use crate::bot::commands::models::LyraCommand;
 use crate::bot::modules::{connections::Join, misc::Ping};
@@ -27,7 +26,7 @@ macro_rules! declare_commands {
             )*
         ]);
 
-        pub async fn handle_commands(ctx: Context<App>) -> anyhow::Result<()> {
+        pub async fn handle_commands(ctx: Context) -> anyhow::Result<()> {
             let cmd_data = ctx.command_data();
 
             match cmd_data.name.to_case(Case::Pascal).as_str() {

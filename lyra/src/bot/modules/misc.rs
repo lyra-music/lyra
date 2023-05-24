@@ -10,13 +10,13 @@ pub struct Ping;
 #[async_trait]
 impl LyraCommand for Ping {
     async fn callback(&self, ctx: Context) -> anyhow::Result<()> {
-        match ctx.bot().latency().average() {
+        match ctx.bot().latency().await.average() {
             Some(latency) => {
                 ctx.respond(&format!("🏓 Pong! `({}ms)`", latency.as_millis()))
                     .await?;
             }
             None => {
-                ctx.ephem("‼️ Bot is still starting up, please try again later.")
+                ctx.ephem("‼️ Cannot calculate the ping at the moment, try again later.")
                     .await?;
             }
         }

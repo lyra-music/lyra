@@ -1,7 +1,8 @@
 mod client;
 mod commands;
-mod events;
+mod gateway;
 mod inc;
+mod lavalink;
 mod lib;
 mod manager;
 mod modules;

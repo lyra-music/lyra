@@ -43,7 +43,8 @@ impl LyraCommand for Join {
         // ))?;
 
         // ctx.respond(&format!("Joined <#{channel_id}>!")).await?;
-        ctx.respond(&format!("{:#?}", self.channel)).await?;
+        ctx.respond(&format!("```rs\n{:#?}```", self.channel))
+            .await?;
 
         Ok(())
     }

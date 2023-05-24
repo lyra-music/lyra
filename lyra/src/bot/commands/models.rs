@@ -22,7 +22,7 @@ use twilight_model::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use crate::bot::lib::models::LyraBot;
+use crate::bot::lib::models::Lyra;
 use lyra_proc::declare_kinds;
 
 #[async_trait]
@@ -31,11 +31,8 @@ pub trait LyraCommand: Sync + Send {
 }
 
 #[declare_kinds(App, Component, Modal, Autocomplete)]
-pub struct Context<Kind = App>
-where
-    Kind: ContextKind,
-{
-    bot: Arc<LyraBot>,
+pub struct Context<Kind: ContextKind = App> {
+    bot: Arc<Lyra>,
     interaction: Box<InteractionCreate>,
     kind: PhantomData<Kind>,
 }
@@ -44,7 +41,7 @@ pub trait ContextKind {}
 
 type RespondResult = anyhow::Result<Response<Message>>;
 
-impl Context<App> {
+impl Context {
     pub fn command_data(&self) -> CommandData {
         if let InteractionData::ApplicationCommand(data) = self.interaction_data() {
             return *data.clone();
@@ -53,11 +50,8 @@ impl Context<App> {
     }
 }
 
-impl<Kind> Context<Kind>
-where
-    Kind: ContextKind,
-{
-    pub fn bot(&self) -> &Arc<LyraBot> {
+impl<Kind: ContextKind> Context<Kind> {
+    pub const fn bot(&self) -> &Arc<Lyra> {
         &self.bot
     }
 

@@ -1,6 +1,8 @@
 mod handle;
 mod heartbeats;
 mod interactions;
-pub mod models;
+mod models;
+mod shards;
 
 pub use handle::handle;
+pub use models::Context;

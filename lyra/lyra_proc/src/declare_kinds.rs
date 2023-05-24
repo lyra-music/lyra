@@ -37,7 +37,7 @@ pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
         impl ContextKind for #kinds {}
 
         impl Context<#kinds> {
-            pub fn #fn_idents(interaction: Box<InteractionCreate>, bot: Arc<LyraBot>) -> Context<#kinds> {
+            pub fn #fn_idents(interaction: Box<InteractionCreate>, bot: Arc<Lyra>) -> Context<#kinds> {
                 if let InteractionType::#inter_types = interaction.kind {
                     return Self {
                         bot,
