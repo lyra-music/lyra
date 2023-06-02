@@ -2,6 +2,11 @@ use std::ops::Deref;
 use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use twilight_cache_inmemory::{
+    model::{CachedGuild, CachedMember, CachedVoiceState},
+    InMemoryCache,
+};
 use twilight_http::{Client as HttpClient, Response};
 use twilight_lavalink::Lavalink;
 use twilight_model::{
@@ -10,18 +15,22 @@ use twilight_model::{
     },
     channel::{
         message::{AllowedMentions, MessageFlags},
-        Message,
+        Channel, Message,
     },
     gateway::payload::incoming::InteractionCreate,
+    guild::Permissions,
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{ChannelMarker, GuildMarker},
+        marker::{ChannelMarker, GuildMarker, UserMarker},
         Id,
     },
     user::User,
 };
-use twilight_util::builder::InteractionResponseDataBuilder;
+use twilight_util::{
+    builder::InteractionResponseDataBuilder, permission_calculator::PermissionCalculator,
+};
 
+use super::errors::{Error, Result};
 use crate::bot::lib::models::Lyra;
 use lyra_proc::declare_kinds;
 
@@ -31,13 +40,14 @@ pub trait LyraCommand: Sync + Send {
 }
 
 #[declare_kinds(App, Component, Modal, Autocomplete)]
+#[derive(Clone)]
 pub struct Context<Kind: ContextKind = App> {
     bot: Arc<Lyra>,
     interaction: Box<InteractionCreate>,
     kind: PhantomData<Kind>,
 }
 
-pub trait ContextKind {}
+pub trait ContextKind: Sync {}
 
 type RespondResult = anyhow::Result<Response<Message>>;
 
@@ -55,29 +65,91 @@ impl<Kind: ContextKind> Context<Kind> {
         &self.bot
     }
 
+    pub fn cache(&self) -> &InMemoryCache {
+        self.bot.cache()
+    }
+
     pub fn http(&self) -> &HttpClient {
-        &self.bot.http()
+        self.bot.http()
     }
 
     pub fn lavalink(&self) -> &Lavalink {
         self.bot.lavalink()
     }
 
-    pub fn guild_id(&self) -> &Option<Id<GuildMarker>> {
-        &self.interaction.guild_id
+    pub fn bot_member(&self) -> Result<CachedMember> {
+        Ok(self
+            .cache()
+            .member(self.guild_id_unchecked(), self.bot().user_id())
+            .ok_or(Error::Cache)?
+            .clone())
     }
 
-    pub fn channel_id(&self) -> Id<ChannelMarker> {
+    pub fn bot_permissions_for(&self, channel: Id<ChannelMarker>) -> Result<Permissions> {
+        let guild_id = self.guild_id_unchecked();
+        let everyone_role = self.cache().role(guild_id.cast()).ok_or(Error::Cache)?;
+        let bot_roles = self
+            .bot_member()?
+            .roles()
+            .into_par_iter()
+            .map(|&r| {
+                let role = self.cache().role(r).expect("role must exist in cache");
+                (r, role.permissions)
+            })
+            .collect::<Vec<_>>();
+        let channel = self.cache().channel(channel).ok_or(Error::Cache)?;
+
+        let permission_calculator = PermissionCalculator::new(
+            guild_id,
+            self.bot().user_id(),
+            everyone_role.permissions,
+            &bot_roles,
+        );
+
+        Ok(permission_calculator.in_channel(
+            channel.kind,
+            channel
+                .permission_overwrites
+                .as_ref()
+                .ok_or(Error::Cache)?
+                .as_slice(),
+        ))
+    }
+
+    pub fn get_guild(&self) -> Option<CachedGuild> {
+        self.cache().guild(self.guild_id()?)?.clone().into()
+    }
+
+    pub fn guild_id(&self) -> Option<Id<GuildMarker>> {
+        self.interaction.guild_id
+    }
+
+    pub fn guild_id_unchecked(&self) -> Id<GuildMarker> {
+        self.guild_id()
+            .expect("this interaction must be executed in guilds")
+    }
+
+    pub fn channel(&self) -> &Channel {
         self.interaction
-            .channel_id
+            .channel
+            .as_ref()
             .expect("`interaction.channel_id` must not be `None`")
     }
 
+    #[inline]
+    pub fn channel_id(&self) -> Id<ChannelMarker> {
+        self.channel().id
+    }
+
     pub fn author(&self) -> &User {
-        &self
-            .interaction
+        self.interaction
             .author()
             .expect("`interaction.author()` must not be `None`")
+    }
+
+    #[inline]
+    pub fn author_id(&self) -> Id<UserMarker> {
+        self.author().id
     }
 
     fn resp_builder(&self) -> InteractionResponseDataBuilder {
@@ -90,12 +162,12 @@ impl<Kind: ContextKind> Context<Kind> {
             .content(message)
             .flags(MessageFlags::EPHEMERAL)
             .build();
-        Ok(self.respond_rich(Some(data)).await?)
+        self.respond_rich(Some(data)).await
     }
 
     pub async fn respond(&self, message: &str) -> RespondResult {
         let data = self.resp_builder().content(message).build();
-        Ok(self.respond_rich(Some(data)).await?)
+        self.respond_rich(Some(data)).await
     }
 
     pub async fn respond_rich(&self, data: Option<InteractionResponseData>) -> RespondResult {
@@ -124,5 +196,22 @@ impl<Kind: ContextKind> Context<Kind> {
             .data
             .as_ref()
             .expect("`interaction.data` must not be `None`")
+    }
+
+    pub fn author_permissions(&self) -> Permissions {
+        self.interaction
+            .member
+            .as_ref()
+            .expect("this interaction must be executed in guilds")
+            .permissions
+            .expect("this field should exist")
+    }
+
+    pub fn current_voice_state(&self) -> Option<CachedVoiceState> {
+        let user = self.bot().user_id();
+        self.cache()
+            .voice_state(user, self.guild_id_unchecked())
+            .as_deref()
+            .cloned()
     }
 }

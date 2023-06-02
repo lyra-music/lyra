@@ -7,6 +7,7 @@ use anyhow::Context;
 use tokio::sync::RwLock;
 use twilight_gateway::{error::ReceiveMessageErrorType, CloseFrame, Event, MessageSender};
 use twilight_gateway::{Intents, Shard, ShardId};
+use twilight_lavalink::model::IncomingEvent;
 
 use super::gateway;
 use super::lavalink;
@@ -25,8 +26,7 @@ impl BotManager {
     pub fn new(config: LyraConfig) -> Self {
         let LyraConfig { token, .. } = &config;
 
-        let intents: Intents =
-            Intents::GUILD_MESSAGES | Intents::GUILD_VOICE_STATES | Intents::MESSAGE_CONTENT;
+        let intents: Intents = Intents::GUILDS | Intents::GUILD_VOICE_STATES;
         let shard_id = ShardId::ONE;
         let shard = Shard::new(shard_id, token.clone(), intents);
         let sender = shard.sender();
@@ -44,7 +44,7 @@ impl BotManager {
     }
 
     pub async fn build_bot(&self) -> anyhow::Result<Lyra> {
-        Ok(Lyra::new(self.config.clone(), self.shard.clone()).await?)
+        Lyra::new(self.config.clone(), self.shard.clone()).await
     }
 
     pub async fn handle_shutdown(&self, bot: Arc<Lyra>) -> anyhow::Result<()> {
@@ -89,14 +89,14 @@ impl BotManager {
     pub async fn handle_lavalink_events(&self, bot: Arc<Lyra>) -> anyhow::Result<()> {
         loop {
             match bot.next_lavalink_event().await {
+                None | Some(IncomingEvent::WeboscketClosed(_)) if self.is_shutting_down() => {
+                    tracing::debug!("lavalink shutdown");
+                    return Ok(());
+                }
                 Some(event) => {
                     let ctx = lavalink::Context::new(event, bot.clone());
 
                     traced::tokio_spawn(lavalink::handle(ctx))
-                }
-                None if self.is_shutting_down() => {
-                    tracing::debug!("lavalink shutdown");
-                    return Ok(());
                 }
                 _ => {}
             }

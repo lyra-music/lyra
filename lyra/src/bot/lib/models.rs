@@ -2,7 +2,7 @@ use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use hyper::client::{Client as HyperClient, HttpConnector};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 use twilight_cache_inmemory::InMemoryCache;
@@ -12,7 +12,12 @@ use twilight_http::{
     Client as HttpClient,
 };
 use twilight_lavalink::{model::IncomingEvent, node::IncomingEvents, Lavalink};
-use twilight_model::{channel::message::AllowedMentions, oauth::Application};
+use twilight_model::{
+    channel::message::AllowedMentions,
+    id::{marker::UserMarker, Id},
+    oauth::Application,
+    user::CurrentUser,
+};
 use twilight_standby::Standby;
 
 use crate::bot::commands::declare::COMMANDS;
@@ -51,6 +56,7 @@ pub struct Lyra {
     cache: InMemoryCache,
     http: HttpClient,
     lavalink: LavalinkComponent,
+    db: Pool<Postgres>,
     hyper: HyperClient<HttpConnector>,
     standby: Standby,
     sender: MessageSender,
@@ -81,7 +87,7 @@ impl Lyra {
         let sender = shard.read().await.sender();
         let latency = RwLock::new(shard.read().await.latency().clone()).into();
 
-        let pool = PgPoolOptions::new()
+        let db = PgPoolOptions::new()
             .max_connections(5)
             .connect(&database_url)
             .await?;
@@ -96,6 +102,7 @@ impl Lyra {
             cache: InMemoryCache::new(),
             http,
             lavalink,
+            db,
             hyper: HyperClient::new(),
             standby: Standby::new(),
             sender,
@@ -104,7 +111,7 @@ impl Lyra {
         })
     }
 
-    pub const fn cache(&self) -> &InMemoryCache {
+    pub fn cache(&self) -> &InMemoryCache {
         &self.cache
     }
 
@@ -118,6 +125,10 @@ impl Lyra {
 
     pub const fn lavalink(&self) -> &Lavalink {
         &self.lavalink.client
+    }
+
+    pub const fn db(&self) -> &Pool<Postgres> {
+        &self.db
     }
 
     pub const fn standby(&self) -> &Standby {
@@ -166,5 +177,16 @@ impl Lyra {
         client.set_global_commands(COMMANDS.as_ref()).await?;
 
         Ok(())
+    }
+
+    pub fn user(&self) -> CurrentUser {
+        self.cache
+            .current_user()
+            .expect("current user object must be available")
+    }
+
+    #[inline]
+    pub fn user_id(&self) -> Id<UserMarker> {
+        self.user().id
     }
 }
