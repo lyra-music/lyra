@@ -6,6 +6,7 @@ use twilight_model::application::command::Command;
 
 use crate::bot::commands::models::Context;
 use crate::bot::commands::models::LyraCommand;
+use crate::bot::modules::connections::Leave;
 use crate::bot::modules::{connections::Join, misc::Ping};
 
 macro_rules! replace_expr {
@@ -40,4 +41,4 @@ macro_rules! declare_commands {
 
 }
 
-declare_commands!(Ping, Join);
+declare_commands!(Ping, Join, Leave);

@@ -28,10 +28,11 @@ pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
         .iter()
         .map(|kc| format!("`interaction.kind` must be `{}`", &kc));
 
-    let gen = quote!(
+    quote!(
         #input
 
         #(
+        #[derive(Clone)]
         pub struct #kinds;
 
         impl ContextKind for #kinds {}
@@ -48,6 +49,5 @@ pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
                 panic!(#panic_msgs)
             }
         })*
-    );
-    gen.into()
+    ).into()
 }

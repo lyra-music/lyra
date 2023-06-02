@@ -22,7 +22,7 @@ pub fn get_dominant_palette_from_image(
         .par_iter()
         .filter(|x| x.alpha == 255)
         .map(|x| x.into_format::<_, f32>().into_color())
-        .collect::<Vec<Lab>>();
+        .collect::<Vec<_>>();
 
     let result = (0..RUNS)
         .map(|i| {
@@ -47,6 +47,6 @@ pub fn get_dominant_palette_from_image(
                 .into_format::<u8>()
                 .into_u32::<Rgba>()
         })
-        .collect::<Vec<u32>>();
+        .collect::<Vec<_>>();
     rgb
 }
