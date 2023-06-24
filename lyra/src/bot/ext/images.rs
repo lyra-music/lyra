@@ -1,4 +1,4 @@
-use image;
+use image::{self, imageops::FilterType, DynamicImage, GenericImageView};
 use kmeans_colors::{get_kmeans_hamerly, Sort};
 use palette::{rgb::channels::Rgba, FromColor, IntoColor, Lab, Pixel, Srgb, Srgba};
 use rayon::prelude::*;
@@ -49,4 +49,35 @@ pub fn get_dominant_palette_from_image(
         })
         .collect::<Vec<_>>();
     rgb
+}
+
+pub fn limit_image_file_size(image: DynamicImage, limit: u64) -> DynamicImage {
+    let (x, y) = image.dimensions();
+    let bytes_per_pixel = image.color().bytes_per_pixel() as u32;
+
+    let max_image_size = (x * y * bytes_per_pixel) as u64;
+    if max_image_size <= limit {
+        return image;
+    }
+
+    let x_to_y = x as f64 / y as f64;
+
+    let new_y = ((limit as f64) / (bytes_per_pixel as f64 * x_to_y)).sqrt();
+    let new_x = new_y * x_to_y;
+
+    image.resize(new_x as u32, new_y as u32, FilterType::Lanczos3)
+}
+
+#[cfg(test)]
+mod test {
+    use super::limit_image_file_size;
+
+    #[test]
+    fn test_limit_image_byte_size() {
+        let image = image::open("../assets/lyra2-X.png").unwrap_or_else(|e| panic!("{e:#?}"));
+        let new_image = limit_image_file_size(image, 8 * 2_u64.pow(20));
+        new_image
+            .save("../assets/lyra2-XD.png")
+            .unwrap_or_else(|e| panic!("{e:#?}"));
+    }
 }
