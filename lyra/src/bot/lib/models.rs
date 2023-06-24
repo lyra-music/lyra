@@ -1,31 +1,54 @@
-use std::{env, net::SocketAddr, str::FromStr, sync::Arc};
-
-use chrono::{DateTime, Duration, Utc};
-use hyper::client::{Client as HyperClient, HttpConnector};
-use sqlx::postgres::PgPoolOptions;
-use tokio::sync::RwLock;
-use tokio_stream::StreamExt;
-use twilight_cache_inmemory::InMemoryCache;
-use twilight_gateway::{Latency, MessageSender, Shard};
-use twilight_http::{
-    client::{ClientBuilder, InteractionClient},
-    Client as HttpClient,
+use std::{
+    env,
+    net::SocketAddr,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
-use twilight_lavalink::{model::IncomingEvent, node::IncomingEvents, Lavalink};
-use twilight_model::{channel::message::AllowedMentions, oauth::Application};
+
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use hyper::client::{Client as HyperClient, HttpConnector};
+use log::LevelFilter;
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    ConnectOptions, Pool, Postgres,
+};
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::{client::InteractionClient, Client as HttpClient, Response};
+use twilight_model::{
+    application::interaction::Interaction,
+    channel::{
+        message::{AllowedMentions, MessageFlags},
+        Message,
+    },
+    http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
+    id::{marker::UserMarker, Id},
+    oauth::Application,
+    user::CurrentUser,
+};
 use twilight_standby::Standby;
+use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::commands::declare::COMMANDS;
 
+pub type RespondResult = Result<Response<Message>>;
+
+pub trait Cacheful {
+    fn cache(&self) -> &InMemoryCache;
+}
+
 #[derive(Clone)]
-pub struct LyraConfig {
+pub struct Config {
     pub token: String,
     pub lavalink_addr: SocketAddr,
     pub lavalink_auth: String,
     pub database_url: String,
 }
 
-impl LyraConfig {
+impl Config {
     pub fn from_env() -> Self {
         Self {
             token: env::var("BOT_TOKEN").expect("`BOT_TOKEN` must be set"),
@@ -41,130 +64,174 @@ impl LyraConfig {
     }
 }
 
-struct LavalinkComponent {
-    client: Lavalink,
-    rx: Arc<RwLock<IncomingEvents>>,
+pub struct LyraInfo {
+    started: DateTime<Utc>,
+    guild_count: AtomicUsize,
+}
+
+impl LyraInfo {
+    pub fn guild_count(&self) -> usize {
+        self.guild_count.load(Ordering::Relaxed)
+    }
+
+    pub fn set_guild_count(&self, guild_count: usize) {
+        self.guild_count.store(guild_count, Ordering::Relaxed);
+    }
+
+    pub fn increment_guild_count(&self) {
+        self.guild_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn decrement_guild_count(&self) {
+        self.guild_count.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 pub struct Lyra {
-    config: LyraConfig,
-    cache: InMemoryCache,
-    http: HttpClient,
-    lavalink: LavalinkComponent,
+    config: Config,
+    cache: Arc<InMemoryCache>,
+    http: Arc<HttpClient>,
+    db: Pool<Postgres>,
     hyper: HyperClient<HttpConnector>,
     standby: Standby,
-    sender: MessageSender,
-    latency: Arc<RwLock<Latency>>,
-    started: DateTime<Utc>,
+    info: LyraInfo,
 }
 
 impl Lyra {
-    pub async fn new(config: LyraConfig, shard: Arc<RwLock<Shard>>) -> anyhow::Result<Self> {
-        let shard_count = 1u64;
+    pub async fn new(config: Config, http: Arc<HttpClient>) -> Result<Self> {
+        let Config {
+            ref database_url, ..
+        } = config;
 
-        let LyraConfig {
-            token,
-            lavalink_addr,
-            lavalink_auth,
-            database_url,
-        } = config.clone();
-
-        let http = ClientBuilder::default()
-            .default_allowed_mentions(AllowedMentions::default())
-            .token(token)
-            .build();
-        let user_id = http.current_user().await?.model().await?.id;
-
-        let lavalink_client = Lavalink::new(user_id, shard_count);
-        let (_, lavalink_rx) = lavalink_client.add(lavalink_addr, lavalink_auth).await?;
-
-        let sender = shard.read().await.sender();
-        let latency = RwLock::new(shard.read().await.latency().clone()).into();
-
-        let pool = PgPoolOptions::new()
+        let mut options = PgConnectOptions::from_str(database_url.as_str())?;
+        options.log_statements(LevelFilter::Debug);
+        let db = PgPoolOptions::new()
             .max_connections(5)
-            .connect(&database_url)
+            .connect_with(options)
             .await?;
 
-        let lavalink = LavalinkComponent {
-            client: lavalink_client,
-            rx: RwLock::new(lavalink_rx).into(),
+        let info = LyraInfo {
+            started: Utc::now(),
+            guild_count: AtomicUsize::new(0),
         };
 
         Ok(Self {
             config,
-            cache: InMemoryCache::new(),
+            cache: InMemoryCache::new().into(),
             http,
-            lavalink,
+            db,
             hyper: HyperClient::new(),
             standby: Standby::new(),
-            sender,
-            latency,
-            started: Utc::now(),
+            info,
         })
     }
 
-    pub const fn cache(&self) -> &InMemoryCache {
-        &self.cache
+    pub fn clone_cache(&self) -> Arc<InMemoryCache> {
+        self.cache.clone()
     }
 
-    pub const fn http(&self) -> &HttpClient {
+    pub fn http(&self) -> &HttpClient {
         &self.http
+    }
+
+    pub fn clone_http(&self) -> Arc<HttpClient> {
+        self.http.clone()
     }
 
     pub const fn hyper(&self) -> &HyperClient<HttpConnector> {
         &self.hyper
     }
 
-    pub const fn lavalink(&self) -> &Lavalink {
-        &self.lavalink.client
+    pub const fn db(&self) -> &Pool<Postgres> {
+        &self.db
     }
 
     pub const fn standby(&self) -> &Standby {
         &self.standby
     }
 
-    pub const fn sender(&self) -> &MessageSender {
-        &self.sender
+    pub const fn info(&self) -> &LyraInfo {
+        &self.info
     }
 
-    pub const fn started(&self) -> &DateTime<Utc> {
-        &self.started
-    }
-
-    pub fn elapsed(&self) -> Duration {
-        Utc::now() - self.started
-    }
-
-    pub async fn disconnect_lavalink(&self) {
-        self.lavalink.client.disconnect(self.config.lavalink_addr);
-    }
-
-    pub async fn next_lavalink_event(&self) -> Option<IncomingEvent> {
-        self.lavalink.rx.write().await.next().await
-    }
-
-    pub async fn latency(&self) -> Latency {
-        self.latency.read().await.clone()
-    }
-
-    pub async fn update_latency(&self, latency: Latency) {
-        *self.latency.write().await = latency;
-    }
-
-    pub async fn app(&self) -> anyhow::Result<Application> {
+    pub async fn app(&self) -> Result<Application> {
         Ok(self.http.current_user_application().await?.model().await?)
     }
 
-    pub async fn interaction_client(&self) -> anyhow::Result<InteractionClient> {
+    pub async fn interaction_client(&self) -> Result<InteractionClient> {
         Ok(self.http.interaction(self.app().await?.id))
     }
 
-    pub async fn register_app_commands(&self) -> anyhow::Result<()> {
+    pub async fn register_app_commands(&self) -> Result<()> {
         let client = self.interaction_client().await?;
 
         client.set_global_commands(COMMANDS.as_ref()).await?;
 
         Ok(())
+    }
+
+    pub fn user(&self) -> CurrentUser {
+        self.cache
+            .current_user()
+            .expect("current user object must be available")
+    }
+
+    #[inline]
+    pub fn user_id(&self) -> Id<UserMarker> {
+        self.user().id
+    }
+
+    pub fn base_interaction_response_data_builder() -> InteractionResponseDataBuilder {
+        InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
+    }
+
+    pub async fn ephem_to(
+        &self,
+        interaction: &Interaction,
+        content: impl Into<String>,
+    ) -> RespondResult {
+        let data = Self::base_interaction_response_data_builder()
+            .content(content)
+            .flags(MessageFlags::EPHEMERAL)
+            .build();
+        self.respond_rich_to(interaction, Some(data)).await
+    }
+
+    pub async fn respond_to(
+        &self,
+        interaction: &Interaction,
+        content: impl Into<String>,
+    ) -> RespondResult {
+        let data = Self::base_interaction_response_data_builder()
+            .content(content)
+            .build();
+        self.respond_rich_to(interaction, Some(data)).await
+    }
+
+    pub async fn respond_rich_to(
+        &self,
+        interaction: &Interaction,
+        data: Option<InteractionResponseData>,
+    ) -> RespondResult {
+        let client = self.interaction_client().await?;
+
+        client
+            .create_response(
+                interaction.id,
+                &interaction.token,
+                &InteractionResponse {
+                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    data,
+                },
+            )
+            .await?;
+
+        Ok(client.response(&interaction.token).await?)
+    }
+}
+
+impl Cacheful for Lyra {
+    fn cache(&self) -> &InMemoryCache {
+        &self.cache
     }
 }

@@ -1,13 +1,15 @@
+use std::ops::Deref;
+
 use proc_macro::{Span, TokenStream};
 use quote::quote;
 use syn::{self, Ident};
 
 use crate::models::Args;
 
-pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
-    let kinds = &args.0;
+pub(super) fn impl_declare_kinds(kinds: &Args, input: &syn::ItemStruct) -> TokenStream {
+    let ref kinds = kinds.deref();
     let _kinds = kinds.iter().map(|i| i.to_string()).collect::<Vec<_>>();
-    let _kind_snake = _kinds.iter().map(|k| k.to_lowercase()).collect::<Vec<_>>();
+    let mut _kind_snake = _kinds.iter().map(|k| k.to_lowercase()).collect::<Vec<_>>();
     let inter_types = _kinds.iter().map(|k| {
         let k_str = match k.as_ref() {
             "App" => "ApplicationCommand",
@@ -18,7 +20,7 @@ pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
         };
         Ident::new(&k_str, Span::call_site().into()).to_owned()
     });
-    let fn_idents = _kind_snake.iter().map(|k| {
+    let fn_idents = _kind_snake.iter_mut().map(|k| {
         Ident::new(
             &format!("from_{}_interaction", &k),
             Span::call_site().into(),
@@ -28,26 +30,27 @@ pub fn impl_declare_kinds(args: &Args, input: &syn::ItemStruct) -> TokenStream {
         .iter()
         .map(|kc| format!("`interaction.kind` must be `{}`", &kc));
 
-    let gen = quote!(
+    quote! {
         #input
 
         #(
+        #[derive(Copy, Clone)]
         pub struct #kinds;
 
         impl ContextKind for #kinds {}
 
         impl Context<#kinds> {
-            pub fn #fn_idents(interaction: Box<InteractionCreate>, bot: Arc<Lyra>) -> Context<#kinds> {
-                if let InteractionType::#inter_types = interaction.kind {
+            pub fn #fn_idents(event: Box<InteractionCreate>, bot: Arc<ContextedLyra>) -> Context<#kinds> {
+                if let InteractionType::#inter_types = event.kind {
                     return Self {
                         bot,
-                        interaction,
+                        inner: event,
                         kind: PhantomData::<#kinds>,
                     };
                 }
                 panic!(#panic_msgs)
             }
         })*
-    );
-    gen.into()
+    }
+    .into()
 }

@@ -1,7 +1,9 @@
 mod bot;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv()?;
-    bot::run().await
+async fn main() {
+    dotenv::dotenv().ok();
+    if let Err(why) = bot::run().await {
+        tracing::error!("unhandled error: {why:#?}")
+    }
 }

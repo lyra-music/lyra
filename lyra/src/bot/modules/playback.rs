@@ -1,9 +1,13 @@
+use anyhow::Result;
 use twilight_lavalink::model::{Pause, Seek, Stop};
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
-use crate::bot::commands::models::Context;
+use crate::bot::{
+    commands::{models::App, Context},
+    lavalink::Lavalinkful,
+};
 
-pub async fn pause(ctx: Context) -> anyhow::Result<()> {
+pub async fn pause(ctx: Context<App>) -> Result<()> {
     tracing::debug!(
         "pause command in channel {} by {}",
         ctx.channel_id(),
@@ -22,7 +26,7 @@ pub async fn pause(ctx: Context) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn seek(ctx: Context) -> anyhow::Result<()> {
+pub async fn seek(ctx: Context<App>) -> Result<()> {
     let bot = ctx.bot();
     let (author, channel_id) = (ctx.author(), ctx.channel_id());
 
@@ -50,7 +54,7 @@ pub async fn seek(ctx: Context) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn stop(ctx: Context) -> anyhow::Result<()> {
+pub async fn stop(ctx: Context<App>) -> Result<()> {
     tracing::debug!(
         "stop command in channel {} by {}",
         ctx.channel_id(),
