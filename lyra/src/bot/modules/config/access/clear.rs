@@ -108,7 +108,7 @@ impl LyraCommand for Clear {
                     ctx.bot()
                         .respond_to(
                             &interaction,
-                            format!("{} Cancled running a destructive command.", NOTICE),
+                            format!("{} Canceled running a destructive command.", NOTICE),
                         )
                         .await?;
                     return Ok(());
