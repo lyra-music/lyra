@@ -10,15 +10,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
+  test:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: Check
-      working-directory: lyra
-      run: cargo check --verbose
     - name: Run tests
       working-directory: lyra
       run: cargo test --verbose
