@@ -1,119 +1,88 @@
-use std::ops::Deref;
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, ops::Deref, sync::Arc};
 
+use anyhow::Result;
 use async_trait::async_trait;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use sqlx::{Pool, Postgres};
 use twilight_cache_inmemory::{
     model::{CachedGuild, CachedMember, CachedVoiceState},
     InMemoryCache,
 };
-use twilight_http::{Client as HttpClient, Response};
-use twilight_lavalink::Lavalink;
+use twilight_http::Client as HttpClient;
 use twilight_model::{
     application::interaction::{
         application_command::CommandData, Interaction, InteractionData, InteractionType,
     },
     channel::{
-        message::{AllowedMentions, MessageFlags},
-        Channel, Message,
+        message::{component::ActionRow, Embed, MessageFlags},
+        Channel,
     },
     gateway::payload::incoming::InteractionCreate,
-    guild::Permissions,
+    guild::{PartialMember, Permissions},
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{ChannelMarker, GuildMarker, UserMarker},
+        marker::{ChannelMarker, CommandMarker, GuildMarker, UserMarker},
         Id,
     },
     user::User,
 };
-use twilight_util::{
-    builder::InteractionResponseDataBuilder, permission_calculator::PermissionCalculator,
-};
+use twilight_util::builder::InteractionResponseDataBuilder;
 
-use super::errors::{Error, Result};
-use crate::bot::lib::models::Lyra;
+use super::errors;
+use crate::bot::{
+    gateway::ContextedLyra,
+    lavalink::{Lavalink, Lavalinkful},
+    lib::models::{Cacheful, Lyra, RespondResult},
+};
 use lyra_proc::declare_kinds;
 
+pub trait ResolvedCommandInfo {
+    fn id() -> Id<CommandMarker>;
+    fn name() -> String;
+}
+
 #[async_trait]
-pub trait LyraCommand: Sync + Send {
-    async fn callback(&self, ctx: Context) -> anyhow::Result<()>;
+pub trait LyraCommand: ResolvedCommandInfo {
+    async fn execute(self, ctx: Context<App>) -> Result<()>;
 }
 
 #[declare_kinds(App, Component, Modal, Autocomplete)]
 #[derive(Clone)]
-pub struct Context<Kind: ContextKind = App> {
-    bot: Arc<Lyra>,
-    interaction: Box<InteractionCreate>,
+pub struct Context<Kind: ContextKind> {
+    inner: Box<InteractionCreate>,
+    bot: Arc<ContextedLyra>,
     kind: PhantomData<Kind>,
 }
 
 pub trait ContextKind: Sync {}
 
-type RespondResult = anyhow::Result<Response<Message>>;
-
-impl Context {
-    pub fn command_data(&self) -> CommandData {
+impl Context<App> {
+    pub fn command_data(&self) -> &CommandData {
         if let InteractionData::ApplicationCommand(data) = self.interaction_data() {
-            return *data.clone();
+            return data;
         }
         unreachable!()
     }
 }
 
 impl<Kind: ContextKind> Context<Kind> {
-    pub const fn bot(&self) -> &Arc<Lyra> {
+    pub fn bot(&self) -> &ContextedLyra {
         &self.bot
-    }
-
-    pub fn cache(&self) -> &InMemoryCache {
-        self.bot.cache()
     }
 
     pub fn http(&self) -> &HttpClient {
         self.bot.http()
     }
 
-    pub fn lavalink(&self) -> &Lavalink {
-        self.bot.lavalink()
+    pub fn db(&self) -> &Pool<Postgres> {
+        self.bot.db()
     }
 
-    pub fn bot_member(&self) -> Result<CachedMember> {
+    pub fn bot_member(&self) -> errors::Result<CachedMember> {
         Ok(self
             .cache()
             .member(self.guild_id_unchecked(), self.bot().user_id())
-            .ok_or(Error::Cache)?
+            .ok_or(errors::Error::Cache)?
             .clone())
-    }
-
-    pub fn bot_permissions_for(&self, channel: Id<ChannelMarker>) -> Result<Permissions> {
-        let guild_id = self.guild_id_unchecked();
-        let everyone_role = self.cache().role(guild_id.cast()).ok_or(Error::Cache)?;
-        let bot_roles = self
-            .bot_member()?
-            .roles()
-            .into_par_iter()
-            .map(|&r| {
-                let role = self.cache().role(r).expect("role must exist in cache");
-                (r, role.permissions)
-            })
-            .collect::<Vec<_>>();
-        let channel = self.cache().channel(channel).ok_or(Error::Cache)?;
-
-        let permission_calculator = PermissionCalculator::new(
-            guild_id,
-            self.bot().user_id(),
-            everyone_role.permissions,
-            &bot_roles,
-        );
-
-        Ok(permission_calculator.in_channel(
-            channel.kind,
-            channel
-                .permission_overwrites
-                .as_ref()
-                .ok_or(Error::Cache)?
-                .as_slice(),
-        ))
     }
 
     pub fn get_guild(&self) -> Option<CachedGuild> {
@@ -121,7 +90,7 @@ impl<Kind: ContextKind> Context<Kind> {
     }
 
     pub fn guild_id(&self) -> Option<Id<GuildMarker>> {
-        self.interaction.guild_id
+        self.inner.guild_id
     }
 
     pub fn guild_id_unchecked(&self) -> Id<GuildMarker> {
@@ -129,22 +98,29 @@ impl<Kind: ContextKind> Context<Kind> {
             .expect("this interaction must be executed in guilds")
     }
 
-    pub fn channel(&self) -> &Channel {
-        self.interaction
-            .channel
-            .as_ref()
-            .expect("`interaction.channel_id` must not be `None`")
-    }
-
     #[inline]
     pub fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel().id
     }
 
+    pub fn channel(&self) -> &Channel {
+        self.inner
+            .channel
+            .as_ref()
+            .expect("`self.inner.channel` must not be `None`")
+    }
+
     pub fn author(&self) -> &User {
-        self.interaction
+        self.inner
             .author()
-            .expect("`interaction.author()` must not be `None`")
+            .expect("`self.inner.author()` must not be `None`")
+    }
+
+    pub fn member(&self) -> &PartialMember {
+        self.inner
+            .member
+            .as_ref()
+            .expect("`self.inner.member` must not be `None`")
     }
 
     #[inline]
@@ -152,54 +128,118 @@ impl<Kind: ContextKind> Context<Kind> {
         self.author().id
     }
 
-    fn resp_builder(&self) -> InteractionResponseDataBuilder {
-        InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
+    fn base_interaction_response_data_builder() -> InteractionResponseDataBuilder {
+        Lyra::base_interaction_response_data_builder()
     }
 
-    pub async fn ephem(&self, message: &str) -> RespondResult {
-        let data = self
-            .resp_builder()
-            .content(message)
-            .flags(MessageFlags::EPHEMERAL)
+    pub async fn ephem(&self, content: impl Into<String>) -> RespondResult {
+        self.bot.ephem_to(&self.inner, content).await
+    }
+
+    pub async fn respond(&self, content: impl Into<String>) -> RespondResult {
+        self.bot.respond_to(&self.inner, content).await
+    }
+
+    pub async fn respond_rich(&self, data: Option<InteractionResponseData>) -> RespondResult {
+        self.bot.respond_rich_to(&self.inner, data).await
+    }
+
+    pub async fn respond_components(
+        &self,
+        content: impl Into<String>,
+        components: impl IntoIterator<Item = twilight_model::channel::message::Component>,
+    ) -> RespondResult {
+        let data = Self::base_interaction_response_data_builder()
+            .content(content)
+            .components(components)
             .build();
         self.respond_rich(Some(data)).await
     }
 
-    pub async fn respond(&self, message: &str) -> RespondResult {
-        let data = self.resp_builder().content(message).build();
-        self.respond_rich(Some(data)).await
-    }
-
-    pub async fn respond_rich(&self, data: Option<InteractionResponseData>) -> RespondResult {
+    pub async fn respond_modal(
+        &self,
+        custom_id: impl Into<String>,
+        title: impl Into<String>,
+        text_inputs: impl IntoIterator<Item = impl Into<twilight_model::channel::message::Component>>,
+    ) -> Result<()> {
         let client = self.bot().interaction_client().await?;
+
+        let data = InteractionResponseDataBuilder::new()
+            .custom_id(custom_id)
+            .title(title)
+            .components(text_inputs.into_iter().map(|t| {
+                ActionRow {
+                    components: vec![t.into()],
+                }
+                .into()
+            }))
+            .build()
+            .into();
 
         client
             .create_response(
-                self.interaction.id,
-                &self.interaction.token,
+                self.inner.id,
+                &self.inner.token,
                 &InteractionResponse {
-                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    kind: InteractionResponseType::Modal,
                     data,
                 },
             )
             .await?;
+        Ok(())
+    }
 
-        Ok(client.response(&self.interaction.token).await?)
+    pub async fn respond_embeds_only(
+        &self,
+        embeds: impl IntoIterator<Item = Embed>,
+    ) -> RespondResult {
+        let data = Self::base_interaction_response_data_builder()
+            .embeds(embeds)
+            .build();
+        self.respond_rich(Some(data)).await
+    }
+
+    pub async fn followup(&self, content: &str) -> RespondResult {
+        let client = self.bot().interaction_client().await?;
+
+        Ok(client
+            .create_followup(&self.inner.token)
+            .content(content)?
+            .await?)
+    }
+
+    pub async fn followup_ephem(&self, content: &str) -> RespondResult {
+        let client = self.bot().interaction_client().await?;
+
+        Ok(client
+            .create_followup(&self.inner.token)
+            .flags(MessageFlags::EPHEMERAL)
+            .content(content)?
+            .await?)
+    }
+
+    pub async fn update_response(&self, content: &str) -> RespondResult {
+        let client = self.bot().interaction_client().await?;
+
+        Ok(client
+            .update_response(&self.inner.token)
+            .content(content.into())?
+            .await?)
     }
 
     pub fn interaction(&self) -> Interaction {
-        self.interaction.deref().deref().clone()
+        self.inner.deref().deref().clone()
     }
 
     pub fn interaction_data(&self) -> &InteractionData {
-        self.interaction
+        self.inner
             .data
             .as_ref()
             .expect("`interaction.data` must not be `None`")
     }
 
     pub fn author_permissions(&self) -> Permissions {
-        self.interaction
+        self.inner
             .member
             .as_ref()
             .expect("this interaction must be executed in guilds")
@@ -207,11 +247,33 @@ impl<Kind: ContextKind> Context<Kind> {
             .expect("this field should exist")
     }
 
+    pub fn bot_permissions(&self) -> Permissions {
+        self.inner
+            .app_permissions
+            .expect("this interaction must be executed in guilds")
+    }
+
     pub fn current_voice_state(&self) -> Option<CachedVoiceState> {
         let user = self.bot().user_id();
         self.cache()
-            .voice_state(user, self.guild_id_unchecked())
+            .voice_state(user, self.guild_id()?)
             .as_deref()
             .cloned()
+    }
+}
+
+impl<Kind: ContextKind> Cacheful for Context<Kind> {
+    fn cache(&self) -> &InMemoryCache {
+        self.bot.cache()
+    }
+}
+
+impl<Kind: ContextKind> Lavalinkful for Context<Kind> {
+    fn lavalink(&self) -> &Lavalink {
+        self.bot.lavalink()
+    }
+
+    fn clone_lavalink(&self) -> Arc<Lavalink> {
+        self.bot.clone_lavalink()
     }
 }

@@ -1,10 +1,9 @@
 use std::fmt::Display;
 
+use anyhow::Result;
 use async_trait::async_trait;
-use lyra_proc::{check, err, out};
 use twilight_gateway::MessageSender;
 use twilight_interactions::command::{CommandModel, CreateCommand};
-use twilight_lavalink::{model::Destroy, Lavalink};
 use twilight_mention::Mention;
 use twilight_model::{
     gateway::payload::outgoing::UpdateVoiceState,
@@ -14,13 +13,18 @@ use twilight_model::{
     },
 };
 
-use crate::bot::commands::{
-    checks,
-    errors::Error,
-    models::{Context, LyraCommand},
+use crate::bot::{
+    commands::{
+        checks,
+        errors::Error,
+        macros::{caut, hid, out},
+        models::{App, LyraCommand},
+        Context,
+    },
+    lavalink::{Lavalink, Lavalinkful},
 };
 
-struct LeaveResponse(Id<ChannelMarker>);
+pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
 
 impl Display for LeaveResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -28,13 +32,19 @@ impl Display for LeaveResponse {
     }
 }
 
-struct DisconnectContext<'a> {
+pub(super) struct DisconnectContext<'a> {
     sender: &'a MessageSender,
     guild_id: Id<GuildMarker>,
 }
 
-impl<'a> From<&'a Context> for DisconnectContext<'a> {
-    fn from(ctx: &'a Context) -> Self {
+impl<'a> DisconnectContext<'a> {
+    pub(super) fn new(sender: &'a MessageSender, guild_id: Id<GuildMarker>) -> Self {
+        Self { sender, guild_id }
+    }
+}
+
+impl<'a> From<&'a Context<App>> for DisconnectContext<'a> {
+    fn from(ctx: &'a Context<App>) -> Self {
         Self {
             sender: ctx.bot().sender(),
             guild_id: ctx.guild_id_unchecked(),
@@ -42,20 +52,26 @@ impl<'a> From<&'a Context> for DisconnectContext<'a> {
     }
 }
 
-fn disconnect(ctx: DisconnectContext) -> anyhow::Result<()> {
+pub(super) fn disconnect(ctx: DisconnectContext) -> Result<()> {
     ctx.sender
         .command(&UpdateVoiceState::new(ctx.guild_id, None, false, false))?;
 
     Ok(())
 }
 
-struct LavalinkCleanupContext<'a> {
+pub(super) struct DestroyResourcesContext<'a> {
     lavalink: &'a Lavalink,
     guild_id: Id<GuildMarker>,
 }
 
-impl<'a> From<&'a Context> for LavalinkCleanupContext<'a> {
-    fn from(ctx: &'a Context) -> Self {
+impl<'a> DestroyResourcesContext<'a> {
+    pub(super) fn new(lavalink: &'a Lavalink, guild_id: Id<GuildMarker>) -> Self {
+        Self { lavalink, guild_id }
+    }
+}
+
+impl<'a> From<&'a Context<App>> for DestroyResourcesContext<'a> {
+    fn from(ctx: &'a Context<App>) -> Self {
         Self {
             lavalink: ctx.lavalink(),
             guild_id: ctx.guild_id_unchecked(),
@@ -63,24 +79,23 @@ impl<'a> From<&'a Context> for LavalinkCleanupContext<'a> {
     }
 }
 
-async fn lavalink_cleanup(ctx: LavalinkCleanupContext<'_>) -> anyhow::Result<()> {
+pub(super) async fn destroy_resources(ctx: DestroyResourcesContext<'_>) -> Result<()> {
     let guild_id = ctx.guild_id;
-    let Some(player) = ctx.lavalink.players().get(&guild_id) else {return Ok(())};
-    player.send(Destroy::from(guild_id))?;
+    ctx.lavalink.destroy_player(guild_id).await?;
+    ctx.lavalink.remove_connection(guild_id);
 
     Ok(())
 }
 
-async fn leave(ctx: &Context) -> anyhow::Result<LeaveResponse> {
+async fn leave(ctx: &Context<App>) -> Result<LeaveResponse> {
     let guild_id = ctx.guild_id_unchecked();
-    let Some(voice) = ctx.current_voice_state() else {
-        return Err(Error::NotInVoice.into());
-    };
+    let voice = ctx.current_voice_state().ok_or(Error::NotInVoice)?;
 
     let channel_id = voice.channel_id();
     checks::noone_else_in_voice(ctx, channel_id)?;
 
-    lavalink_cleanup(ctx.into()).await?;
+    ctx.lavalink().dispatch_connection_change(guild_id);
+    destroy_resources(ctx.into()).await?;
     disconnect(ctx.into())?;
 
     let response = LeaveResponse(channel_id);
@@ -91,22 +106,21 @@ async fn leave(ctx: &Context) -> anyhow::Result<LeaveResponse> {
 #[derive(CreateCommand, CommandModel)]
 #[command(
     name = "leave",
-    desc = "Leaves the currently connected voice/stage channel and clears the queue"
+    desc = "Leaves the currently connected voice/stage channel and clears the queue",
+    dm_permission = false
 )]
 pub struct Leave;
 
 #[async_trait]
 impl LyraCommand for Leave {
-    async fn callback(&self, ctx: Context) -> anyhow::Result<()> {
-        check!(Guild);
-
+    async fn execute(self, ctx: Context<App>) -> Result<()> {
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
-                out!(&format!("📎 ~~{}~~", voice.mention()));
+                out!(format!("📎 ~~{}~~", voice.mention()), ctx);
             }
             Err(e) => match e.downcast()? {
                 Error::NotInVoice => {
-                    err!("❗ Not currently connected to a voice channel");
+                    caut!("Not currently connected to a voice channel.", ctx);
                 }
                 other => return Err(other.into()),
             },

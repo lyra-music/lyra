@@ -1,10 +1,14 @@
+use anyhow::Result;
 use hyper::{Body, Request};
 use twilight_lavalink::{http::LoadedTracks, model::Play};
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
-use crate::bot::commands::models::Context;
+use crate::bot::{
+    commands::{models::App, Context},
+    lavalink::Lavalinkful,
+};
 
-pub async fn play(ctx: Context) -> anyhow::Result<()> {
+pub async fn play(ctx: Context<App>) -> Result<()> {
     let bot = ctx.bot();
     let (author, channel_id) = (ctx.author(), ctx.channel_id());
 

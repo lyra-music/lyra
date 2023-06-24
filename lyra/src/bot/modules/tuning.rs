@@ -1,9 +1,13 @@
+use anyhow::Result;
 use twilight_lavalink::model::Volume;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
-use crate::bot::commands::models::Context;
+use crate::bot::{
+    commands::{models::App, Context},
+    lavalink::Lavalinkful,
+};
 
-pub async fn volume(ctx: Context) -> anyhow::Result<()> {
+pub async fn volume(ctx: Context<App>) -> Result<()> {
     let (author, channel_id) = (ctx.author(), ctx.channel_id());
 
     tracing::debug!(
