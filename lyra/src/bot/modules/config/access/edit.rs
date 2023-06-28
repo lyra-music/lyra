@@ -164,7 +164,6 @@ pub struct EditMemberRole {
 #[async_trait]
 impl LyraCommand for EditMemberRole {
     async fn execute(self, ctx: Context<App>) -> Result<()> {
-        // FIXME: Update this when twilight-interactions support user/role differentiation 1st-party
         let inputted_mentionables = [
             Some(self.member_or_role),
             self.member_or_role_2,

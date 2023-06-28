@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -31,23 +31,23 @@ jobs:
           - 5432:5432
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      
-    - name: Codespell
-      uses: codespell-project/actions-codespell@v1
-      with:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Codespell
+        uses: codespell-project/actions-codespell@v1
+        with:
           path: lyra
           ignore_words_list: crate,ans,cant
 
-    - name: Setup Database
-      working-directory: db
-      run: |
-        cargo install sqlx-cli --no-default-features --features native-tls,postgres
-        cargo sqlx database setup
-    
-    - name: Build And Test
-      working-directory: lyra
-      run: |
-        cargo build --verbose
-        cargo test --verbose
+      - name: Setup Database
+        working-directory: db
+        run: |
+          cargo install sqlx-cli --no-default-features --features native-tls,postgres
+          cargo sqlx database setup
+
+      - name: Build And Test
+        working-directory: lyra
+        run: |
+          cargo build --verbose --release
+          cargo test --verbose --release
