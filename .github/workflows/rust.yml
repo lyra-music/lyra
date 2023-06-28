@@ -8,26 +8,23 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  DATABASE_URL: postgresql://localhost/test_db
+  DATABASE_URL: postgres://postgres@localhost/db
 
 jobs:
   test:
-
     runs-on: ubuntu-latest
+
     steps:
     - name: Check out code
       uses: actions/checkout@v3
 
-    - name: Install PostgreSQL
-      run: sudo apt-get install postgresql
-
     - name: Start PostgreSQL
-      run: sudo systemctl start postgresql.service
+      run: sudo systemctl start postgresql
 
     - name: Set up database
       run: |
         cargo install sqlx-cli --no-default-features --features native-tls,postgres
-        cargo sqlx database setup
+        cargo sqlx database create
     
     - name: Build and Test
       working-directory: lyra
