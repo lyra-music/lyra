@@ -31,15 +31,19 @@ jobs:
           - 5432:5432
 
     steps:
-    - name: Check out code
+    - name: Checkout Code
       uses: actions/checkout@v3
+      
+    - name: Codespell
+      run: codespell lyra -L crate,ans,cant
 
-    - name: Set up database
+    - name: Setup Database
+      working-directory: db
       run: |
         cargo install sqlx-cli --no-default-features --features native-tls,postgres
-        cargo sqlx database create
+        cargo sqlx database setup
     
-    - name: Build and Test
+    - name: Build And Test
       working-directory: lyra
       run: |
         cargo build --verbose
