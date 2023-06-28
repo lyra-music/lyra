@@ -57,7 +57,6 @@ impl LyraCommand for Clear {
             });
         });
 
-        // TODO: warn for destructive command
         let text_input = TextInput {
             custom_id: "destructive-command-confirmation-text-input".into(),
             label: "Are you sure?".into(),

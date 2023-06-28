@@ -1,6 +1,6 @@
 [package]
 name = "lyra"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
@@ -17,7 +17,7 @@ atomic-option = "0.1.2"
 dashmap = "5.4.0"
 version_check = "0.9.4"
 os_info = "3.7.0"
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 hex = "0.4.3"
 anyhow = "1.0.71"
 thiserror = "1.0.40"
@@ -67,3 +67,6 @@ default-features = false
 version = "0.6.1"
 features = ["std"]
 default-features = false
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
