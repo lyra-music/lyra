@@ -1,0 +1,2 @@
+#!/bin/sh
+cd ./db && cargo sqlx database setup

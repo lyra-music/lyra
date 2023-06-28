@@ -1,4 +1,0 @@
-#!/bin/sh
-DB_NAME="lyra_db"
-
-/bin/createdb $DB_NAME && /bin/psql -f "$PWD/db/prepare.sql" $DB_NAME
