@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgres://user:password@localhost:5432/db
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_DB: db
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+      
+    - name: Codespell
+      uses: codespell-project/actions-codespell@v1
+      with:
+          path: lyra
+          ignore_words_list: crate,ans,cant
+
+    - name: Setup Database
+      working-directory: db
+      run: |
+        cargo install sqlx-cli --no-default-features --features native-tls,postgres
+        cargo sqlx database setup
+    
+    - name: Build And Test
+      working-directory: lyra
+      run: |
+        cargo build --verbose
+        cargo test --verbose
