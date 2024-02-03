@@ -1,2 +1,2 @@
-pub mod images;
-pub mod utils;
+pub mod image;
+pub mod util;

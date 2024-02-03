@@ -40,6 +40,9 @@ jobs:
           path: lyra
           ignore_words_list: crate,ans,cant
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.5.0
+
       - name: Setup Database
         working-directory: db
         run: |

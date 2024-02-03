@@ -1,20 +1,12 @@
-// use tracing::Level;
+use super::{error::manager::StartError, manager::BotManager};
+use crate::bot::core::model::Config;
 
-use anyhow::Result;
-
-use super::manager::BotManager;
-use crate::bot::lib::models::Config;
-
-pub async fn run() -> Result<()> {
-    tracing_subscriber::fmt()
-        // .with_max_level(Level::DEBUG)
-        .init();
+pub async fn run() -> Result<(), StartError> {
+    tracing_subscriber::fmt().compact().init();
 
     let config = Config::from_env();
-    let bot_manager = BotManager::new(config);
+    let mut bot_manager = BotManager::new(config);
 
     bot_manager.start().await?;
-
-    tracing::info!("shut down gracefully");
     Ok(())
 }
