@@ -1,19 +1,24 @@
-use std::{fs, iter, sync::Arc, thread};
+use std::{fs, mem, str::FromStr, sync::Arc};
 
-use anyhow::{Context, Result};
-use futures::future;
-use tokio::{
-    sync::{watch, RwLock},
-    task::JoinSet,
+use log::LevelFilter;
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    ConnectOptions,
 };
+use tokio::{sync::watch, task::JoinSet};
 use tokio_stream::StreamExt;
 use twilight_gateway::{
-    stream::{self, ShardEventStream, ShardRef},
+    stream::{self, StartRecommendedError},
     CloseFrame, Config as ShardConfig, Event,
 };
 use twilight_gateway::{ConfigBuilder, Intents, Shard};
 use twilight_http::{client::ClientBuilder, Client};
-use twilight_lavalink::model::IncomingEvent;
+use twilight_lavalink::{
+    client::ClientError,
+    model::IncomingEvent,
+    node::{IncomingEvents, NodeError},
+    Node,
+};
 use twilight_model::{
     channel::message::AllowedMentions,
     gateway::{
@@ -23,91 +28,116 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::bot::{
-    lavalink::LavalinkManager,
-    lib::consts::metadata::{
-        AUTHORS, COPYRIGHT, OS_INFO, REPOSITORY, RUST_VERSION, SUPPORT, VERSION,
-    },
+use crate::bot::core::r#const::metadata::{
+    AUTHORS, COPYRIGHT, OS_INFO, REPOSITORY, RUST_VERSION, SUPPORT, VERSION,
 };
 
-use super::lib::{
-    models::{Cacheful, Config, Lyra},
-    traced,
+use super::{
+    core::{
+        model::{BotState, CacheAware, Config},
+        traced,
+    },
+    error::manager::{StartError, WaitForShutdownError},
+    gateway,
+    lavalink::{self, NodeAndReceiver},
 };
 use super::{
-    gateway::{self, OldResources},
-    lavalink::{self, Lavalink},
+    gateway::LastCachedStates,
+    lavalink::{ClientAware, Lavalink},
 };
 
 pub(super) struct BotManager {
     config: Config,
-    shard_config: ShardConfig,
-    http: Arc<Client>,
+    shard_config: Option<ShardConfig>,
+    http: Option<Client>,
 }
 
 impl BotManager {
     const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
+    const LAVALINK_NODE_COUNT: usize = 1;
 
-    pub(super) fn new(config: Config) -> Self {
-        let Config { ref token, .. } = config;
+    pub(super) fn new(mut config: Config) -> Self {
+        let token = mem::take(&mut config.token);
 
         let http = ClientBuilder::default()
             .default_allowed_mentions(AllowedMentions::default())
-            .token(token.to_owned())
+            .token(token.clone())
             .build()
             .into();
 
-        let shard_config = ConfigBuilder::new(token.clone(), Self::INTENTS)
-            .presence(
-                UpdatePresencePayload::new(
-                    [Activity::from(MinimalActivity {
-                        kind: ActivityType::Listening,
-                        name: "/play".into(),
-                        url: None,
-                    })],
-                    false,
-                    None,
-                    Status::Online,
+        let shard_config = Some(
+            ConfigBuilder::new(token, Self::INTENTS)
+                .presence(
+                    UpdatePresencePayload::new(
+                        [Activity::from(MinimalActivity {
+                            kind: ActivityType::Listening,
+                            name: "/play".into(),
+                            url: None,
+                        })],
+                        false,
+                        None,
+                        Status::Online,
+                    )
+                    .expect("activities must not be empty"),
                 )
-                .expect("activities must not be empty"),
-            )
-            .build();
+                .build(),
+        );
 
         Self {
             config,
-            http,
             shard_config,
+            http,
         }
     }
 
-    pub(super) async fn start(&self) -> Result<()> {
-        let shards = self.build_and_split_shards().await?;
+    pub(super) async fn start(&mut self) -> Result<(), StartError> {
+        let http = self.http.take().expect("`BotManager::http` must exist");
+        let shards = self.build_and_split_shards(&http).await?;
 
         let (tx, rx) = watch::channel(false);
 
         let mut set = JoinSet::new();
 
-        let bot = Arc::new(Lyra::new(self.config.clone(), self.http.clone()).await?);
-        bot.register_app_commands().await?;
+        let database_url = mem::take(&mut self.config.database_url);
+        let options = PgConnectOptions::from_str(&database_url)?.log_statements(LevelFilter::Debug);
+        let db = PgPoolOptions::new()
+            .max_connections(5)
+            .connect_with(options)
+            .await?;
 
-        let user_id = self.http.current_user().await?.model().await?.id;
+        let shard_count = shards.len() as u64;
+        let user_id = http.current_user().await?.model().await?.id;
 
-        let shard_count = shards.iter().map(|s| s.len() as u64).sum();
-        let lavalink_and_manager = self.build_lavalink_manager(shard_count, user_id).await?;
+        let (lavalink, nodes_and_receivers) =
+            self.build_lavalink_nodes(shard_count, user_id).await?;
 
-        for mut shards in shards {
+        let bot = Arc::new(BotState::new(db, http, lavalink));
+        bot.interaction().await?.register_global_commands().await?;
+
+        for mut shard in shards {
             let mut rx = rx.clone();
             let bot = bot.clone();
-            let (lavalink, lavalink_manager) = lavalink_and_manager.clone();
 
             set.spawn(async move {
                 tokio::select! {
-                    _ = Self::handle_gateway_events(shards.iter_mut(), lavalink.clone(), bot.clone()) => {},
-                    _ = Self::handle_lavalink_events(lavalink_manager.clone(), lavalink.clone(), bot) => {},
+                    _ = Self::handle_gateway_events(&mut shard, bot.clone()) => {},
                     _ = rx.changed() => {
-                        future::join_all(shards.iter_mut().map(|shard| async move {
-                            shard.close(CloseFrame::NORMAL).await
-                        })).await;
+                        _ = shard.close(CloseFrame::NORMAL).await;
+                    }
+                }
+            });
+        }
+
+        for (node, mut node_rx) in nodes_and_receivers {
+            let mut rx = rx.clone();
+            let bot = bot.clone();
+            let addr = node.config().address;
+
+            set.spawn(async move {
+                tokio::select! {
+                    () = Self::handle_lavalink_events(&mut node_rx, node, bot.clone()) => {},
+                    _ = rx.changed() => {
+                        _ = bot.lavalink().disconnect(addr);
                     }
                 }
             });
@@ -122,89 +152,67 @@ impl BotManager {
 
         while set.join_next().await.is_some() {}
 
+        tracing::info!("shut down gracefully");
         Ok(())
     }
 
-    async fn build_and_split_shards(&self) -> Result<Vec<Vec<Shard>>> {
-        let tasks = thread::available_parallelism()?.get();
+    async fn build_and_split_shards(
+        &mut self,
+        client: &Client,
+    ) -> Result<Vec<Shard>, StartRecommendedError> {
+        let shard_config = self
+            .shard_config
+            .take()
+            .expect("`BotManager::shard_config` must exist");
 
-        let init = iter::repeat_with(Vec::new)
-            .take(tasks)
-            .collect::<Vec<Vec<_>>>();
-        let shards =
-            stream::create_recommended(&self.http, self.shard_config.clone(), |_, builder| {
-                builder.build()
-            })
+        let shards = stream::create_recommended(client, shard_config, |_, builder| builder.build())
             .await?
-            .enumerate()
-            .fold(init, |mut fold, (idx, shard)| {
-                fold[idx % tasks].push(shard);
-                fold
-            });
-
+            .collect();
         Ok(shards)
     }
 
-    async fn build_lavalink_manager(
+    async fn build_lavalink_nodes(
         &self,
         shard_count: u64,
         user_id: Id<UserMarker>,
-    ) -> Result<(Arc<Lavalink>, Arc<RwLock<LavalinkManager>>)> {
+    ) -> Result<(Lavalink, [NodeAndReceiver; Self::LAVALINK_NODE_COUNT]), NodeError> {
         let Config {
             ref lavalink_addr,
             ref lavalink_auth,
             ..
         } = self.config;
+
         let client = twilight_lavalink::Lavalink::new(user_id, shard_count);
 
         let node_1 = client.add(*lavalink_addr, lavalink_auth).await?;
-        let node_2 = client.add(*lavalink_addr, lavalink_auth).await?;
 
-        let lavalink = Arc::new(Lavalink::new(client));
-        let manager = Arc::new(RwLock::new(LavalinkManager::new([node_1, node_2].into())));
-
-        Ok((lavalink, manager))
+        Ok((client.into(), [node_1]))
     }
 
     async fn handle_lavalink_events(
-        lavalink_manager: Arc<RwLock<LavalinkManager>>,
-        lavalink: Arc<Lavalink>,
-        bot: Arc<Lyra>,
-    ) -> Result<()> {
+        incoming_events: &mut IncomingEvents,
+        node: Arc<Node>,
+        bot: Arc<BotState>,
+    ) {
         loop {
-            if let Some((_, event)) = lavalink_manager
-                .write()
-                .await
-                .incoming_events()
-                .next()
-                .await
-            {
-                Self::process_lavalink_events(event, lavalink.clone(), bot.clone()).await?
+            if let Some(event) = incoming_events.next().await {
+                Self::process_lavalink_events(node.clone(), event, bot.clone());
             }
         }
     }
 
-    async fn process_lavalink_events(
-        event: IncomingEvent,
-        lavalink: Arc<Lavalink>,
-        bot: Arc<Lyra>,
-    ) -> Result<()> {
-        let bot = lavalink::ContextedLyra::new(event, bot, lavalink);
-        traced::tokio_spawn(bot.process());
-
-        Ok(())
+    fn process_lavalink_events(node: Arc<Node>, event: IncomingEvent, bot: Arc<BotState>) {
+        traced::tokio_spawn(lavalink::process(bot, event, node));
     }
 
     async fn handle_gateway_events(
-        shards: impl Iterator<Item = &mut Shard>,
-        lavalink: Arc<Lavalink>,
-        bot: Arc<Lyra>,
-    ) -> Result<()> {
-        let mut stream = ShardEventStream::new(shards);
+        shard: &mut Shard,
+        bot: Arc<BotState>,
+    ) -> Result<(), ClientError> {
         loop {
-            let (shard, event) = match stream.next().await {
-                Some((shard, Ok(event))) => (shard, event),
-                Some((_, Err(source))) => {
+            let event = match shard.next_event().await {
+                Ok(event) => event,
+                Err(source) => {
                     tracing::warn!(?source, "error receiving event");
 
                     if source.is_fatal() {
@@ -213,40 +221,41 @@ impl BotManager {
 
                     continue;
                 }
-                None => break Ok(()),
             };
 
-            Self::process_gateway_events(shard, event, lavalink.clone(), bot.clone()).await?
+            Self::process_gateway_events(shard, event, bot.clone()).await?;
         }
     }
 
     async fn process_gateway_events(
-        shard: ShardRef<'_>,
+        shard: &Shard,
         event: Event,
-        lavalink: Arc<Lavalink>,
-        bot: Arc<Lyra>,
-    ) -> Result<()> {
-        let old_resources = OldResources::new(bot.cache(), &event);
+        bot: Arc<BotState>,
+    ) -> Result<(), ClientError> {
+        let states = LastCachedStates::new(bot.cache(), &event);
 
         bot.cache().update(&event);
         bot.standby().process(&event);
-        lavalink.process(&event).await?;
+        bot.lavalink().process(&event).await?;
 
-        let bot = gateway::ContextedLyra::new(event, old_resources, bot, shard, lavalink);
-        traced::tokio_spawn(bot.process());
+        traced::tokio_spawn(gateway::process(
+            bot,
+            event,
+            states,
+            shard.latency().clone(),
+            shard.sender(),
+        ));
 
         Ok(())
     }
 
-    async fn wait_for_shutdown() -> Result<()> {
+    async fn wait_for_shutdown() -> Result<(), WaitForShutdownError> {
         #[cfg(target_family = "unix")]
         {
             use tokio::signal::unix::{self, SignalKind};
 
-            let mut sigint = unix::signal(SignalKind::interrupt())
-                .context("unable to register SIGINT handler")?;
-            let mut sigterm = unix::signal(SignalKind::terminate())
-                .context("unable to register SIGTERM handler")?;
+            let mut sigint = unix::signal(SignalKind::interrupt())?;
+            let mut sigterm = unix::signal(SignalKind::terminate())?;
 
             tokio::select! {
                 _ = sigint.recv() => tracing::debug!("received SIGINT"),
@@ -258,9 +267,7 @@ impl BotManager {
         {
             use tokio::signal;
 
-            signal::ctrl_c()
-                .await
-                .context("unable to register Ctrl+C handler")?;
+            signal::ctrl_c().await?;
         }
 
         Ok(())

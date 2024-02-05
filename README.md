@@ -8,6 +8,5 @@ A *featureful*, *self-hostable* **Discord music bot**, made with [`twilight-rs`]
 
 </div>
 
-> **Warning**
-> 
+> [!WARNING]
 > Still very early in development!

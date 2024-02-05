@@ -1,10 +1,10 @@
-use convert_case::{Case, Casing};
+use heck::ToTitleCase;
 use itertools::Itertools;
 use proc_macro::{Span, TokenStream};
 use quote::quote;
 use syn::Ident;
 
-use crate::models::Args;
+use crate::model::Args;
 
 pub(super) fn impl_view_access_ids(categories: &Args) -> TokenStream {
     let column_names = categories
@@ -22,16 +22,16 @@ pub(super) fn impl_view_access_ids(categories: &Args) -> TokenStream {
 
     let access_queries = column_names.clone().map(|t| {
         format!(
-            r#"--sql
+            r"--sql
             SELECT id FROM {t} WHERE guild = $1;
-            "#,
+            ",
         )
     });
 
     let mode_queries = format!(
-        r#"--sql
+        r"--sql
         SELECT {} FROM guild_configs WHERE id = $1
-        "#,
+        ",
         column_names.clone().join(", ")
     );
 
@@ -49,9 +49,7 @@ pub(super) fn impl_view_access_ids(categories: &Args) -> TokenStream {
         })
         .map(|m| Ident::new(m, Span::call_site().into()));
 
-    let category_names = categories
-        .iter()
-        .map(|c| c.to_string().to_case(Case::Title));
+    let category_names = categories.iter().map(|c| c.to_string().to_title_case());
 
     quote! {
         struct __AccessView {

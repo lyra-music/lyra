@@ -1,37 +1,31 @@
-use anyhow::Result;
-use twilight_gateway::Event;
-use twilight_model::application::interaction::InteractionType;
+use std::sync::Arc;
 
-use super::{guilds, models::Process, shards, ContextedLyra};
-use crate::bot::{commands, voice};
+use twilight_gateway::{Event, Latency, MessageSender};
 
-impl ContextedLyra {
-    pub async fn process(self) -> Result<()> {
-        match self.event {
-            Event::Ready(ref e) => {
-                let ctx = shards::ReadyContext::from_ready(e, &self);
-                ctx.process().await
-            }
-            Event::GuildCreate(ref e) => {
-                let ctx = guilds::Context::from_guild_events(e, &self);
-                ctx.process().await
-            }
-            Event::GuildDelete(ref e) => {
-                let ctx = guilds::Context::from_guild_events(e, &self);
-                ctx.process().await
-            }
-            Event::InteractionCreate(ref e) => match e.kind {
-                InteractionType::ApplicationCommand => {
-                    let ctx = commands::Context::from_app_interaction(e.clone(), self.into());
-                    ctx.process().await
-                }
-                _ => Ok(()),
-            },
-            Event::VoiceStateUpdate(ref e) => {
-                let ctx = voice::Context::from_voice_state_update(e, &self);
-                ctx.process().await
-            }
-            _ => Ok(()),
+use super::{model::Process, LastCachedStates};
+use crate::bot::{core::model::BotState, error::gateway::ProcessResult};
+
+pub async fn process(
+    bot: Arc<BotState>,
+    event: Event,
+    states: LastCachedStates,
+    latency: Latency,
+    sender: MessageSender,
+) -> ProcessResult {
+    match event {
+        Event::Ready(ref e) => bot.as_ready_context(e).process().await,
+        Event::GuildCreate(ref e) => bot.as_guild_create_context(e).process().await,
+        Event::GuildDelete(ref e) => bot.as_guild_delete_context(e).process().await,
+        Event::InteractionCreate(e) => {
+            bot.into_interaction_create_context(e, latency, sender)
+                .process()
+                .await
         }
+        Event::VoiceStateUpdate(e) => {
+            bot.into_voice_state_update_context(e, states, sender)
+                .process()
+                .await
+        }
+        _ => Ok(()),
     }
 }

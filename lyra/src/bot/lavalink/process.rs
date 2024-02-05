@@ -1,14 +1,14 @@
-use anyhow::Result;
+use std::sync::Arc;
 
-use super::models::ContextedLyra;
+use twilight_lavalink::{model::IncomingEvent, Node};
 
-impl ContextedLyra {
-    pub async fn process(self) -> Result<()> {
-        // TODO: Handle lavalink events
-        // match ctx.event {
-        //     _ => {}
-        // }
+use super::model::Process;
+use crate::bot::{core::model::BotState, error::lavalink::ProcessResult};
 
-        Ok(())
+pub async fn process(bot: Arc<BotState>, event: IncomingEvent, _node: Arc<Node>) -> ProcessResult {
+    match event {
+        IncomingEvent::TrackStart(ref e) => bot.as_track_start_context(e).process().await,
+        IncomingEvent::TrackEnd(ref e) => bot.as_track_end_context(e).process().await,
+        _ => Ok(()),
     }
 }

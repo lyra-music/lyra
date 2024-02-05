@@ -1,4 +1,11 @@
-mod models;
+mod model;
 mod process;
+mod track;
 
-pub use models::{ContextedLyra, Lavalink, LavalinkManager, Lavalinkful};
+pub use self::{
+    model::{
+        ClientAware, ConnectionInfo, Event, EventRecvResult, Lavalink, NodeAndReceiver, Queue,
+        QueueIndexerType, QueueItem, RepeatMode,
+    },
+    process::process,
+};
