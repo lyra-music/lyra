@@ -18,18 +18,16 @@ use crate::bot::{
     lavalink::ClientAware,
 };
 
-fn generate_remove_choices(
+async fn generate_remove_choices(
     focused: &str,
     finished: Vec<i64>,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(connection) = ctx.lavalink().connections().get(&ctx.guild_id_expected()) else {
+    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
         return Vec::new();
     };
-    let (queue, Some(queue_len)) = (
-        connection.queue(),
-        NonZeroUsize::new(connection.queue().len()),
-    ) else {
+    let data_r = data.read().await;
+    let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
     };
 
@@ -96,7 +94,7 @@ impl BotAutocomplete for Autocomplete {
             })
             .expect("at least one option must be focused");
 
-        let choices = generate_remove_choices(&focused, finished, &ctx);
+        let choices = generate_remove_choices(&focused, finished, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)
     }
 }
@@ -125,11 +123,12 @@ pub struct Remove {
 impl BotSlashCommand for Remove {
     async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
         let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx)?;
+        check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let connection = ctx.lavalink().connection(ctx.guild_id_expected());
-        let queue = connection.queue();
+        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let data_r = data.read().await;
+        let queue = data_r.queue();
         let queue_len = queue.len();
 
         let inputs = [
@@ -155,7 +154,6 @@ impl BotSlashCommand for Remove {
 
         positions.sort_unstable();
 
-        drop(connection);
         Ok(super::remove(positions.into(), &mut ctx).await?)
     }
 }

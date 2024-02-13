@@ -1,8 +1,6 @@
 use std::{
     env,
-    net::SocketAddr,
     ops::Deref,
-    str::FromStr,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -37,8 +35,6 @@ use crate::bot::{
     lavalink::{self, Lavalink},
 };
 
-pub type HyperClient = hyper::client::Client<hyper::client::HttpConnector>;
-
 pub type MessageResponse = Response<Message>;
 pub type UnitRespondResult = RespondResult<()>;
 pub type MessageRespondResult = RespondResult<MessageResponse>;
@@ -46,24 +42,19 @@ pub type UnitFollowupResult = FollowupResult<()>;
 pub type MessageFollowupResult = FollowupResult<MessageResponse>;
 
 pub struct Config {
-    pub token: String,
-    pub lavalink_addr: SocketAddr,
-    pub lavalink_auth: String,
-    pub database_url: String,
+    pub token: &'static str,
+    pub lavalink_host: &'static str,
+    pub lavalink_pwd: &'static str,
+    pub database_url: &'static str,
 }
 
 impl Config {
-    pub fn from_env() -> Self {
+    pub const fn from_env() -> Self {
         Self {
-            token: env::var("BOT_TOKEN").expect("`BOT_TOKEN` must be set"),
-            lavalink_addr: SocketAddr::from_str(
-                env::var("LAVALINK_ADDR")
-                    .expect("`LAVALINK_ADDR` must be set")
-                    .as_str(),
-            )
-            .expect("`LAVALINK_ADDR` must be a valid address"),
-            lavalink_auth: env::var("LAVALINK_AUTH").expect("`LAVALINK_AUTH` must be set"),
-            database_url: env::var("DATABASE_URL").expect("`DATABASE_URL` must be set"),
+            token: env!("BOT_TOKEN"),
+            lavalink_host: const_str::concat!(env!("SERVER_ADDRESS"), ":", env!("SERVER_PORT")),
+            lavalink_pwd: env!("LAVALINK_SERVER_PASSWORD"),
+            database_url: env!("DATABASE_URL"),
         }
     }
 }
@@ -351,16 +342,11 @@ pub trait HttpAware {
     fn http(&self) -> &Client;
 }
 
-pub trait HyperAware {
-    fn hyper(&self) -> &HyperClient;
-}
-
 pub struct BotState {
     cache: InMemoryCache,
     http: Client,
     standby: Standby,
     lavalink: Lavalink,
-    hyper: HyperClient,
     db: Pool<Postgres>,
     info: BotInfo,
 }
@@ -377,7 +363,6 @@ impl BotState {
             http,
             standby: Standby::new(),
             lavalink,
-            hyper: HyperClient::new(),
             db,
             info,
         }
@@ -438,11 +423,5 @@ impl CacheAware for Arc<BotState> {
 impl HttpAware for BotState {
     fn http(&self) -> &Client {
         &self.http
-    }
-}
-
-impl HyperAware for BotState {
-    fn hyper(&self) -> &HyperClient {
-        &self.hyper
     }
 }

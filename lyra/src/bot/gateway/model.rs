@@ -14,11 +14,11 @@ pub trait SenderAware {
 }
 
 pub trait GuildIdAware {
-    fn guild_id(&self) -> Option<Id<GuildMarker>>;
+    fn get_guild_id(&self) -> Option<Id<GuildMarker>>;
 }
 
 pub trait ExpectedGuildIdAware {
-    fn guild_id_expected(&self) -> Id<GuildMarker>;
+    fn guild_id(&self) -> Id<GuildMarker>;
 }
 
 pub struct LastCachedStates {

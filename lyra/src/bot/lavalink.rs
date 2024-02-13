@@ -4,8 +4,8 @@ mod track;
 
 pub use self::{
     model::{
-        ClientAware, ConnectionInfo, Event, EventRecvResult, Lavalink, NodeAndReceiver, Queue,
-        QueueIndexerType, QueueItem, RepeatMode,
+        ClientAware, Event, EventRecvResult, Lavalink, PlayerData, Queue, QueueIndexerType,
+        QueueItem, RepeatMode,
     },
-    process::process,
+    process::handlers,
 };

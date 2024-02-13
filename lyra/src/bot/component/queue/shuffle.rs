@@ -26,13 +26,15 @@ impl BotSlashCommand for Shuffle {
             .run(&mut ctx)
             .await?;
 
-        let guild_id = ctx.guild_id_expected();
-        let indexer_type = ctx.lavalink().connection(guild_id).queue().indexer_type();
+        let guild_id = ctx.guild_id();
+        let data = ctx.lavalink().player_data(guild_id);
+        let data_r = data.read().await;
+        let indexer_type = data_r.queue().indexer_type();
 
         match indexer_type {
             QueueIndexerType::Shuffled => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+                data.write()
+                    .await
                     .queue_mut()
                     .set_indexer_type(QueueIndexerType::Standard);
                 out!("**` ⮆ `** Disabled shuffle", ctx);
@@ -44,8 +46,8 @@ impl BotSlashCommand for Shuffle {
                 );
             }
             QueueIndexerType::Standard => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+                data.write()
+                    .await
                     .queue_mut()
                     .set_indexer_type(QueueIndexerType::Shuffled);
                 out!("🔀 Enabled shuffle", ctx);

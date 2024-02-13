@@ -101,7 +101,7 @@ type GetUsersVoiceChannelResult =
 fn get_users_voice_channel(ctx: &Ctx<impl CtxKind>) -> GetUsersVoiceChannelResult {
     let voice_state = ctx
         .cache()
-        .voice_state(ctx.author_id(), ctx.guild_id_expected())
+        .voice_state(ctx.author_id(), ctx.guild_id())
         .ok_or(UserNotInVoiceError)?;
 
     let channel_id = voice_state.channel_id();
@@ -153,7 +153,7 @@ async fn connect_to_new(
         channel_parent_id,
         channel_type,
         None,
-        ctx.guild_id_expected(),
+        ctx.guild_id(),
         ctx,
     )
     .await?)
@@ -186,7 +186,7 @@ async fn connect_to(
         channel_parent_id,
         channel_type,
         old_channel_id,
-        ctx.guild_id_expected(),
+        ctx.guild_id(),
         ctx,
     )
     .await?)
@@ -212,30 +212,32 @@ async fn impl_connect_to(
     let joined = JoinedChannel::new(channel_id, channel_type);
 
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
-    let response = old_channel_id.map_or_else(
-        || {
-            ctx.lavalink()
-                .new_connection(guild_id, channel_id, ctx.channel_id());
-            Response::Joined {
-                voice: joined,
-                empty: voice_is_empty,
-            }
-        },
-        |old_channel_id| {
-            ctx.lavalink()
-                .connection_mut(guild_id)
-                .set_channel_id(channel_id);
-            Response::Moved {
-                from: old_channel_id,
-                to: joined,
-                empty: voice_is_empty,
-            }
-        },
-    );
 
-    ctx.lavalink().notify_connection_change(guild_id);
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;
+
+    let response = if let Some(from) = old_channel_id {
+        ctx.lavalink()
+            .player_data(guild_id)
+            .write()
+            .await
+            .connection
+            .channel_id = channel_id;
+        Response::Moved {
+            from,
+            to: joined,
+            empty: voice_is_empty,
+        }
+    } else {
+        ctx.lavalink()
+            .new_player_data(guild_id, channel_id, ctx.channel_id())
+            .await?;
+        Response::Joined {
+            voice: joined,
+            empty: voice_is_empty,
+        }
+    };
+    ctx.lavalink().notify_connection_change(guild_id).await;
 
     if joined.kind == JoinedChannelType::Stage {
         ctx.bot()
@@ -267,7 +269,7 @@ impl DeleteEmptyVoiceNotice {
         Self {
             message_id,
             channel_id,
-            guild_id: ctx.guild_id_expected(),
+            guild_id: ctx.guild_id(),
             interaction_token: ctx.interaction_token().to_string().into(),
             bot: ctx.bot_owned(),
         }

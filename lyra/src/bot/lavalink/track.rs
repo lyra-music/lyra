@@ -1,67 +1,59 @@
-use twilight_lavalink::model::{TrackEnd, TrackStart};
+use lavalink_rs::{
+    client::LavalinkClient,
+    model::events::{TrackEnd, TrackException, TrackStart, TrackStuck},
+};
+use lyra_proc::hook;
+use tokio::sync::RwLock;
 
-use crate::bot::{core::model::BotStateRef, error::lavalink::ProcessResult, lavalink::ClientAware};
+use crate::bot::lavalink::PlayerData;
 
-pub(super) struct StartContext<'a> {
-    inner: &'a twilight_lavalink::model::TrackStart,
-    bot: BotStateRef<'a>,
+#[hook]
+pub(super) async fn start(_: LavalinkClient, _session_id: String, event: &TrackStart) {
+    tracing::debug!(
+        "guild {} started {}",
+        event.guild_id.0,
+        event.track.info.title
+    );
 }
 
-impl crate::bot::core::model::BotState {
-    pub(super) const fn as_track_start_context<'a>(
-        &'a self,
-        inner: &'a TrackStart,
-    ) -> StartContext<'a> {
-        StartContext { inner, bot: self }
-    }
-}
+#[hook]
+pub(super) async fn end(client: LavalinkClient, _session_id: String, event: &TrackEnd) {
+    let guild_id = event.guild_id;
+    tracing::debug!("guild {} ended   {}", guild_id.0, event.track.info.title);
 
-impl<'a> super::model::Process for StartContext<'a> {
-    async fn process(self) -> ProcessResult {
-        tracing::debug!("guild {} started {}", self.inner.guild_id, self.inner.track);
-        // TODO: handle now playing message sending
-        Ok(())
-    }
-}
+    let ctx = client
+        .get_player_context(guild_id)
+        .expect("player context must exist");
 
-pub(super) struct EndContext<'a> {
-    inner: &'a twilight_lavalink::model::TrackEnd,
-    bot: BotStateRef<'a>,
-}
+    let data = ctx
+        .data::<RwLock<PlayerData>>()
+        .expect("data type must be valid");
+    let data_r = data.read().await;
+    let queue = data_r.queue();
 
-impl crate::bot::core::model::BotState {
-    pub(super) const fn as_track_end_context<'a>(&'a self, inner: &'a TrackEnd) -> EndContext<'a> {
-        EndContext { inner, bot: self }
-    }
-}
+    // TODO: handle now playing message deleting
+    if queue.advance_locked() {
+        queue.advance_unlock();
+    } else {
+        let data = ctx
+            .data::<RwLock<PlayerData>>()
+            .expect("data type must be valid");
+        let mut data_w = data.write().await;
+        let queue = data_w.queue_mut();
 
-impl<'a> super::model::Process for EndContext<'a> {
-    async fn process(self) -> ProcessResult {
-        let guild_id = self.inner.guild_id;
-        tracing::debug!("guild {} ended   {}", guild_id, self.inner.track);
-        let lavalink = self.bot.lavalink();
+        queue.advance();
+        if let Some(item) = queue.current() {
+            let Err(e) = ctx.play_now(item.track()).await else {
+                return;
+            };
 
-        // TODO: handle now playing message deleting
-        let connection = lavalink.connection(guild_id);
-        let queue = connection.queue();
-        if queue.advance_locked() {
-            queue.advance_unlock();
-        } else {
-            drop(connection);
-            let mut connection = lavalink.connection_mut(guild_id);
-            let queue = connection.queue_mut();
-            queue.advance();
-            if let Some(item) = connection.downgrade().queue().current() {
-                lavalink
-                    .player(guild_id)
-                    .await?
-                    .send(twilight_lavalink::model::Play::from((
-                        guild_id,
-                        item.track().track.clone(),
-                    )))?;
-            }
+            tracing::error!(?e);
         }
-
-        Ok(())
     }
 }
+
+#[hook]
+pub(super) async fn exception(client: LavalinkClient, session_id: String, event: &TrackException) {}
+
+#[hook]
+pub(super) async fn stuck(client: LavalinkClient, session_id: String, event: &TrackStuck) {}

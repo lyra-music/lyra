@@ -7,7 +7,6 @@ pub enum StartError {
     Sqlx(#[from] sqlx::Error),
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
     Http(#[from] twilight_http::Error),
-    NodeError(#[from] twilight_lavalink::node::NodeError),
     Send(#[from] tokio::sync::watch::error::SendError<bool>),
     WaitForShutdown(#[from] WaitForShutdownError),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),

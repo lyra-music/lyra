@@ -11,7 +11,6 @@ use crate::bot::{
         Ctx,
     },
     component::queue::normalize_queue_position,
-    core::r#const::text::UNTITLED_TRACK,
     error::command::{AutocompleteResult, Result as CommandResult},
     gateway::ExpectedGuildIdAware,
     lavalink::ClientAware,
@@ -29,17 +28,15 @@ struct MoveAutocompleteOptions {
     kind: MoveAutocompleteOptionType,
 }
 
-fn generate_move_autocomplete_choices(
+async fn generate_move_autocomplete_choices(
     options: &MoveAutocompleteOptions,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(connection) = ctx.lavalink().connections().get(&ctx.guild_id_expected()) else {
+    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
         return Vec::new();
     };
-    let (queue, Some(queue_len)) = (
-        connection.queue(),
-        NonZeroUsize::new(connection.queue().len()),
-    ) else {
+    let data_r = data.read().await;
+    let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
     };
 
@@ -130,7 +127,7 @@ impl BotAutocomplete for Autocomplete {
             focused: focused.into_boxed_str(),
             kind,
         };
-        let choices = generate_move_autocomplete_choices(&options, &ctx);
+        let choices = generate_move_autocomplete_choices(&options, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)
     }
 }
@@ -150,16 +147,16 @@ pub struct Move {
 impl BotSlashCommand for Move {
     async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
         let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx)?;
+        check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let mut connection = ctx.lavalink().connection_mut(ctx.guild_id_expected());
-        let queue = connection.queue_mut();
+        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let mut data_w = data.write().await;
+        let queue = data_w.queue_mut();
         let queue_len = queue.len();
 
         if queue_len == 1 {
             drop(in_voice_with_user);
-            drop(connection);
             sus!(
                 "Nowhere to move the track as it is the only track in the queue.",
                 ctx
@@ -170,7 +167,6 @@ impl BotSlashCommand for Move {
 
         if self.track == self.position {
             drop(in_voice_with_user);
-            drop(connection);
             bad!(
                 format!("Invalid new position: {}; New position must be different from the old position", self.position),
                 ctx
@@ -202,12 +198,8 @@ impl BotSlashCommand for Move {
 
         queue.insert(insert_position, track);
 
-        drop(connection);
         out!(
-            format!(
-                "⤴️ Moved `{}` to position **`{position}`**",
-                track_title.as_deref().unwrap_or(UNTITLED_TRACK)
-            ),
+            format!("⤴️ Moved `{}` to position **`{position}`**", track_title),
             ctx
         );
     }

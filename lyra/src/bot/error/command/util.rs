@@ -36,6 +36,7 @@ pub enum ResidualImplConnectToError {
     Cache(#[from] crate::bot::error::Cache),
     GatewaySend(#[from] twilight_gateway::error::SendError),
     TwilightHttp(#[from] twilight_http::Error),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -92,6 +93,9 @@ impl AutoJoinAttemptError {
         error: crate::bot::error::component::connection::join::ImplConnectToError,
     ) -> Self {
         match error {
+            crate::bot::error::component::connection::join::ImplConnectToError::Lavalink(e) => {
+                Self::ImplAutoJoin(ResidualImplAutoJoinError::ConnectToNew(ResidualConnectToNewError::ImplConnectTo(ResidualImplConnectToError::Lavalink(e))))
+            },
             crate::bot::error::component::connection::join::ImplConnectToError::Forbidden(e) => {
                 Self::Failed(crate::bot::error::AutoJoinAttemptFailed::Forbidden(e))
             },

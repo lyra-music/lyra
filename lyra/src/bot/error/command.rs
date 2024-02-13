@@ -80,14 +80,9 @@ pub enum FlattenedError<'a> {
     StandbyCanceled(&'a twilight_standby::future::Canceled),
     Confirmation(&'a util::ConfirmationError),
     GatewaySend(&'a twilight_gateway::error::SendError),
-    Client(&'a twilight_lavalink::client::ClientError),
-    NodeSender(&'a twilight_lavalink::node::NodeSenderError),
-    UnknownLoadType(&'a super::component::queue::play::UnknownLoadTypeError),
-    Http(&'a http::Error),
-    Hyper(&'a hyper::Error),
-    SerdeJson(&'a serde_json::Error),
     AutoJoinSuppressed(&'a util::AutoJoinSuppressedError),
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
+    Lavalink(&'a lavalink_rs::error::LavalinkError),
 }
 
 pub use FlattenedError as Fe;
@@ -290,6 +285,9 @@ impl<'a> Fe<'a> {
             super::component::connection::join::ResidualImplConnectToError::TwilightHttp(e) => {
                 Self::TwilightHttp(e)
             }
+            super::component::connection::join::ResidualImplConnectToError::Lavalink(e) => {
+                Self::Lavalink(e)
+            }
             super::component::connection::join::ResidualImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed_residual(e)
             }
@@ -369,8 +367,8 @@ impl<'a> Fe<'a> {
             super::component::connection::leave::PreDisconnectCleanupError::EventSend(e) => {
                 Self::EventSend(e)
             }
-            super::component::connection::leave::PreDisconnectCleanupError::NodeSender(e) => {
-                Self::NodeSender(e)
+            super::component::connection::leave::PreDisconnectCleanupError::Lavalink(e) => {
+                Self::Lavalink(e)
             }
         }
     }
@@ -398,11 +396,8 @@ impl<'a> Fe<'a> {
         error: &'a super::component::queue::remove::WithAdvanceLockAndStoppedError,
     ) -> Fe<'a> {
         match error {
-            super::component::queue::remove::WithAdvanceLockAndStoppedError::Client(e) => {
-                Self::Client(e)
-            }
-            super::component::queue::remove::WithAdvanceLockAndStoppedError::NodeSender(e) => {
-                Self::NodeSender(e)
+            super::component::queue::remove::WithAdvanceLockAndStoppedError::Lavalink(e) => {
+                Self::Lavalink(e)
             }
         }
     }
@@ -437,6 +432,7 @@ impl<'a> Fe<'a> {
 
     const fn from_impl_connect_to_residual_2(error: &'a util::ResidualImplConnectToError) -> Self {
         match error {
+            util::ResidualImplConnectToError::Lavalink(e) => Self::Lavalink(e),
             util::ResidualImplConnectToError::Cache(e) => Self::Cache(e),
             util::ResidualImplConnectToError::GatewaySend(e) => Self::GatewaySend(e),
             util::ResidualImplConnectToError::TwilightHttp(e) => Self::TwilightHttp(e),
@@ -492,22 +488,9 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_load_track_process(
-        error: &'a super::component::queue::play::LoadTrackProcessError,
-    ) -> Fe<'a> {
-        match error {
-            super::component::queue::play::LoadTrackProcessError::Http(e) => Self::Http(e),
-            super::component::queue::play::LoadTrackProcessError::Hyper(e) => Self::Hyper(e),
-            super::component::queue::play::LoadTrackProcessError::SerdeJson(e) => {
-                Self::SerdeJson(e)
-            }
-        }
-    }
-
     const fn from_play(error: &'a super::component::queue::play::Error) -> Fe<'a> {
         match error {
-            super::component::queue::play::Error::NodeSender(e) => Self::NodeSender(e),
-            super::component::queue::play::Error::Client(e) => Self::Client(e),
+            super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
             super::component::queue::play::Error::CheckNotSuppressed(e) => {
                 Self::from_check_not_suppressed_error(e)
             }
@@ -516,10 +499,6 @@ impl<'a> Fe<'a> {
             super::component::queue::play::Error::AutoJoinOrCheckInVoiceWithUser(e) => {
                 Self::from_auto_join_or_check_in_voice_with_user(e)
             }
-            super::component::queue::play::Error::LoadTrackProcess(e) => {
-                Self::from_load_track_process(e)
-            }
-            super::component::queue::play::Error::UnknownLoadType(e) => Fe::UnknownLoadType(e),
         }
     }
 
@@ -578,14 +557,11 @@ pub enum AutocompleteError {
     SerdeJson(#[from] serde_json::Error),
     BaseHttp(#[from] http::Error),
     Http(#[from] twilight_http::Error),
-    Hyper(#[from] hyper::Error),
-    Client(#[from] twilight_lavalink::client::ClientError),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
     DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
     LoadFailed(#[from] super::LoadFailed),
-    UnknownLoadType(#[from] super::component::queue::play::UnknownLoadTypeError),
     Respond(#[from] RespondError),
-    LoadTrackProcess(#[from] super::component::queue::play::LoadTrackProcessError),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 
 pub type AutocompleteResult = core::result::Result<(), AutocompleteError>;

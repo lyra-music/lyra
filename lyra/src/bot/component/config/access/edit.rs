@@ -197,7 +197,7 @@ impl BotSlashCommand for MemberRole {
             .filter(|(_, mentionables)| !mentionables.is_empty());
 
         let db = ctx.db();
-        let g = ctx.guild_id_expected().get() as i64;
+        let g = ctx.guild_id().get() as i64;
         match self.action {
             EditAction::Add => categorized_mentionables.for_each(|(cat, mentionables)| {
                 add_access(&mut set, db.clone(), &cat, g, mentionables);
@@ -329,7 +329,7 @@ impl BotSlashCommand for Channel {
             .filter(|(_, channels)| !channels.is_empty());
 
         let db = ctx.db();
-        let g = ctx.guild_id_expected().get() as i64;
+        let g = ctx.guild_id().get() as i64;
         match self.action {
             EditAction::Add => categorized_channels
                 .for_each(|(cat, channels)| add_access(&mut set, db.clone(), &cat, g, channels)),

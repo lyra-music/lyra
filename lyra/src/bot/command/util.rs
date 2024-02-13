@@ -229,7 +229,7 @@ async fn handle_suppressed_auto_join(
             let wait_for_speaker =
                 ctx.bot()
                     .standby()
-                    .wait_for(ctx.guild_id_expected(), move |e: &Event| {
+                    .wait_for(ctx.guild_id(), move |e: &Event| {
                         let Event::VoiceStateUpdate(e) = e else {
                             return false;
                         };
@@ -292,20 +292,20 @@ pub async fn prompt_for_confirmation(
     .await?;
 
     let author_id = ctx.author_id();
-    let wait_for_modal_submit =
-        ctx.bot()
-            .standby()
-            .wait_for(ctx.guild_id_expected(), move |e: &Event| {
-                let Event::InteractionCreate(ref i) = e else {
-                    return false;
-                };
-                let Some(InteractionData::ModalSubmit(ref m)) = i.data else {
-                    return false;
-                };
-                m.custom_id == modal_custom_id
-                    && matches!(i.kind, InteractionType::ModalSubmit)
-                    && i.author_id() == Some(author_id)
-            });
+    let wait_for_modal_submit = ctx
+        .bot()
+        .standby()
+        .wait_for(ctx.guild_id(), move |e: &Event| {
+            let Event::InteractionCreate(ref i) = e else {
+                return false;
+            };
+            let Some(InteractionData::ModalSubmit(ref m)) = i.data else {
+                return false;
+            };
+            m.custom_id == modal_custom_id
+                && matches!(i.kind, InteractionType::ModalSubmit)
+                && i.author_id() == Some(author_id)
+        });
 
     let wait_for_modal_submit = tokio::time::timeout(
         Duration::from_secs(DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT.into()),

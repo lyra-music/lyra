@@ -27,7 +27,7 @@ pub struct View;
 
 impl BotSlashCommand for View {
     async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
-        let guild_id = ctx.guild_id_expected().get() as i64;
+        let guild_id = ctx.guild_id().get() as i64;
         let db = ctx.db();
 
         let embed = EmbedBuilder::new()

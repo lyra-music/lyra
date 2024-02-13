@@ -92,7 +92,7 @@ impl BotSlashCommand for Mode {
             UPDATE guild_configs SET {set_statements} WHERE id = $1 AND ({where_clause});
             "
         ))
-        .bind(ctx.guild_id_expected().get() as i64)
+        .bind(ctx.guild_id().get() as i64)
         .bind(access_mode)
         .execute(ctx.db())
         .await?;

@@ -65,7 +65,7 @@ impl InactivityTimeoutContext {
         Self {
             inner: value.bot_owned(),
             sender: value.sender().clone(),
-            guild_id: value.guild_id_expected(),
+            guild_id: value.guild_id(),
         }
     }
 }
@@ -95,7 +95,7 @@ impl HttpAware for InactivityTimeoutContext {
 }
 
 impl ExpectedGuildIdAware for InactivityTimeoutContext {
-    fn guild_id_expected(&self) -> Id<GuildMarker> {
+    fn guild_id(&self) -> Id<GuildMarker> {
         self.guild_id
     }
 }
@@ -119,7 +119,7 @@ async fn start_inactivity_timeout(
         }
     }
 
-    ctx.lavalink().notify_connection_change(guild_id);
+    ctx.lavalink().notify_connection_change(guild_id).await;
     pre_disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
@@ -147,15 +147,16 @@ pub async fn handle_voice_state_update(
     let lavalink = ctx.lavalink();
 
     let (connected_channel_id, text_channel_id) = {
-        let Some(mut connection) = lavalink.connections().get_mut(&guild_id) else {
+        let Some(player) = lavalink.get_player_data(guild_id) else {
             return Ok(());
         };
 
+        let connection = &player.read().await.connection;
         if connection.just_changed().await {
             return Ok(());
         }
 
-        (connection.channel_id(), connection.text_channel_id())
+        (connection.channel_id, connection.text_channel_id)
     };
 
     match maybe_old_state {

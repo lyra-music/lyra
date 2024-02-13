@@ -34,7 +34,7 @@ impl BotSlashCommand for Clear {
         let mut set = JoinSet::new();
         category_flags.iter_names_as_column().for_each(|c| {
             let db = ctx.db().clone();
-            let g = ctx.guild_id_expected().get() as i64;
+            let g = ctx.guild_id().get() as i64;
 
             set.spawn(async move {
                 sqlx::query(&format!(

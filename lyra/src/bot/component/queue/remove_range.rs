@@ -33,17 +33,15 @@ struct RemoveRangeAutocompleteOptions {
     kind: RemoveRangeAutocompleteOptionsType,
 }
 
-fn generate_remove_range_autocomplete_choices(
+async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(connection) = ctx.lavalink().connections().get(&ctx.guild_id_expected()) else {
+    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
         return Vec::new();
     };
-    let (queue, Some(queue_len)) = (
-        connection.queue(),
-        NonZeroUsize::new(connection.queue().len()),
-    ) else {
+    let data_r = data.read().await;
+    let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
     };
 
@@ -135,7 +133,7 @@ impl BotAutocomplete for Autocomplete {
             focused: focused.into_boxed_str(),
             kind,
         };
-        let choices = generate_remove_range_autocomplete_choices(&options, &ctx);
+        let choices = generate_remove_range_autocomplete_choices(&options, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)
     }
 }
@@ -155,11 +153,12 @@ pub struct RemoveRange {
 impl BotSlashCommand for RemoveRange {
     async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
         let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx)?;
+        check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let connection = ctx.lavalink().connection(ctx.guild_id_expected());
-        let queue = connection.queue();
+        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let data_r = data.read().await;
+        let queue = data_r.queue();
         let queue_len = queue.len();
 
         if queue_len == 1 {
@@ -171,7 +170,6 @@ impl BotSlashCommand for RemoveRange {
                 .await?;
 
             drop(in_voice_with_user);
-            drop(connection);
             sus!(
                 format!("The queue only has one track; Use {remove} instead."),
                 ctx
@@ -197,14 +195,12 @@ impl BotSlashCommand for RemoveRange {
             };
 
             drop(in_voice_with_user);
-            drop(connection);
             bad!(message, ctx);
         }
 
         let positions = (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p as usize));
         check::all_users_track(positions, in_voice_with_user, queue, &ctx)?;
 
-        drop(connection);
         Ok(super::remove_range(self.start, self.end, &mut ctx).await?)
     }
 }

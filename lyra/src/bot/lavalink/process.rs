@@ -1,14 +1,11 @@
-use std::sync::Arc;
+use lavalink_rs::model::events::Events;
 
-use twilight_lavalink::{model::IncomingEvent, Node};
-
-use super::model::Process;
-use crate::bot::{core::model::BotState, error::lavalink::ProcessResult};
-
-pub async fn process(bot: Arc<BotState>, event: IncomingEvent, _node: Arc<Node>) -> ProcessResult {
-    match event {
-        IncomingEvent::TrackStart(ref e) => bot.as_track_start_context(e).process().await,
-        IncomingEvent::TrackEnd(ref e) => bot.as_track_end_context(e).process().await,
-        _ => Ok(()),
+pub fn handlers() -> Events {
+    Events {
+        track_start: Some(super::track::start),
+        track_end: Some(super::track::end),
+        track_exception: Some(super::track::exception),
+        track_stuck: Some(super::track::stuck),
+        ..Default::default()
     }
 }

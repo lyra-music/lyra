@@ -32,12 +32,8 @@ impl Display for LeaveResponse {
 }
 
 pub(super) fn disconnect(ctx: &(impl SenderAware + ExpectedGuildIdAware)) -> Result<(), SendError> {
-    ctx.sender().command(&UpdateVoiceState::new(
-        ctx.guild_id_expected(),
-        None,
-        false,
-        false,
-    ))?;
+    ctx.sender()
+        .command(&UpdateVoiceState::new(ctx.guild_id(), None, false, false))?;
 
     Ok(())
 }
@@ -45,24 +41,23 @@ pub(super) fn disconnect(ctx: &(impl SenderAware + ExpectedGuildIdAware)) -> Res
 pub(super) async fn pre_disconnect_cleanup(
     ctx: &(impl ExpectedGuildIdAware + lavalink::ClientAware + Sync),
 ) -> Result<(), PreDisconnectCleanupError> {
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
-    lavalink.dispatch_queue_clear(guild_id);
-    lavalink.remove_connection(guild_id);
-    lavalink.destroy_player(guild_id)?;
+    lavalink.dispatch_queue_clear(guild_id).await;
+    lavalink.delete_player(guild_id).await?;
 
     Ok(())
 }
 
 async fn leave(ctx: &Ctx<SlashCommand>) -> Result<LeaveResponse, leave::Error> {
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
 
     let in_voice = check::in_voice(ctx)?;
     let channel_id = in_voice.channel_id();
     in_voice.with_user()?.only()?;
 
-    ctx.lavalink().notify_connection_change(guild_id);
+    ctx.lavalink().notify_connection_change(guild_id).await;
     pre_disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 

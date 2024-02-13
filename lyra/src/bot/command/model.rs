@@ -37,14 +37,14 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::{
     core::model::{
-        BotState, BotStateAware, CacheAware, HttpAware, HyperAware, HyperClient,
-        InteractionInterface, MessageResponse, OwnedBotState, OwnedBotStateAware,
+        BotState, BotStateAware, CacheAware, HttpAware, InteractionInterface, MessageResponse,
+        OwnedBotState, OwnedBotStateAware,
     },
     error::{
         command::{AutocompleteResult, FollowupError, RespondError, Result as CommandResult},
         core::DeserializeBodyFromHttpError,
     },
-    gateway::{ExpectedGuildIdAware, SenderAware},
+    gateway::{ExpectedGuildIdAware, GuildIdAware, SenderAware},
     lavalink,
 };
 
@@ -143,12 +143,8 @@ impl<T: CtxKind> Ctx<T> {
 
     pub fn bot_member(&self) -> Reference<'_, (Id<GuildMarker>, Id<UserMarker>), CachedMember> {
         self.cache()
-            .member(self.guild_id_expected(), self.bot().user_id())
+            .member(self.guild_id(), self.bot().user_id())
             .expect("bot's member object must exist")
-    }
-
-    pub fn guild_id(&self) -> Option<Id<GuildMarker>> {
-        self.inner.guild_id
     }
 
     #[inline]
@@ -208,7 +204,7 @@ impl<T: CtxKind> Ctx<T> {
             return self.bot_permissions();
         }
 
-        let guild_id = self.guild_id_expected();
+        let guild_id = self.guild_id();
         let user_id = self.bot().user_id();
         let everyone_role = self
             .cache()
@@ -246,7 +242,7 @@ impl<T: CtxKind> Ctx<T> {
 
     pub fn current_voice_state(&self) -> CurrentVoiceStateResult {
         let user = self.bot().user_id();
-        self.cache().voice_state(user, self.guild_id()?)
+        self.cache().voice_state(user, self.get_guild_id()?)
     }
 }
 
@@ -286,16 +282,16 @@ impl<T: CtxKind> lavalink::ClientAware for Ctx<T> {
     }
 }
 
-impl<T: CtxKind> ExpectedGuildIdAware for Ctx<T> {
-    fn guild_id_expected(&self) -> Id<GuildMarker> {
-        self.guild_id()
-            .expect("this interaction must be executed in guilds")
+impl<T: CtxKind> GuildIdAware for Ctx<T> {
+    fn get_guild_id(&self) -> Option<Id<GuildMarker>> {
+        self.inner.guild_id
     }
 }
 
-impl<T: CtxKind> HyperAware for Ctx<T> {
-    fn hyper(&self) -> &HyperClient {
-        self.bot.hyper()
+impl<T: CtxKind> ExpectedGuildIdAware for Ctx<T> {
+    fn guild_id(&self) -> Id<GuildMarker> {
+        self.get_guild_id()
+            .expect("this interaction must be executed in guilds")
     }
 }
 

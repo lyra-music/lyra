@@ -318,13 +318,20 @@ fn generate_latent_embed_colours() -> LatentEmbedColours {
     }
 }
 
-fn get_users_in_voice(
+async fn get_users_in_voice(
     ctx: &Ctx<impl RespondViaMessage>,
     guild_id: Id<GuildMarker>,
 ) -> Result<HashSet<Id<UserMarker>>, CacheError> {
     let users_in_voice = ctx
         .cache()
-        .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id())
+        .voice_channel_states(
+            ctx.lavalink()
+                .player_data(guild_id)
+                .read()
+                .await
+                .connection
+                .channel_id,
+        )
         .expect("bot must be in voice")
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
@@ -442,13 +449,13 @@ pub async fn start(
     topic: &Topic,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<Resolution, StartPollError> {
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
 
     let (author_name, author_icon) = get_author_info(guild_id, ctx);
     let embed_latent = generate_latent_embed_colours();
     let (upvote_button_id, row) = generate_upvote_button_id_and_row();
 
-    let users_in_voice = get_users_in_voice(ctx, guild_id)?;
+    let users_in_voice = get_users_in_voice(ctx, guild_id).await?;
     let votes = HashMap::from([(ctx.author_id(), Vote(true))]);
     let threshold = ((users_in_voice.len() + 1) as f64 / 2.).round() as usize;
 
@@ -469,8 +476,12 @@ pub async fn start(
 
     let message_id = message.id();
     {
-        let mut connection = ctx.lavalink().connection_mut(guild_id);
-        connection.set_poll(Some(Poll::new(topic, message.clone())));
+        ctx.lavalink()
+            .player_data(guild_id)
+            .write()
+            .await
+            .connection
+            .set_poll(Poll::new(topic, message.clone()));
     }
     let components = &mut ctx
         .bot()
@@ -542,7 +553,13 @@ async fn wait_for_votes(
     embed_ctx: UpdatePollEmbedContext,
     guild_id: Id<GuildMarker>,
 ) -> Result<Resolution, WaitForVotesError> {
-    let mut rx = ctx.lavalink().connection(guild_id).subscribe();
+    let mut rx = ctx
+        .lavalink()
+        .player_data(guild_id)
+        .read()
+        .await
+        .connection
+        .subscribe();
     loop {
         let poll_stream = wait_for_poll_actions(&mut rx, &mut poll_ctx);
         match tokio::time::timeout(Duration::from_secs(30), poll_stream).await {
@@ -586,7 +603,8 @@ async fn wait_for_votes(
                 PollAction::AlternateCast(user_id) => {
                     if !users_in_voice.contains(&user_id) {
                         ctx.lavalink()
-                            .dispatch(guild_id, Event::AlternateVoteCastDenied);
+                            .dispatch(guild_id, Event::AlternateVoteCastDenied)
+                            .await;
                         continue;
                     }
                     match votes.entry(user_id) {
@@ -595,7 +613,8 @@ async fn wait_for_votes(
                         }
                         Entry::Occupied(e) => {
                             ctx.lavalink()
-                                .dispatch(guild_id, Event::AlternateVoteCastedAlready(*e.get()));
+                                .dispatch(guild_id, Event::AlternateVoteCastedAlready(*e.get()))
+                                .await;
                             continue;
                         }
                     }

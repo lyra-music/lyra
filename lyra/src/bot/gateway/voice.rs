@@ -90,7 +90,7 @@ impl SenderAware for Context {
 }
 
 impl ExpectedGuildIdAware for Context {
-    fn guild_id_expected(&self) -> Id<GuildMarker> {
+    fn guild_id(&self) -> Id<GuildMarker> {
         self.inner
             .guild_id
             .expect("`VoiceStateUpdate::guild_id` must exist")

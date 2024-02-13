@@ -21,15 +21,16 @@ impl BotSlashCommand for FairQueue {
     async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
         check::user_is_dj(&ctx)?;
         check::in_voice(&ctx)?.with_someone_else()?;
-        check::queue_not_empty(&ctx)?;
+        check::queue_not_empty(&ctx).await?;
 
-        let guild_id = ctx.guild_id_expected();
-        let indexer_type = ctx.lavalink().connection(guild_id).queue().indexer_type();
+        let guild_id = ctx.guild_id();
+        let data = ctx.lavalink().player_data(guild_id);
+        let indexer_type = data.read().await.queue().indexer_type();
 
         match indexer_type {
             QueueIndexerType::Fair => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+                data.write()
+                    .await
                     .queue_mut()
                     .set_indexer_type(QueueIndexerType::Standard);
                 out!("**` ⮆ `** Disabled fair queue", ctx);
@@ -41,8 +42,8 @@ impl BotSlashCommand for FairQueue {
                 );
             }
             QueueIndexerType::Standard => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+                data.write()
+                    .await
                     .queue_mut()
                     .set_indexer_type(QueueIndexerType::Fair);
                 out!("⚖️ Enabled fair queue", ctx);
