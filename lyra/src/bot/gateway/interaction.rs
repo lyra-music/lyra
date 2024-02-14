@@ -172,6 +172,8 @@ async fn match_error(
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         Fe::Cache(_) => {
+            tracing::warn!("cache error: {:#?}", error);
+
             crit!("Something isn't working at the moment, try again later.", i);
         }
         Fe::UserNotDj(_) => {

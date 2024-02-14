@@ -1,8 +1,8 @@
 use lavalink_rs::{
     client::LavalinkClient,
+    hook,
     model::events::{TrackEnd, TrackException, TrackStart, TrackStuck},
 };
-use lyra_proc::hook;
 use tokio::sync::RwLock;
 
 use crate::bot::lavalink::PlayerData;

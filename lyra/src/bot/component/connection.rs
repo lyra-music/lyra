@@ -45,7 +45,7 @@ use crate::bot::{
 fn users_in_voice(ctx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
     ctx.cache()
         .voice_channel_states(channel_id)
-        .and_then(|voice_states| {
+        .map_or(Some(0), |voice_states| {
             let mut users = voice_states
                 .map(|v| ctx.cache().user(v.user_id()))
                 .collect::<Option<Vec<_>>>()?;

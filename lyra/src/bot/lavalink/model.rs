@@ -581,19 +581,21 @@ impl Lavalink {
                 self.0
                     .handle_voice_server_update(e.guild_id, e.token.clone(), e.endpoint.clone());
             }
-            twilight_gateway::Event::VoiceStateUpdate(e) => self.0.handle_voice_state_update(
-                e.guild_id.expect("guild_id must exist"),
-                e.channel_id,
-                e.user_id,
-                e.session_id.clone(),
-            ),
+            twilight_gateway::Event::VoiceStateUpdate(e) => {
+                self.0.handle_voice_state_update(
+                    e.guild_id.expect("guild_id must exist"),
+                    e.channel_id,
+                    e.user_id,
+                    e.session_id.clone(),
+                );
+            }
             _ => {}
         }
     }
 
     async fn connection_info(&self, guild_id: Id<GuildMarker>) -> ConnectionInfo {
         self.0
-            .get_connection_info(guild_id, Duration::MAX)
+            .get_connection_info(guild_id, Duration::from_secs(5))
             .await
             .expect("timeout should not have been reached")
     }

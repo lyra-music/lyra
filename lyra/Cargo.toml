@@ -53,7 +53,7 @@ fuzzy-matcher = "0.3.7"
 http = "0.2.11"
 log = "0.4.20"
 tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 serde_json = "1.0.113"
 rand = "0.8.5"
 rand_chacha = "0.3.1"

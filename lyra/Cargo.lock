@@ -1111,7 +1111,7 @@ dependencies = [
 [[package]]
 name = "lavalink-rs"
 version = "0.10.0"
-source = "git+https://gitlab.com/vicky5124/lavalink-rs/#7c70b8d341910e466f63a01e02da2783c2efd97c"
+source = "git+https://gitlab.com/vicky5124/lavalink-rs/#918f1e824d789bb19f81e022f1ff93e70b59779f"
 dependencies = [
  "arc-swap",
  "dashmap",
@@ -1284,7 +1284,7 @@ dependencies = [
 [[package]]
 name = "macros"
 version = "0.1.0"
-source = "git+https://gitlab.com/vicky5124/lavalink-rs/#7c70b8d341910e466f63a01e02da2783c2efd97c"
+source = "git+https://gitlab.com/vicky5124/lavalink-rs/#918f1e824d789bb19f81e022f1ff93e70b59779f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1639,9 +1639,9 @@ dependencies = [
 
 [[package]]
 name = "pkg-config"
-version = "0.3.29"
+version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2900ede94e305130c13ddd391e0ab7cbaeb783945ae07a279c268cb05109c6cb"
+checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
 name = "png"
