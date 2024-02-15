@@ -1,6 +1,6 @@
 use std::{fs, mem, str::FromStr, sync::Arc};
 
-use lavalink_rs::client::LavalinkClient;
+use lavalink_rs::{client::LavalinkClient, model::client::NodeDistributionStrategy};
 use log::LevelFilter;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
@@ -51,12 +51,12 @@ impl BotManager {
 
         let http = ClientBuilder::default()
             .default_allowed_mentions(AllowedMentions::default())
-            .token(token.to_owned())
+            .token(token.clone())
             .build()
             .into();
 
         let shard_config = Some(
-            ConfigBuilder::new(token.to_owned(), Self::INTENTS)
+            ConfigBuilder::new(token, Self::INTENTS)
                 .presence(
                     UpdatePresencePayload::new(
                         [Activity::from(MinimalActivity {
@@ -89,7 +89,7 @@ impl BotManager {
         let mut set = JoinSet::new();
 
         let database_url = mem::take(&mut self.config.database_url);
-        let options = PgConnectOptions::from_str(database_url)?.log_statements(LevelFilter::Debug);
+        let options = PgConnectOptions::from_str(&database_url)?.log_statements(LevelFilter::Debug);
         let db = PgPoolOptions::new()
             .max_connections(5)
             .connect_with(options)
@@ -148,7 +148,7 @@ impl BotManager {
             lavalink_host,
             lavalink_pwd,
             ..
-        } = self.config;
+        } = &self.config;
 
         let events = lavalink::handlers();
 
@@ -159,7 +159,7 @@ impl BotManager {
             ..Default::default()
         }]);
 
-        let client = LavalinkClient::new(events, nodes).await;
+        let client = LavalinkClient::new(events, nodes, NodeDistributionStrategy::new()).await;
         client.into()
     }
 

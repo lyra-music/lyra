@@ -1,5 +1,4 @@
 use std::{
-    env,
     ops::Deref,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -42,19 +41,24 @@ pub type UnitFollowupResult = FollowupResult<()>;
 pub type MessageFollowupResult = FollowupResult<MessageResponse>;
 
 pub struct Config {
-    pub token: &'static str,
-    pub lavalink_host: &'static str,
-    pub lavalink_pwd: &'static str,
-    pub database_url: &'static str,
+    pub token: String,
+    pub lavalink_host: String,
+    pub lavalink_pwd: String,
+    pub database_url: String,
 }
 
 impl Config {
-    pub const fn from_env() -> Self {
+    pub fn from_env() -> Self {
+        #[inline]
+        fn env_var(key: &'static str) -> String {
+            std::env::var(key).unwrap_or_else(|e| panic!("invalid key `{key}`: {e}"))
+        }
+
         Self {
-            token: env!("BOT_TOKEN"),
-            lavalink_host: const_str::concat!(env!("SERVER_ADDRESS"), ":", env!("SERVER_PORT")),
-            lavalink_pwd: env!("LAVALINK_SERVER_PASSWORD"),
-            database_url: env!("DATABASE_URL"),
+            token: env_var("BOT_TOKEN"),
+            lavalink_host: env_var("SERVER_ADDRESS") + ":" + &env_var("SERVER_PORT"),
+            lavalink_pwd: env_var("LAVALINK_SERVER_PASSWORD"),
+            database_url: env_var("DATABASE_URL"),
         }
     }
 }

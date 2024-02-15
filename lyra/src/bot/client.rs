@@ -1,13 +1,22 @@
-use super::{error::manager::StartError, manager::BotManager};
-use crate::bot::core::model::Config;
+pub async fn run() -> Result<(), super::error::manager::StartError> {
+    #[inline]
+    fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
+        parsed
+            .parse()
+            .unwrap_or_else(|e| panic!("invalid directive `{parsed}`: {e}"))
+    }
 
-pub async fn run() -> Result<(), StartError> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
+                .from_env_lossy()
+                .add_directive(parse_directive("lavalink_rs=trace")),
+        )
         .init();
 
-    let config = Config::from_env();
-    let mut bot_manager = BotManager::new(config);
+    let config = super::core::model::Config::from_env();
+    let mut bot_manager = super::manager::BotManager::new(config);
 
     bot_manager.start().await?;
     Ok(())

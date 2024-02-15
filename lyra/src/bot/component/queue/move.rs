@@ -13,7 +13,7 @@ use crate::bot::{
     component::queue::normalize_queue_position,
     error::command::{AutocompleteResult, Result as CommandResult},
     gateway::ExpectedGuildIdAware,
-    lavalink::ClientAware,
+    lavalink::{ClientAware, CorrectTrackInfo},
 };
 
 enum MoveAutocompleteOptionType {
@@ -184,7 +184,8 @@ impl BotSlashCommand for Move {
         let track = queue
             .remove(track_position.get() - 1)
             .expect("`self.track as usize - 1` must be in bounds");
-        let track_title = track.track().info.title.clone();
+        let track_title = track.track().info.corrected_title();
+        let mesage = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 
         let insert_position = position.get() - 1;
 
@@ -198,9 +199,6 @@ impl BotSlashCommand for Move {
 
         queue.insert(insert_position, track);
 
-        out!(
-            format!("⤴️ Moved `{}` to position **`{position}`**", track_title),
-            ctx
-        );
+        out!(mesage, ctx);
     }
 }

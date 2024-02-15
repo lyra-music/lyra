@@ -1111,7 +1111,7 @@ dependencies = [
 [[package]]
 name = "lavalink-rs"
 version = "0.10.0"
-source = "git+https://gitlab.com/vicky5124/lavalink-rs/#918f1e824d789bb19f81e022f1ff93e70b59779f"
+source = "git+https://gitlab.com/vicky5124/lavalink-rs?rev=88969984#88969984a3307a469e9d693d9f36a2c4324620bc"
 dependencies = [
  "arc-swap",
  "dashmap",
@@ -1284,7 +1284,7 @@ dependencies = [
 [[package]]
 name = "macros"
 version = "0.1.0"
-source = "git+https://gitlab.com/vicky5124/lavalink-rs/#918f1e824d789bb19f81e022f1ff93e70b59779f"
+source = "git+https://gitlab.com/vicky5124/lavalink-rs?rev=88969984#88969984a3307a469e9d693d9f36a2c4324620bc"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -5,23 +5,27 @@ use lavalink_rs::{
 };
 use tokio::sync::RwLock;
 
-use crate::bot::lavalink::PlayerData;
+use crate::bot::lavalink::{model::CorrectTrackInfo, PlayerData};
 
 #[hook]
 pub(super) async fn start(_: LavalinkClient, _session_id: String, event: &TrackStart) {
     tracing::debug!(
-        "guild {} started {}",
+        "guild {} started {:?}",
         event.guild_id.0,
-        event.track.info.title
+        event.track.info.checked_title()
     );
 }
 
 #[hook]
-pub(super) async fn end(client: LavalinkClient, _session_id: String, event: &TrackEnd) {
+pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &TrackEnd) {
     let guild_id = event.guild_id;
-    tracing::debug!("guild {} ended   {}", guild_id.0, event.track.info.title);
+    tracing::debug!(
+        "guild {} ended   {:?}",
+        guild_id.0,
+        event.track.info.checked_title()
+    );
 
-    let ctx = client
+    let ctx = lavalink
         .get_player_context(guild_id)
         .expect("player context must exist");
 
@@ -53,7 +57,7 @@ pub(super) async fn end(client: LavalinkClient, _session_id: String, event: &Tra
 }
 
 #[hook]
-pub(super) async fn exception(client: LavalinkClient, session_id: String, event: &TrackException) {}
+pub(super) async fn exception(_: LavalinkClient, _session_id: String, _: &TrackException) {}
 
 #[hook]
-pub(super) async fn stuck(client: LavalinkClient, session_id: String, event: &TrackStuck) {}
+pub(super) async fn stuck(_: LavalinkClient, _session_id: String, _: &TrackStuck) {}

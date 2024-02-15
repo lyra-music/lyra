@@ -64,7 +64,7 @@ lazy_static = "1.4.0"
 chrono = "0.4.34"
 sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
-lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs/", features = [
+lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs", rev = "88969984", features = [
     "twilight",
 ] }
 

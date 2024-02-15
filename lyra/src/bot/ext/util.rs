@@ -12,7 +12,8 @@ use twilight_model::guild::Permissions;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::bot::{
-    core::r#const::regex, error::PrettifiedTimestampParse as PrettifiedTimestampParseError,
+    core::r#const::regex as const_regex,
+    error::PrettifiedTimestampParse as PrettifiedTimestampParseError,
 };
 
 pub trait OptionMap {
@@ -126,10 +127,9 @@ pub trait ViaGrapheme: UnicodeSegmentation {
         Self: ToOwned,
         <Self as ToOwned>::Owned: for<'a> FromIterator<&'a str>,
     {
-        if self.grapheme_len() <= new_len {
-            return Cow::Borrowed(self);
-        }
-        Cow::Owned(self.graphemes(true).take(new_len).collect())
+        (self.grapheme_len() <= new_len)
+            .then_some(Cow::Borrowed(self))
+            .unwrap_or_else(|| Cow::Owned(self.graphemes(true).take(new_len).collect()))
     }
 }
 
@@ -152,11 +152,10 @@ impl PrettyTruncator for str {
         Self: ToOwned,
     {
         let trail = Self::trail();
-        if self.grapheme_len() <= new_len {
-            return Cow::Borrowed(self);
-        }
-        let truncated = self.grapheme_truncate(new_len - trail.grapheme_len());
-        truncated + trail
+
+        (self.grapheme_len() <= new_len)
+            .then_some(Cow::Borrowed(self))
+            .unwrap_or_else(|| self.grapheme_truncate(new_len - trail.grapheme_len()) + trail)
     }
 }
 
@@ -204,9 +203,9 @@ impl FromStr for PrettifiedTimestamp {
     type Err = PrettifiedTimestampParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let captures = if let Some(captures) = regex::TIMESTAMP.captures(value) {
+        let captures = if let Some(captures) = const_regex::TIMESTAMP.captures(value) {
             captures
-        } else if let Some(captures) = regex::TIMESTAMP_2.captures(value) {
+        } else if let Some(captures) = const_regex::TIMESTAMP_2.captures(value) {
             captures
         } else {
             return Err(PrettifiedTimestampParseError);

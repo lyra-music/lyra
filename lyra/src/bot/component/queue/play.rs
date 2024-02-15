@@ -1,5 +1,3 @@
-use std::mem;
-
 use chrono::Duration;
 use futures::future;
 use itertools::{Either, Itertools};
@@ -36,7 +34,7 @@ use crate::bot::{
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, Lavalink},
+    lavalink::{ClientAware, CorrectPlaylistInfo, CorrectTrackInfo, Lavalink},
 };
 
 struct LoadTrackContext {
@@ -163,8 +161,8 @@ impl AutocompleteResultPrettify for TrackData {
 
         let track_length =
             PrettifiedTimestamp::from(Duration::milliseconds(track_info.length as i64));
-        let title = mem::take(&mut track_info.title);
-        let author = mem::take(&mut track_info.author);
+        let title = track_info.take_and_correct_title();
+        let author = track_info.take_and_correct_author();
 
         format!(
             "⌛{} 👤{} 🎵{}",
@@ -181,7 +179,7 @@ impl AutocompleteResultPrettify for Track {
             unreachable!()
         };
 
-        let name = mem::take(&mut data.info.name);
+        let name = data.info.take_and_correct_name();
         let track_length = PrettifiedTimestamp::from(Duration::milliseconds(
             data.tracks.iter().map(|t| t.info.length as i64).sum(),
         ));
@@ -317,7 +315,7 @@ async fn play(
                     .map(|t| {
                         format!(
                             "[`{}`](<{}>)",
-                            t.info.title,
+                            t.info.corrected_title(),
                             t.info.uri.as_ref().expect("uri must exist")
                         )
                     })
@@ -335,7 +333,7 @@ async fn play(
                         format!(
                             "`{} tracks` from playlist [`{}`](<{}>)",
                             p.tracks.len(),
-                            p.info.name,
+                            p.info.corrected_name(),
                             p.uri
                         )
                     })

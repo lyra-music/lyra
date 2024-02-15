@@ -37,7 +37,7 @@ use crate::bot::{
         UserNotStageManager as UserNotStageManagerError,
     },
     gateway::{ExpectedGuildIdAware, GuildIdAware},
-    lavalink::{self, ClientAware, Event, PlayerData, QueueItem},
+    lavalink::{self, ClientAware, CorrectTrackInfo, Event, PlayerData, QueueItem},
 };
 
 use super::{
@@ -337,7 +337,7 @@ async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, 
 
     let requester = current.requester();
     let position = NonZeroUsize::new(index + 1).expect("`index + 1` must be nonzero");
-    let title = current.track().info.title.clone().into();
+    let title = current.track().info.corrected_title().into();
     let channel_id = data_r.connection.channel_id;
 
     Ok(CurrentlyPlaying {
@@ -433,7 +433,7 @@ fn impl_users_track(
         check::UserOnlyInError::InVoiceWithSomeoneElse(e) => e.0,
         check::UserOnlyInError::Cache(e) => return e.into(),
     };
-    let title = track.track().info.title.clone().into();
+    let title = track.track().info.corrected_title().into();
     let requester = track.requester();
 
     NotUsersTrackError {

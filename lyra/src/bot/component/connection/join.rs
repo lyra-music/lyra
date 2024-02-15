@@ -229,15 +229,21 @@ async fn impl_connect_to(
             empty: voice_is_empty,
         }
     } else {
-        ctx.lavalink()
-            .new_player_data(guild_id, channel_id, ctx.channel_id())
-            .await?;
+        let channel_id = ctx.channel_id();
+        let lavalink = ctx.lavalink().clone();
+        traced::tokio_spawn(async move {
+            lavalink
+                .new_player_data(guild_id, channel_id, channel_id)
+                .await?;
+            lavalink.notify_connection_change(guild_id).await;
+
+            Ok::<_, lavalink_rs::error::LavalinkError>(())
+        });
         Response::Joined {
             voice: joined,
             empty: voice_is_empty,
         }
     };
-    ctx.lavalink().notify_connection_change(guild_id).await;
 
     if joined.kind == JoinedChannelType::Stage {
         ctx.bot()

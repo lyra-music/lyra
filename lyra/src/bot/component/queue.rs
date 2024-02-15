@@ -40,7 +40,7 @@ use crate::bot::{
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, QueueItem},
+    lavalink::{ClientAware, CorrectTrackInfo, QueueItem},
 };
 
 fn generate_position_choice(
@@ -67,7 +67,7 @@ fn generate_position_choice(
             position,
             track_length,
             requester,
-            track_info.title.pretty_truncate(53)
+            track_info.corrected_title().pretty_truncate(53)
         ),
         name_localizations: None,
         value: CommandOptionChoiceValue::Integer(position.get() as i64),
@@ -147,8 +147,8 @@ fn generate_position_choices_from_fuzzy_match<'a>(
     let queue_iter = queue_iter
         .filter_map(|(p, t)| {
             let track_info = &t.track().info;
-            let author = track_info.author.clone();
-            let title = track_info.title.clone();
+            let author = track_info.corrected_author();
+            let title = track_info.corrected_title();
             let requester = t.requester();
             Some((
                 p,
@@ -252,7 +252,7 @@ async fn impl_remove(
         0 => String::new(),
         1..=ADD_TRACKS_WRAP_LIMIT => removed
             .into_iter()
-            .map(|t| format!("`{}`", t.into_track().info.title))
+            .map(|t| format!("`{}`", t.into_track().info.corrected_title()))
             .collect::<Vec<_>>()
             .pretty_join_with_and(),
         _ => format!("`{removed_len} tracks`"),
