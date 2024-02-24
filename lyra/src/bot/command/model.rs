@@ -544,7 +544,7 @@ pub enum PartialInteractionData {
 }
 
 pub trait CommandInfoAware {
-    fn name() -> Box<str>;
+    fn name() -> &'static str;
 }
 
 pub trait BotSlashCommand: CommandInfoAware {

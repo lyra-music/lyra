@@ -8,7 +8,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
 };
 
 use futures::Future;
@@ -29,9 +28,7 @@ use twilight_model::id::{
 
 use crate::bot::{
     command::poll::Poll,
-    core::r#const::{
-        lavaplayer as const_lavaplayer, misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, text as const_text,
-    },
+    core::r#const::{self, lavaplayer as const_lavaplayer, text as const_text},
     error::component::queue::remove::WithAdvanceLockAndStoppedError,
     ext::util::{chunked_range, multi_interleave, NestedTranspose},
 };
@@ -206,6 +203,7 @@ impl CorrectPlaylistInfo for lavalink_rs::model::track::PlaylistInfo {
     }
 }
 
+#[derive(Debug)]
 pub struct QueueItem {
     track: TrackData,
     requester: Id<UserMarker>,
@@ -425,8 +423,13 @@ impl Queue {
     }
 
     pub fn position(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.index + self.current().map_or(0, |_| 1))
-            .expect("`self.index + 1` must be nonzero")
+        NonZeroUsize::new(
+            self.index
+                + self
+                    .current()
+                    .map_or_else(|| usize::from(self.index == 0), |_| 1),
+        )
+        .expect("`self.index + 1` must be nonzero")
     }
 
     pub const fn index(&self) -> &usize {
@@ -584,29 +587,33 @@ impl Queue {
     }
 }
 
-pub struct ConnectionData {
+#[derive(Debug)]
+pub struct Connection {
     pub channel_id: Id<ChannelMarker>,
     pub text_channel_id: Id<ChannelMarker>,
     poll: Option<Poll>,
-    change_notify: Notify,
+    change: Notify,
     event_sender: broadcast::Sender<Event>,
 }
 
-impl ConnectionData {
+type ConnectionRef<'a> = dashmap::mapref::one::Ref<'a, Id<GuildMarker>, Connection>;
+type ConnectionRefMut<'a> = dashmap::mapref::one::RefMut<'a, Id<GuildMarker>, Connection>;
+
+impl Connection {
     pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
         Self {
             channel_id,
             text_channel_id,
-            change_notify: Notify::new(),
+            change: Notify::new(),
             event_sender: broadcast::channel(16).0,
             poll: None,
         }
     }
 
-    pub async fn just_changed(&self) -> bool {
+    pub async fn changed(&self) -> bool {
         tokio::time::timeout(
-            Duration::from_millis(WAIT_FOR_BOT_EVENTS_TIMEOUT.into()),
-            self.change_notify.notified(),
+            *r#const::connection::CONNECTION_CHANGED_TIMEOUT,
+            self.change.notified(),
         )
         .await
         .is_ok()
@@ -629,7 +636,8 @@ impl ConnectionData {
     }
 
     pub fn notify_change(&self) {
-        self.change_notify.notify_one();
+        tracing::trace!("notified connection change");
+        self.change.notify_one();
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
@@ -637,26 +645,39 @@ impl ConnectionData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, const_panic::PanicFmt)]
+pub struct AlternateVoteCastUserId(u64);
+
+impl From<Id<UserMarker>> for AlternateVoteCastUserId {
+    fn from(value: Id<UserMarker>) -> Self {
+        Self(value.get())
+    }
+}
+
+impl From<AlternateVoteCastUserId> for Id<UserMarker> {
+    fn from(value: AlternateVoteCastUserId) -> Self {
+        Self::new(value.0)
+    }
+}
+
+#[derive(Debug, Clone, const_panic::PanicFmt)]
 pub enum Event {
     QueueClear,
     QueueRepeat,
-    AlternateVoteCast(Id<UserMarker>),
+    AlternateVoteCast(AlternateVoteCastUserId),
     AlternateVoteDjCast,
     AlternateVoteCastedAlready(crate::bot::command::poll::Vote),
     AlternateVoteCastDenied,
 }
 
 pub struct PlayerData {
-    pub connection: ConnectionData,
     queue: Queue,
     now_playing_message_id: Option<Id<MessageMarker>>,
 }
 
 impl PlayerData {
-    pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+    pub const fn new() -> Self {
         Self {
-            connection: ConnectionData::new(channel_id, text_channel_id),
             queue: Queue::new(),
             now_playing_message_id: None,
         }
@@ -675,69 +696,87 @@ impl PlayerData {
         rx: &mut broadcast::Receiver<Event>,
         predicate: impl Fn(&Event) -> bool + Send + Sync,
     ) -> EventRecvResult<Option<Event>> {
-        let event = tokio::time::timeout(
-            Duration::from_millis(WAIT_FOR_BOT_EVENTS_TIMEOUT.into()),
-            async {
-                loop {
-                    let event = rx.recv().await?;
-                    if predicate(&event) {
-                        return Ok(event);
-                    }
+        let event = tokio::time::timeout(*r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, async {
+            loop {
+                let event = rx.recv().await?;
+                if predicate(&event) {
+                    return Ok(event);
                 }
-            },
-        );
+            }
+        });
         Ok(event.await.transpose()?.ok())
     }
 }
 
-#[derive(Clone)]
-pub struct Lavalink(LavalinkClient);
+#[derive(Debug)]
+pub struct Lavalink {
+    inner: LavalinkClient,
+    connections: dashmap::DashMap<Id<GuildMarker>, Connection>,
+}
 
 impl From<LavalinkClient> for Lavalink {
     fn from(value: LavalinkClient) -> Self {
-        Self(value)
+        Self {
+            inner: value,
+            connections: dashmap::DashMap::new(),
+        }
     }
 }
 
 pub type EventRecvResult<T> = Result<T, broadcast::error::RecvError>;
 
 impl Lavalink {
+    pub fn clone_inner(&self) -> LavalinkClient {
+        self.inner.clone()
+    }
+
     pub fn process(&self, event: &twilight_gateway::Event) {
         match event {
             twilight_gateway::Event::VoiceServerUpdate(e) => {
-                self.0
-                    .handle_voice_server_update(e.guild_id, e.token.clone(), e.endpoint.clone());
-                tracing::info!("handled voice server update");
+                self.inner.handle_voice_server_update(
+                    e.guild_id,
+                    e.token.clone(),
+                    e.endpoint.clone(),
+                );
             }
             twilight_gateway::Event::VoiceStateUpdate(e) => {
-                self.0.handle_voice_state_update(
+                self.inner.handle_voice_state_update(
                     e.guild_id.expect("guild_id must exist"),
                     e.channel_id,
                     e.user_id,
                     e.session_id.clone(),
                 );
-                tracing::info!("handled voice state update");
             }
             _ => {}
         }
     }
 
-    async fn connection_info(&self, guild_id: Id<GuildMarker>) -> ConnectionInfo {
-        self.0
-            .get_connection_info(guild_id, Duration::from_secs(5))
+    async fn get_lavalink_connection_info(
+        &self,
+        guild_id: Id<GuildMarker>,
+    ) -> Option<ConnectionInfo> {
+        self.inner
+            .get_connection_info(
+                guild_id,
+                *r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+            )
+            .await
+            .ok()
+    }
+
+    async fn lavalink_connection_info(&self, guild_id: Id<GuildMarker>) -> ConnectionInfo {
+        self.get_lavalink_connection_info(guild_id)
             .await
             .expect("timeout should not have been reached")
     }
 
-    pub async fn new_player_data(
-        &self,
-        guild_id: Id<GuildMarker>,
-        channel_id: Id<ChannelMarker>,
-        text_channel_id: Id<ChannelMarker>,
-    ) -> LavalinkResult<()> {
-        let info = self.connection_info(guild_id).await;
-        let data = Arc::new(RwLock::new(PlayerData::new(channel_id, text_channel_id)));
-        self.0
+    pub async fn new_player_data(&self, guild_id: Id<GuildMarker>) -> LavalinkResult<()> {
+        let now = tokio::time::Instant::now();
+        let info = self.lavalink_connection_info(guild_id).await;
+        tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
+
+        let data = Arc::new(RwLock::new(PlayerData::new()));
+        self.inner
             .create_player_context_with_data(guild_id, info, data)
             .await?;
 
@@ -745,13 +784,13 @@ impl Lavalink {
     }
 
     pub fn get_player_data(&self, guild_id: Id<GuildMarker>) -> Option<Arc<RwLock<PlayerData>>> {
-        self.0
+        self.inner
             .get_player_context(guild_id)
             .map(|c| c.data().expect("data type must be valid"))
     }
 
     pub fn player(&self, guild_id: Id<GuildMarker>) -> PlayerContext {
-        self.0
+        self.inner
             .get_player_context(guild_id)
             .expect("player context must exist")
     }
@@ -762,26 +801,50 @@ impl Lavalink {
             .expect("data type must be valid")
     }
 
-    pub async fn notify_connection_change(&self, guild_id: Id<GuildMarker>) {
-        self.player_data(guild_id)
-            .read()
-            .await
-            .connection
-            .notify_change();
+    pub fn new_connection(
+        &self,
+        guild_id: Id<GuildMarker>,
+        channel_id: Id<ChannelMarker>,
+        text_channel_id: Id<ChannelMarker>,
+    ) {
+        self.connections
+            .insert(guild_id, Connection::new(channel_id, text_channel_id));
+    }
+
+    pub fn drop_connection(&self, guild_id: Id<GuildMarker>) {
+        self.connections.remove(&guild_id);
+    }
+
+    pub fn get_connection(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRef> {
+        self.connections.get(&guild_id)
+    }
+
+    pub fn get_connection_mut(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRefMut> {
+        self.connections.get_mut(&guild_id)
+    }
+
+    pub fn connection(&self, guild_id: Id<GuildMarker>) -> ConnectionRef {
+        self.get_connection(guild_id)
+            .expect("connection must exist")
+    }
+
+    pub fn connection_mut(&self, guild_id: Id<GuildMarker>) -> ConnectionRefMut {
+        self.get_connection_mut(guild_id)
+            .expect("connection must exist")
+    }
+
+    pub fn notify_connection_change(&self, guild_id: Id<GuildMarker>) {
+        self.connection(guild_id).notify_change();
     }
 
     #[inline]
-    pub async fn dispatch(&self, guild_id: Id<GuildMarker>, event: Event) {
-        self.player_data(guild_id)
-            .read()
-            .await
-            .connection
-            .dispatch(event);
+    pub fn dispatch(&self, guild_id: Id<GuildMarker>, event: Event) {
+        self.connection(guild_id).dispatch(event);
     }
 
     #[inline]
-    pub async fn dispatch_queue_clear(&self, guild_id: Id<GuildMarker>) {
-        self.dispatch(guild_id, Event::QueueClear).await;
+    pub fn dispatch_queue_clear(&self, guild_id: Id<GuildMarker>) {
+        self.dispatch(guild_id, Event::QueueClear);
     }
 }
 
@@ -789,6 +852,6 @@ impl Deref for Lavalink {
     type Target = LavalinkClient;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }

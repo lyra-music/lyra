@@ -154,6 +154,7 @@ impl BotSlashCommand for Remove {
 
         positions.sort_unstable();
 
+        drop(data_r);
         Ok(super::remove(positions.into(), &mut ctx).await?)
     }
 }

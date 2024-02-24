@@ -1,4 +1,4 @@
-pub async fn run() -> Result<(), super::error::manager::StartError> {
+pub async fn run() -> Result<(), super::error::runner::StartError> {
     #[inline]
     fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
         parsed
@@ -11,13 +11,10 @@ pub async fn run() -> Result<(), super::error::manager::StartError> {
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
                 .from_env_lossy()
-                .add_directive(parse_directive("lavalink_rs=trace")),
+                .add_directive(parse_directive("lyra=trace")),
+            // .add_directive(parse_directive("lavalink_rs=trace")),
         )
         .init();
 
-    let config = super::core::model::Config::from_env();
-    let mut bot_manager = super::manager::BotManager::new(config);
-
-    bot_manager.start().await?;
-    Ok(())
+    super::runner::start().await
 }

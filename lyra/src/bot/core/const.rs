@@ -14,17 +14,30 @@ pub mod metadata {
 }
 
 pub mod connection {
-    pub const INACTIVITY_TIMEOUT: u16 = 600;
+    use std::time::Duration;
+
+    pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
-    pub const INACTIVITY_TIMEOUT_POLL_INTERVAL: u16 =
-        INACTIVITY_TIMEOUT / INACTIVITY_TIMEOUT_POLL_N as u16;
+
+    lazy_static::lazy_static! {
+        pub static ref CONNECTION_CHANGED_TIMEOUT: Duration = Duration::from_millis(500);
+        pub static ref GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
+        pub static ref INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
+            Duration::from_secs(u64::from(INACTIVITY_TIMEOUT_SECS) / u64::from(INACTIVITY_TIMEOUT_POLL_N));
+    }
 }
 
 pub mod misc {
-    pub const WAIT_FOR_BOT_EVENTS_TIMEOUT: u16 = 250;
+    use std::time::Duration;
+
     pub const ADD_TRACKS_WRAP_LIMIT: usize = 3;
-    pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT: u8 = 30;
-    pub const DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: u8 = 60;
+    pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS: u8 = 30;
+
+    lazy_static::lazy_static! {
+        pub static ref WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
+        pub static ref WAIT_FOR_NOT_SUPPRESSED_TIMEOUT: Duration = Duration::from_secs(WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS.into());
+        pub static ref DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
+    }
 }
 
 pub mod text {

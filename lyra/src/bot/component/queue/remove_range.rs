@@ -10,12 +10,11 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, hid, sus},
-        model::{
-            AutocompleteCtx, BotAutocomplete, BotSlashCommand, CommandInfoAware, SlashCommand,
-        },
+        model::{AutocompleteCtx, BotAutocomplete, BotSlashCommand, SlashCommand},
         Ctx,
     },
-    core::model::BotStateAware,
+    component::queue::Remove,
+    core::model::InteractionClient,
     error::command::{AutocompleteResult, Result as CommandResult},
     gateway::ExpectedGuildIdAware,
     lavalink::ClientAware,
@@ -162,12 +161,7 @@ impl BotSlashCommand for RemoveRange {
         let queue_len = queue.len();
 
         if queue_len == 1 {
-            let remove = ctx
-                .bot()
-                .interaction()
-                .await?
-                .mention_global_command(crate::bot::component::queue::Remove::name())
-                .await?;
+            let remove = InteractionClient::mention_command::<Remove>();
 
             drop(in_voice_with_user);
             sus!(
@@ -201,6 +195,7 @@ impl BotSlashCommand for RemoveRange {
         let positions = (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p as usize));
         check::all_users_track(positions, in_voice_with_user, queue, &ctx)?;
 
+        drop(data_r);
         Ok(super::remove_range(self.start, self.end, &mut ctx).await?)
     }
 }

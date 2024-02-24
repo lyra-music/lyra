@@ -2,8 +2,11 @@ use chrono::Duration;
 use futures::future;
 use itertools::{Either, Itertools};
 use lavalink_rs::{
+    client::LavalinkClient,
     error::LavalinkResult,
-    model::track::{PlaylistData, PlaylistInfo, Track, TrackData, TrackLoadData, TrackLoadType},
+    model::track::{
+        PlaylistData, PlaylistInfo, Track as LoadedTracks, TrackData, TrackLoadData, TrackLoadType,
+    },
 };
 use linkify::{LinkFinder, LinkKind};
 use twilight_interactions::command::{
@@ -23,8 +26,7 @@ use crate::bot::{
             AutocompleteCtx, BotAutocomplete, BotMessageCommand, BotSlashCommand, MessageCommand,
             RespondViaMessage, SlashCommand,
         },
-        util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed,
-        Ctx,
+        util, Ctx,
     },
     core::r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
     error::{
@@ -34,16 +36,25 @@ use crate::bot::{
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, CorrectPlaylistInfo, CorrectTrackInfo, Lavalink},
+    lavalink::{ClientAware, CorrectPlaylistInfo, CorrectTrackInfo},
 };
 
 struct LoadTrackContext {
     guild_id: Id<GuildMarker>,
-    lavalink: Lavalink,
+    lavalink: LavalinkClient,
 }
 
 impl LoadTrackContext {
-    async fn process(&self, query: &str) -> LavalinkResult<Track> {
+    fn with_ctx(ctx: &(impl ExpectedGuildIdAware + ClientAware)) -> Self {
+        Self {
+            guild_id: ctx.guild_id(),
+            lavalink: ctx.lavalink().clone_inner(),
+        }
+    }
+}
+
+impl LoadTrackContext {
+    async fn process(&self, query: &str) -> LavalinkResult<LoadedTracks> {
         self.lavalink.load_tracks(self.guild_id, query).await
     }
 
@@ -87,7 +98,7 @@ struct Playlist {
 }
 
 impl Playlist {
-    fn new(loaded: Track, uri: Box<str>) -> Self {
+    fn new(loaded: LoadedTracks, uri: Box<str>) -> Self {
         match loaded.load_type {
             TrackLoadType::Playlist => {
                 let Some(TrackLoadData::Playlist(data)) = loaded.data else {
@@ -173,7 +184,7 @@ impl AutocompleteResultPrettify for TrackData {
     }
 }
 
-impl AutocompleteResultPrettify for Track {
+impl AutocompleteResultPrettify for LoadedTracks {
     fn prettify(&mut self) -> String {
         let Some(TrackLoadData::Playlist(ref mut data)) = self.data else {
             unreachable!()
@@ -219,7 +230,7 @@ impl BotAutocomplete for Autocomplete {
         let guild_id = ctx.guild_id();
         let load_ctx = LoadTrackContext {
             guild_id,
-            lavalink: ctx.lavalink().clone(),
+            lavalink: ctx.lavalink().clone_inner(),
         };
 
         let mut loaded = load_ctx.process(&query).await?;
@@ -299,10 +310,7 @@ async fn play(
 ) -> Result<(), play::Error> {
     let guild_id = ctx.guild_id();
 
-    let load_ctx = LoadTrackContext {
-        guild_id,
-        lavalink: ctx.lavalink().clone(),
-    };
+    let load_ctx = LoadTrackContext::with_ctx(ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
             let (tracks, playlists) = results.split();
@@ -357,13 +365,15 @@ async fn play(
                 _ => "**`≡+`**",
             };
 
-            auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
+            util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
 
             let total_tracks = Vec::from(results);
             let first_track = total_tracks
                 .first()
                 .expect("first track must exist")
                 .clone();
+
+            util::auto_new_player_data(ctx).await?;
 
             ctx.lavalink()
                 .player_data(guild_id)
@@ -373,6 +383,7 @@ async fn play(
                 .enqueue(total_tracks, ctx.author_id());
 
             ctx.lavalink().player(guild_id).play(&first_track).await?;
+
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }
         Err(e) => match e {

@@ -25,7 +25,7 @@ use crate::bot::{
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::connection::INACTIVITY_TIMEOUT,
+        r#const::connection::INACTIVITY_TIMEOUT_SECS,
         traced,
     },
     error::{
@@ -213,37 +213,28 @@ async fn impl_connect_to(
 
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
 
+    let response = old_channel_id.map_or_else(
+        || {
+            ctx.lavalink()
+                .new_connection(guild_id, channel_id, ctx.channel_id());
+            Response::Joined {
+                voice: joined,
+                empty: voice_is_empty,
+            }
+        },
+        |from| {
+            ctx.lavalink().connection_mut(guild_id).channel_id = channel_id;
+            Response::Moved {
+                from,
+                to: joined,
+                empty: voice_is_empty,
+            }
+        },
+    );
+
+    ctx.lavalink().notify_connection_change(guild_id);
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;
-
-    let response = if let Some(from) = old_channel_id {
-        ctx.lavalink()
-            .player_data(guild_id)
-            .write()
-            .await
-            .connection
-            .channel_id = channel_id;
-        Response::Moved {
-            from,
-            to: joined,
-            empty: voice_is_empty,
-        }
-    } else {
-        let channel_id = ctx.channel_id();
-        let lavalink = ctx.lavalink().clone();
-        traced::tokio_spawn(async move {
-            lavalink
-                .new_player_data(guild_id, channel_id, channel_id)
-                .await?;
-            lavalink.notify_connection_change(guild_id).await;
-
-            Ok::<_, lavalink_rs::error::LavalinkError>(())
-        });
-        Response::Joined {
-            voice: joined,
-            empty: voice_is_empty,
-        }
-    };
 
     if joined.kind == JoinedChannelType::Stage {
         ctx.bot()
@@ -341,7 +332,7 @@ async fn handle_response(
         let text_channel_id = ctx.channel_id();
         let empty_voice_notice_txt = format!(
             "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in <t:{}:R>.",
-            Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT)
+            Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT_SECS)
         );
 
         traced::tokio_spawn(start_inactivity_timeout(

@@ -51,8 +51,4 @@ pub enum RemoveTracksError {
     Followup(#[from] crate::bot::error::command::FollowupError),
     #[error(transparent)]
     DeserializeBodyFromHttp(#[from] crate::bot::error::core::DeserializeBodyFromHttpError),
-    #[error(transparent)]
-    DeserializeBodyFromHttpArc(
-        #[from] std::sync::Arc<crate::bot::error::core::DeserializeBodyFromHttpError>,
-    ),
 }

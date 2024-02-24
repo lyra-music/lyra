@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use chrono::Utc;
+use lavalink_rs::error::LavalinkResult;
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_gateway::Event;
 use twilight_model::{
@@ -21,7 +20,7 @@ use twilight_model::{
 use super::{
     check,
     macros::{hid_fol, note_fol},
-    model::{CommandDataAware, ModalCtx, RespondViaMessage, RespondViaModal},
+    model::{CommandDataAware, CtxKind, ModalCtx, RespondViaMessage, RespondViaModal},
     Ctx,
 };
 use crate::bot::{
@@ -29,8 +28,8 @@ use crate::bot::{
     core::{
         model::{BotStateAware, CacheAware, OwnedBotStateAware},
         r#const::{
+            self,
             discord::{BASE_URL, CDN_URL},
-            misc::{DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT, WAIT_FOR_NOT_SUPPRESSED_TIMEOUT},
         },
     },
     error::{
@@ -44,6 +43,7 @@ use crate::bot::{
         Suppressed as SuppressedError,
     },
     gateway::ExpectedGuildIdAware,
+    lavalink::ClientAware,
 };
 
 pub trait MessageLinkAware {
@@ -245,13 +245,14 @@ async fn handle_suppressed_auto_join(
             let requested_to_speak = note_fol!(
                 &format!(
                     "Requested to speak. **Accept the request in <t:{}:R> to continue.**",
-                    Utc::now().timestamp() + i64::from(WAIT_FOR_NOT_SUPPRESSED_TIMEOUT)
+                    Utc::now().timestamp()
+                        + i64::from(r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS)
                 ),
                 ?ctx
             );
             let requested_to_speak_message = requested_to_speak.model().await?;
             let wait_for_speaker = tokio::time::timeout(
-                Duration::from_secs(WAIT_FOR_NOT_SUPPRESSED_TIMEOUT.into()),
+                *r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT,
                 wait_for_speaker,
             );
 
@@ -308,7 +309,7 @@ pub async fn prompt_for_confirmation(
         });
 
     let wait_for_modal_submit = tokio::time::timeout(
-        Duration::from_secs(DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT.into()),
+        *r#const::misc::DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT,
         wait_for_modal_submit,
     )
     .await;
@@ -331,4 +332,14 @@ pub async fn prompt_for_confirmation(
     };
 
     Ok(modal_ctx)
+}
+
+pub async fn auto_new_player_data(ctx: &Ctx<impl CtxKind>) -> LavalinkResult<()> {
+    let guild_id = ctx.guild_id();
+    let lavalink = ctx.lavalink();
+
+    if lavalink.get_player_data(guild_id).is_none() {
+        lavalink.new_player_data(guild_id).await?;
+    }
+    Ok(())
 }

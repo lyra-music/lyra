@@ -28,11 +28,11 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 use crate::bot::{
     command::{
         macros::{hid_fol, note_fol, out},
-        model::{CommandInfoAware, CtxKind, RespondViaMessage},
+        model::{CtxKind, RespondViaMessage},
         Ctx,
     },
     core::{
-        model::{BotStateAware, CacheAware},
+        model::{CacheAware, InteractionClient},
         r#const::{
             discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
@@ -214,6 +214,8 @@ async fn remove_range(
     let positions = (start..=end)
         .filter_map(|p| NonZeroUsize::new(p as usize))
         .collect();
+
+    drop(data_w);
     impl_remove(positions, removed, queue_cleared, ctx).await
 }
 
@@ -234,6 +236,7 @@ async fn remove(
         queue.dequeue(&positions).collect()
     };
 
+    drop(data_w);
     impl_remove(positions, removed, queue_cleared, ctx).await
 }
 
@@ -285,12 +288,7 @@ async fn impl_remove(
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);
 
     if queue_cleared {
-        let clear = ctx
-            .bot()
-            .interaction()
-            .await?
-            .mention_global_command(Clear::name())
-            .await?;
+        let clear = InteractionClient::mention_command::<Clear>();
 
         note_fol!(
             format!("For clearing the entire queue, use {} instead.", clear),

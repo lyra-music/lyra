@@ -8,7 +8,6 @@ pub mod util;
 pub enum RespondError {
     TwilightHttp(#[from] twilight_http::Error),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
-    DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -33,7 +32,6 @@ pub enum Error {
     UserNotDj(#[from] super::UserNotDj),
     InVoiceWithSomeoneElse(#[from] check::InVoiceWithSomeoneElseError),
     PositionOutOfRange(#[from] super::PositionOutOfRange),
-    DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
     CheckRun(#[from] check::RunError),
     Respond(#[from] RespondError),
     Followup(#[from] FollowupError),
@@ -57,7 +55,6 @@ pub enum FlattenedError<'a> {
     InVoiceWithoutUser(&'a super::InVoiceWithoutUser),
     QueueEmpty(&'a super::QueueEmpty),
     PositionOutOfRange(&'a super::PositionOutOfRange),
-    DeserializeBodyFromHttpArc(&'a std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
     Cache(&'a super::Cache),
     Suppressed(&'a super::Suppressed),
     NotUsersTrack(&'a super::NotUsersTrack),
@@ -224,7 +221,6 @@ impl<'a> Fe<'a> {
     const fn from_respond(error: &'a RespondError) -> Fe<'a> {
         match error {
             RespondError::TwilightHttp(e) => Self::TwilightHttp(e),
-            RespondError::DeserializeBodyFromHttpArc(e) => Self::DeserializeBodyFromHttpArc(e),
             RespondError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
@@ -512,9 +508,6 @@ impl<'a> Fe<'a> {
             super::component::queue::RemoveTracksError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
-            super::component::queue::RemoveTracksError::DeserializeBodyFromHttpArc(e) => {
-                Self::DeserializeBodyFromHttpArc(e)
-            }
         }
     }
 }
@@ -530,7 +523,6 @@ impl Error {
             Self::InVoiceWithoutUser(e) => Fe::InVoiceWithoutUser(e),
             Self::QueueEmpty(e) => Fe::QueueEmpty(e),
             Self::PositionOutOfRange(e) => Fe::PositionOutOfRange(e),
-            Self::DeserializeBodyFromHttpArc(e) => Fe::DeserializeBodyFromHttpArc(e),
             Self::UserNotDj(e) => Fe::UserNotDj(e),
             Self::CheckNotSuppressed(e) => Fe::from_check_not_suppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
@@ -554,11 +546,6 @@ pub type Result = core::result::Result<(), Error>;
 #[derive(thiserror::Error, Debug)]
 #[error("autocomplete failed: {}", .0)]
 pub enum AutocompleteError {
-    SerdeJson(#[from] serde_json::Error),
-    BaseHttp(#[from] http::Error),
-    Http(#[from] twilight_http::Error),
-    DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
-    DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
     LoadFailed(#[from] super::LoadFailed),
     Respond(#[from] RespondError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),

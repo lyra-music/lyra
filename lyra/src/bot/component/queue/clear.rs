@@ -39,7 +39,7 @@ impl BotSlashCommand for Clear {
             let queue = data_r.queue();
 
             queue.stop_with_advance_lock(guild_id, lavalink).await?;
-            data_r.connection.dispatch(Event::QueueClear);
+            lavalink.dispatch(guild_id, Event::QueueClear);
         }
 
         {

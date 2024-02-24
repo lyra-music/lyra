@@ -3,7 +3,7 @@ pub mod component;
 pub mod core;
 pub mod gateway;
 pub mod lavalink;
-pub mod manager;
+pub mod runner;
 
 use thiserror::Error;
 use twilight_mention::Mention;

@@ -39,7 +39,7 @@ fn process(
             let impl_for_inner = match sub_cmd_inner {
                 Some(inner) => quote! {
                     impl CommandInfoAware for #inner {
-                        fn name() -> Box<str> {
+                        fn name() -> &'static str {
                             #name::name()
                         }
                     }
@@ -54,7 +54,7 @@ fn process(
                 quote! {
                     #impl_resolved_command_data
                     impl CommandInfoAware for #sub_cmd {
-                        fn name() -> Box<str> {
+                        fn name() -> &'static str {
                             #name::name()
                         }
                     }

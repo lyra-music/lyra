@@ -14,8 +14,6 @@ pub enum ProcessError {
     #[error(transparent)]
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
     #[error(transparent)]
-    DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
-    #[error(transparent)]
     Http(#[from] twilight_http::Error),
     #[error(transparent)]
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),

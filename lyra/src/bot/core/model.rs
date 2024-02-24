@@ -19,7 +19,7 @@ use twilight_model::{
     guild::Permissions,
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{CommandMarker, InteractionMarker, MessageMarker, UserMarker},
+        marker::{InteractionMarker, MessageMarker, UserMarker},
         Id,
     },
     oauth::Application,
@@ -29,8 +29,13 @@ use twilight_standby::Standby;
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::{
-    command::declare::{MESSAGE_COMMANDS, SLASH_COMMANDS, SLASH_COMMANDS_CACHE},
-    error::core::{DeserializeBodyFromHttpError, FollowupResult, RespondResult},
+    command::{
+        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
+        model::CommandInfoAware,
+    },
+    error::core::{
+        DeserializeBodyFromHttpError, FollowupResult, RegisterGlobalCommandsError, RespondResult,
+    },
     lavalink::{self, Lavalink},
 };
 
@@ -41,26 +46,10 @@ pub type UnitFollowupResult = FollowupResult<()>;
 pub type MessageFollowupResult = FollowupResult<MessageResponse>;
 
 pub struct Config {
-    pub token: String,
-    pub lavalink_host: String,
-    pub lavalink_pwd: String,
-    pub database_url: String,
-}
-
-impl Config {
-    pub fn from_env() -> Self {
-        #[inline]
-        fn env_var(key: &'static str) -> String {
-            std::env::var(key).unwrap_or_else(|e| panic!("invalid key `{key}`: {e}"))
-        }
-
-        Self {
-            token: env_var("BOT_TOKEN"),
-            lavalink_host: env_var("SERVER_ADDRESS") + ":" + &env_var("SERVER_PORT"),
-            lavalink_pwd: env_var("LAVALINK_SERVER_PASSWORD"),
-            database_url: env_var("DATABASE_URL"),
-        }
-    }
+    pub token: &'static str,
+    pub lavalink_host: &'static str,
+    pub lavalink_pwd: &'static str,
+    pub database_url: &'static str,
 }
 
 pub struct BotInfo {
@@ -276,42 +265,38 @@ impl<'a> InteractionClient<'a> {
         }
     }
 
-    pub async fn register_global_commands(&self) -> UnitRespondResult {
-        self.set_global_commands(&[SLASH_COMMANDS.as_ref(), MESSAGE_COMMANDS.as_ref()].concat())
+    pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
+        let commands = self
+            .set_global_commands(&[SLASH_COMMANDS.as_ref(), MESSAGE_COMMANDS.as_ref()].concat())
+            .await?
+            .models()
             .await?;
+
+        POPULATED_COMMANDS_MAP.get_or_init(|| {
+            commands
+                .into_iter()
+                .map(|c| (c.name.clone().into(), c))
+                .collect()
+        });
 
         Ok(())
     }
 
-    pub async fn global_command_id(
-        &self,
-        name: &str,
-    ) -> Result<Id<CommandMarker>, Arc<DeserializeBodyFromHttpError>> {
-        Ok(SLASH_COMMANDS_CACHE
-            .entry(name.into())
-            .or_try_insert_with(async {
-                Ok(self
-                    .global_commands()
-                    .await?
-                    .models()
-                    .await?
-                    .into_iter()
-                    .find(|c| c.name == name)
-                    .unwrap_or_else(|| panic!("Command `/{name}` must exist"))
-                    .id
-                    .unwrap_or_else(|| panic!("Command `/{name}` must have an id")))
-            })
-            .await?
-            .into_value())
+    pub fn populated_command<T: CommandInfoAware>(
+    ) -> &'static twilight_model::application::command::Command {
+        POPULATED_COMMANDS_MAP
+            .get()
+            .expect("`POPULATED_COMMANDS_MAP` must be populated")
+            .get(T::name())
+            .unwrap_or_else(|| panic!("command must exist: {}", T::name()))
     }
 
-    pub async fn mention_global_command(
-        &self,
-        name: Box<str>,
-    ) -> Result<Box<str>, Arc<DeserializeBodyFromHttpError>> {
-        let id = self.global_command_id(&name).await?;
+    pub fn mention_command<T: CommandInfoAware>() -> Box<str> {
+        let cmd = Self::populated_command::<T>();
 
-        Ok(format!("</{name}:{id}>").into_boxed_str())
+        let name = &cmd.name;
+        let id = cmd.id.expect("id must exist");
+        format!("</{name}:{id}>").into_boxed_str()
     }
 }
 

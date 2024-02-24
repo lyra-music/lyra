@@ -4,7 +4,7 @@ mod leave;
 pub use join::{auto as auto_join, Join};
 pub use leave::Leave;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use chrono::Utc;
 use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
@@ -24,12 +24,7 @@ use crate::bot::{
     },
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::{
-            connection::{
-                INACTIVITY_TIMEOUT, INACTIVITY_TIMEOUT_POLL_INTERVAL, INACTIVITY_TIMEOUT_POLL_N,
-            },
-            exit_code::NOTICE,
-        },
+        r#const::{connection as const_connection, exit_code::NOTICE},
         traced,
     },
     error::{
@@ -61,11 +56,11 @@ struct InactivityTimeoutContext {
 }
 
 impl InactivityTimeoutContext {
-    fn from_ctx(value: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
+    fn from_ctx(ctx: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
         Self {
-            inner: value.bot_owned(),
-            sender: value.sender().clone(),
-            guild_id: value.guild_id(),
+            inner: ctx.bot_owned(),
+            sender: ctx.sender().clone(),
+            guild_id: ctx.guild_id(),
         }
     }
 }
@@ -112,14 +107,14 @@ async fn start_inactivity_timeout(
         channel_id
     );
 
-    for _ in 0..INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(Duration::from_secs(INACTIVITY_TIMEOUT_POLL_INTERVAL.into())).await;
+    for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
+        tokio::time::sleep(*const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
         if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
             return Ok(());
         }
     }
 
-    ctx.lavalink().notify_connection_change(guild_id).await;
+    ctx.lavalink().notify_connection_change(guild_id);
     pre_disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
@@ -137,6 +132,7 @@ async fn start_inactivity_timeout(
     Ok(())
 }
 
+#[tracing::instrument(skip_all, name = "voice_state_update")]
 pub async fn handle_voice_state_update(
     ctx: &voice::Context,
 ) -> Result<(), HandleVoiceStateUpdateError> {
@@ -146,15 +142,17 @@ pub async fn handle_voice_state_update(
     let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
+    tracing::trace!("handling voice state update");
     let (connected_channel_id, text_channel_id) = {
-        let Some(player) = lavalink.get_player_data(guild_id) else {
+        let Some(connection) = lavalink.get_connection(guild_id) else {
             return Ok(());
         };
 
-        let connection = &player.read().await.connection;
-        if connection.just_changed().await {
+        if connection.changed().await {
+            tracing::trace!("connection changed");
             return Ok(());
         }
+        tracing::trace!("connection forced");
 
         (connection.channel_id, connection.text_channel_id)
     };
@@ -227,7 +225,7 @@ async fn match_state_channel_id(
             let forcefully_moved_notice = if voice_is_empty {
                 format!(
                     "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",
-                    Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT)
+                    Utc::now().timestamp() + i64::from(const_connection::INACTIVITY_TIMEOUT_SECS)
                 )
             } else {
                 "`(Bot was forcefully moved)`".into()

@@ -338,7 +338,7 @@ async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, 
     let requester = current.requester();
     let position = NonZeroUsize::new(index + 1).expect("`index + 1` must be nonzero");
     let title = current.track().info.corrected_title().into();
-    let channel_id = data_r.connection.channel_id;
+    let channel_id = ctx.lavalink().connection(guild_id).channel_id;
 
     Ok(CurrentlyPlaying {
         requester,
@@ -750,9 +750,7 @@ async fn handle_poll(
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), check::HandlePollError> {
     let guild_id = ctx.guild_id();
-    let lavalink = ctx.lavalink();
-    let player = &lavalink.player_data(guild_id);
-    let connection = &player.read().await.connection;
+    let connection = ctx.lavalink().connection(guild_id);
     if let Some(poll) = connection.poll() {
         let message = poll.message_owned();
 
@@ -767,7 +765,7 @@ async fn handle_poll(
                     alternate_vote: Some(AlternateVoteResponse::DjCasted),
                 })?;
             }
-            connection.dispatch(Event::AlternateVoteCast(ctx.author_id()));
+            connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
 
             let mut rx = connection.subscribe();
 
@@ -801,13 +799,9 @@ async fn handle_poll(
         })?;
     }
 
+    drop(connection);
     let resolution = Box::pin(poll::start(topic, ctx)).await;
-    ctx.lavalink()
-        .player_data(guild_id)
-        .write()
-        .await
-        .connection
-        .reset_poll();
+    ctx.lavalink().connection_mut(guild_id).reset_poll();
     match resolution? {
         PollResolution::UnanimousWin => Ok(()),
         PollResolution::UnanimousLoss => Err(check::PollLossError {

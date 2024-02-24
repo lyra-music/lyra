@@ -1,10 +1,10 @@
 mod bot;
 
 #[tokio::main]
+#[tracing::instrument]
 async fn main() {
     color_eyre::install().ok();
     dotenvy::dotenv().ok();
-    if let Err(why) = bot::run().await {
-        tracing::error!("unhandled error: {why:#?}");
-    }
+
+    let _ = bot::run().await;
 }

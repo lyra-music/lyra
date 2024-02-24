@@ -44,7 +44,8 @@ pub(super) async fn pre_disconnect_cleanup(
     let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
-    lavalink.dispatch_queue_clear(guild_id).await;
+    lavalink.dispatch_queue_clear(guild_id);
+    lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;
 
     Ok(())
@@ -57,7 +58,7 @@ async fn leave(ctx: &Ctx<SlashCommand>) -> Result<LeaveResponse, leave::Error> {
     let channel_id = in_voice.channel_id();
     in_voice.with_user()?.only()?;
 
-    ctx.lavalink().notify_connection_change(guild_id).await;
+    ctx.lavalink().notify_connection_change(guild_id);
     pre_disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 

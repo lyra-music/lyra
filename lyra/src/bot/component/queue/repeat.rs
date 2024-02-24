@@ -64,9 +64,7 @@ impl BotSlashCommand for Repeat {
             .await?;
 
         let lavalink = ctx.lavalink();
-        lavalink
-            .dispatch(guild_id, lavalink::Event::QueueRepeat)
-            .await;
+        lavalink.dispatch(guild_id, lavalink::Event::QueueRepeat);
         lavalink
             .player_data(guild_id)
             .write()

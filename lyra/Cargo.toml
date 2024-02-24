@@ -29,6 +29,7 @@ significant_drop_tightening = { level = "allow", priority = 1 }
 lyra_proc = { path = "./lyra_proc" }
 
 const-str = "0.5.6"
+const_panic = { version = "0.2.8", features = ["derive"] }
 heck = "0.4.1"
 bitflags = "2.4.2"
 unicode-segmentation = "1.11.0"
@@ -36,6 +37,7 @@ dashmap = "5.5.3"
 version_check = "0.9.4"
 os_info = "3.7.0"
 dotenvy = "0.15.7"
+dotenvy_macro = "0.15.7"
 thiserror = "1.0.57"
 color-eyre = "0.6.2"
 rstest = "0.18.2"
@@ -46,25 +48,20 @@ tokio = { version = "1.36.0", features = [
     "rt-multi-thread",
     "macros",
 ] }
-tokio-stream = "0.1.14"
 regex = "1.10.3"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
-http = "0.2.11"
 log = "0.4.20"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-serde_json = "1.0.113"
 rand = "0.8.5"
-rand_chacha = "0.3.1"
 itertools = "0.12.1"
 rayon = "1.8.1"
-moka = { version = "0.12.5", features = ["future"] }
 lazy_static = "1.4.0"
 chrono = "0.4.34"
 sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
-lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs", rev = "88969984", features = [
+lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs", rev = "716373c9", features = [
     "twilight",
 ] }
 
@@ -82,7 +79,7 @@ twilight-util = { version = "0.15.4", features = [
     "permission-calculator",
     "builder",
 ] }
-twilight-interactions = { git = "https://github.com/baptiste0928/twilight-interactions", branch = "refactor-macros" }
+twilight-interactions = "0.15.2"
 
 [dependencies.kmeans_colors]
 version = "0.6.0"
@@ -90,7 +87,7 @@ features = ["palette_color"]
 default-features = false
 
 [dependencies.image]
-version = "0.24.8"
+version = "0.24.9"
 features = ["jpeg", "png", "gif", "tiff"]
 default-features = false
 

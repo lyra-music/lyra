@@ -39,6 +39,7 @@ pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &T
     if queue.advance_locked() {
         queue.advance_unlock();
     } else {
+        drop(data_r);
         let data = ctx
             .data::<RwLock<PlayerData>>()
             .expect("data type must be valid");

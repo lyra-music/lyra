@@ -14,13 +14,14 @@ use super::model::Process;
 use crate::bot::{
     command::{
         macros::{bad, cant, caut, crit, err, hid, hid_fol, nope, note, out_upd, sus, sus_fol},
-        model::{AutocompleteCtx, CommandInfoAware, Ctx, MessageCommand, SlashCommand},
+        model::{AutocompleteCtx, Ctx, MessageCommand, SlashCommand},
         util::MessageLinkAware,
     },
     component::{connection::Join, queue::Play},
     core::{
         model::{
-            BotState, InteractionInterface, OwnedBotState, UnitFollowupResult, UnitRespondResult,
+            BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
+            UnitRespondResult,
         },
         r#const::exit_code::{DUBIOUS, FORBIDDEN, WARNING},
     },
@@ -124,7 +125,7 @@ impl Context {
                 let CommandExecuteError::Command(error) = source else {
                     unreachable!()
                 };
-                match_error(error, name, i, &bot).await
+                match_error(error, name, i).await
             }
             _ => {
                 crit!(format!(
@@ -168,7 +169,6 @@ async fn match_error(
     error: CommandError,
     command_name: Box<str>,
     i: InteractionInterface<'_>,
-    bot: &BotState,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         Fe::Cache(_) => {
@@ -186,9 +186,8 @@ async fn match_error(
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
         // }
         Fe::NotInVoice(_) => {
-            let inter = bot.interaction().await?;
-            let join = inter.mention_global_command(Join::name()).await?;
-            let play = inter.mention_global_command(Play::name()).await?;
+            let join = InteractionClient::mention_command::<Join>();
+            let play = InteractionClient::mention_command::<Play>();
             caut!(
                 format!(
                     "Not currently connected to a voice channel. Use {} or {} first.",
@@ -214,7 +213,7 @@ async fn match_error(
         }
         Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i, bot).await?),
+        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
         Fe::Stopped(_) => todo!(),
         Fe::NotPlaying(_) => todo!(),
         Fe::Paused(_) => todo!(),
@@ -284,15 +283,10 @@ async fn match_autojoin_suppressed(
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
     i: InteractionInterface<'_>,
-    bot: &BotState,
 ) -> Result<(), RespondError> {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
-            let join = bot
-                .interaction()
-                .await?
-                .mention_global_command(Join::name())
-                .await?;
+            let join = InteractionClient::mention_command::<Join>();
             bad!(
                 format!(
                     "Please join a voice channel, or use {} to connect to a channel.",

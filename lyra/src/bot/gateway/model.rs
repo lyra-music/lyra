@@ -21,6 +21,7 @@ pub trait ExpectedGuildIdAware {
     fn guild_id(&self) -> Id<GuildMarker>;
 }
 
+#[derive(Debug)]
 pub struct LastCachedStates {
     pub voice_state: Option<CachedVoiceState>,
 }
