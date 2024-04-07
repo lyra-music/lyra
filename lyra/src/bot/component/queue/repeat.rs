@@ -2,15 +2,11 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 
 use crate::bot::{
     command::{
-        check::CheckerBuilder,
-        macros::out_or_upd,
-        model::{BotSlashCommand, SlashCommand},
-        poll::Topic,
-        Ctx,
+        check::CheckerBuilder, macros::out_or_upd, model::BotSlashCommand, poll::Topic, SlashCtx,
     },
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
-    lavalink::{self, ClientAware},
+    lavalink::{self, DelegateMethods, LavalinkAware},
 };
 
 #[derive(CommandOption, CreateOption)]
@@ -42,7 +38,7 @@ pub struct Repeat {
 }
 
 impl BotSlashCommand for Repeat {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let guild_id = ctx.guild_id();
         let mode = {
             if let Some(mode) = self.mode {

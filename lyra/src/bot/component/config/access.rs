@@ -20,8 +20,10 @@ pub use self::{
     view::View,
 };
 use crate::bot::{
-    command::model::{BotSlashCommand, CommandInfoAware, Ctx},
-    component::config::SlashCommand,
+    command::{
+        model::{BotSlashCommand, CommandInfoAware},
+        SlashCtx,
+    },
     error::command::{check::AccessCalculatorBuildError, Result as CommandResult},
     ext::util::{FlagsPrettify, OptionMap},
 };

@@ -1,4 +1,4 @@
-use std::{fs, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use dotenvy_macro::dotenv;
 use lavalink_rs::{client::LavalinkClient, model::client::NodeDistributionStrategy};
@@ -23,9 +23,7 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::bot::core::r#const::metadata::{
-    AUTHORS, COPYRIGHT, OS_INFO, REPOSITORY, RUST_VERSION, SUPPORT, VERSION,
-};
+use crate::bot::core::r#const::metadata::BANNER;
 
 use super::{
     core::{
@@ -34,7 +32,7 @@ use super::{
     },
     error::runner::{StartError, WaitForSignalError, WaitUntilShutdownError},
     gateway,
-    lavalink::{self, ClientAware},
+    lavalink::{self, DelegateMethods, LavalinkAware},
 };
 use super::{gateway::LastCachedStates, lavalink::Lavalink};
 
@@ -71,7 +69,6 @@ fn build_shard_config() -> ShardConfig {
         .build()
 }
 
-#[tracing::instrument(err(level = tracing::Level::ERROR))]
 pub(super) async fn start() -> Result<(), StartError> {
     tracing::debug!("began starting the bot");
 
@@ -166,23 +163,14 @@ fn process_gateway_events(shard: &Shard, event: Event, bot: Arc<BotState>) {
         bot,
         event,
         states,
+        shard.id(),
         shard.latency().clone(),
         shard.sender(),
     ));
 }
 
 fn print_banner() {
-    let path = "../assets/lyra2-ascii.ans";
-    let banner = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("invalid file `{path}`: {e}"))
-        .replace("%version", VERSION)
-        .replace("%copyright", COPYRIGHT)
-        .replace("%authors", AUTHORS)
-        .replace("%repository", REPOSITORY)
-        .replace("%support", SUPPORT)
-        .replace("%rust", &RUST_VERSION)
-        .replace("%os_info", &OS_INFO);
-    println!("{banner}");
+    println!("{}", *BANNER);
 }
 
 #[tracing::instrument]

@@ -4,12 +4,12 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, hid, out},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, QueueIndexerType},
+    lavalink::{DelegateMethods, IndexerType, LavalinkAware},
 };
 
 /// Toggles fair queuing
@@ -18,7 +18,7 @@ use crate::bot::{
 pub struct FairQueue;
 
 impl BotSlashCommand for FairQueue {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_dj(&ctx)?;
         check::in_voice(&ctx)?.with_someone_else()?;
         check::queue_not_empty(&ctx).await?;
@@ -28,24 +28,24 @@ impl BotSlashCommand for FairQueue {
         let indexer_type = data.read().await.queue().indexer_type();
 
         match indexer_type {
-            QueueIndexerType::Fair => {
+            IndexerType::Fair => {
                 data.write()
                     .await
                     .queue_mut()
-                    .set_indexer_type(QueueIndexerType::Standard);
+                    .set_indexer_type(IndexerType::Standard);
                 out!("**` ⮆ `** Disabled fair queue", ctx);
             }
-            QueueIndexerType::Shuffled => {
+            IndexerType::Shuffled => {
                 bad!(
                     "Cannot enable fair queue as shuffle is currently enabled",
                     ctx
                 );
             }
-            QueueIndexerType::Standard => {
+            IndexerType::Standard => {
                 data.write()
                     .await
                     .queue_mut()
-                    .set_indexer_type(QueueIndexerType::Fair);
+                    .set_indexer_type(IndexerType::Fair);
                 out!("⚖️ Enabled fair queue", ctx);
             }
         }

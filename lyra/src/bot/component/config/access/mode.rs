@@ -6,8 +6,8 @@ use crate::bot::{
     command::{
         check,
         macros::{hid, out, sus},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     component::config::access::AccessCategoryFlags,
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
@@ -71,7 +71,7 @@ pub struct Mode {
 }
 
 impl BotSlashCommand for Mode {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let access_mode = <Option<bool>>::from(self.mode);

@@ -13,7 +13,7 @@ use crate::bot::core::model::{BotState, BotStateAware, CacheAware, HttpAware, Ow
 use crate::bot::error::gateway::ProcessResult;
 use crate::bot::{
     gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::{ClientAware as LavalinkAware, Lavalink},
+    lavalink::{Lavalink, LavalinkAware},
 };
 
 use super::{LastCachedStates, Process};

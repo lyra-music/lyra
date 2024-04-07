@@ -14,8 +14,8 @@ use super::model::Process;
 use crate::bot::{
     command::{
         macros::{bad, cant, caut, crit, err, hid, hid_fol, nope, note, out_upd, sus, sus_fol},
-        model::{AutocompleteCtx, Ctx, MessageCommand, SlashCommand},
         util::MessageLinkAware,
+        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{connection::Join, queue::Play},
     core::{
@@ -38,6 +38,7 @@ use crate::bot::{
         AutoJoinAttemptFailed as AutoJoinAttemptFailedError, EPrint,
         PositionOutOfRange as PositionOutOfRangeError, Suppressed as SuppressedError,
     },
+    lavalink::LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -85,10 +86,17 @@ impl Context {
         };
 
         let name = data.name.clone().into();
+        let inner_guild_id = self.inner.guild_id;
+        let channel_id = self
+            .inner
+            .channel
+            .as_ref()
+            .map(|c| c.id)
+            .expect("channel must exist");
 
         let result = match data.kind {
             CommandType::ChatInput => {
-                <Ctx<SlashCommand>>::from_partial_data(
+                <SlashCtx>::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -100,7 +108,7 @@ impl Context {
             }
             CommandType::User => todo!(),
             CommandType::Message => {
-                <Ctx<MessageCommand>>::from_partial_data(
+                <MessageCtx>::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -112,6 +120,17 @@ impl Context {
             }
             _ => unimplemented!(),
         };
+
+        if let Some(guild_id) = inner_guild_id {
+            let lavalink = bot.lavalink();
+
+            if lavalink
+                .get_connection(guild_id)
+                .is_some_and(|c| c.text_channel_id != channel_id)
+            {
+                lavalink.connection_mut(guild_id).text_channel_id = channel_id;
+            }
+        }
 
         let Err(source) = result else {
             return Ok(());

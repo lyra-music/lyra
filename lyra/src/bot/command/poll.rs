@@ -43,13 +43,12 @@ use crate::bot::{
     },
     ext::util::hex_to_rgb,
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, Event, EventRecvResult},
+    lavalink::{Event, EventRecvResult, LavalinkAware},
 };
 
 use super::{
-    model::RespondViaMessage,
+    model::{Ctx, RespondViaMessage},
     util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware, MessageLinkAware},
-    Ctx,
 };
 
 #[derive(Hash)]

@@ -3,21 +3,27 @@ use lavalink_rs::{
     hook,
     model::events::{TrackEnd, TrackException, TrackStart, TrackStuck},
 };
-use tokio::sync::RwLock;
 
-use crate::bot::lavalink::{model::CorrectTrackInfo, PlayerData};
+use crate::bot::{
+    error::lavalink::ProcessResult,
+    lavalink::{model::CorrectTrackInfo, DelegateMethods},
+};
 
-#[hook]
-pub(super) async fn start(_: LavalinkClient, _session_id: String, event: &TrackStart) {
+// FIXME: don't debug `LavalinkClient` until `lavalink_rs` stops stack overflowing
+
+#[tracing::instrument(err, skip_all, name = "track_start")]
+async fn impl_start(event: &TrackStart) -> ProcessResult {
     tracing::debug!(
         "guild {} started {:?}",
         event.guild_id.0,
         event.track.info.checked_title()
     );
+
+    Ok(())
 }
 
-#[hook]
-pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &TrackEnd) {
+#[tracing::instrument(err, skip_all, name = "track_end")]
+async fn impl_end(lavalink: LavalinkClient, event: &TrackEnd) -> ProcessResult {
     let guild_id = event.guild_id;
     tracing::debug!(
         "guild {} ended   {:?}",
@@ -25,13 +31,11 @@ pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &T
         event.track.info.checked_title()
     );
 
-    let ctx = lavalink
-        .get_player_context(guild_id)
-        .expect("player context must exist");
+    let Some(data) = lavalink.get_player_data(guild_id) else {
+        tracing::trace!(?guild_id, "track ended via forced disconnection");
 
-    let data = ctx
-        .data::<RwLock<PlayerData>>()
-        .expect("data type must be valid");
+        return Ok(());
+    };
     let data_r = data.read().await;
     let queue = data_r.queue();
 
@@ -40,25 +44,45 @@ pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &T
         queue.advance_unlock();
     } else {
         drop(data_r);
-        let data = ctx
-            .data::<RwLock<PlayerData>>()
-            .expect("data type must be valid");
+        let data = lavalink.player_data(guild_id);
         let mut data_w = data.write().await;
         let queue = data_w.queue_mut();
 
         queue.advance();
         if let Some(item) = queue.current() {
-            let Err(e) = ctx.play_now(item.track()).await else {
-                return;
-            };
-
-            tracing::error!(?e);
+            lavalink.player(guild_id).play_now(item.track()).await?;
         }
     }
+
+    Ok(())
+}
+
+#[tracing::instrument(err, skip_all, name = "track_exception")]
+async fn impl_exception() -> ProcessResult {
+    Ok(()) // TODO: handle track exception
+}
+
+#[tracing::instrument(err, skip_all, name = "track_stuck")]
+async fn impl_stuck() -> ProcessResult {
+    Ok(()) // TODO: handle track stuck
 }
 
 #[hook]
-pub(super) async fn exception(_: LavalinkClient, _session_id: String, _: &TrackException) {}
+pub(super) async fn start(_: LavalinkClient, _session_id: String, event: &TrackStart) {
+    let _ = impl_start(event).await;
+}
 
 #[hook]
-pub(super) async fn stuck(_: LavalinkClient, _session_id: String, _: &TrackStuck) {}
+pub(super) async fn end(lavalink: LavalinkClient, _session_id: String, event: &TrackEnd) {
+    let _ = impl_end(lavalink, event).await;
+}
+
+#[hook]
+pub(super) async fn exception(_: LavalinkClient, _session_id: String, _: &TrackException) {
+    let _ = impl_exception().await;
+}
+
+#[hook]
+pub(super) async fn stuck(_: LavalinkClient, _session_id: String, _: &TrackStuck) {
+    let _ = impl_stuck().await;
+}

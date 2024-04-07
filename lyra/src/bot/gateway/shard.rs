@@ -1,4 +1,5 @@
 use tokio::task::JoinSet;
+use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::bot::{
@@ -10,12 +11,21 @@ use super::model::Process;
 
 pub(super) struct ReadyContext<'a> {
     inner: &'a Ready,
+    shard_id: ShardId,
     bot: BotStateRef<'a>,
 }
 
 impl BotState {
-    pub(super) const fn as_ready_context<'a>(&'a self, inner: &'a Ready) -> ReadyContext {
-        ReadyContext { inner, bot: self }
+    pub(super) const fn as_ready_context<'a>(
+        &'a self,
+        inner: &'a Ready,
+        shard_id: ShardId,
+    ) -> ReadyContext {
+        ReadyContext {
+            inner,
+            shard_id,
+            bot: self,
+        }
     }
 }
 
@@ -23,7 +33,9 @@ impl Process for ReadyContext<'_> {
     async fn process(self) -> ProcessResult {
         let guild_count = self.inner.guilds.len();
         tracing::info!("running in {guild_count} guild(s)");
-        self.bot.info().set_guild_count(guild_count);
+        self.bot
+            .info()
+            .reset_guild_count(self.shard_id, guild_count);
 
         let mut set = JoinSet::new();
 

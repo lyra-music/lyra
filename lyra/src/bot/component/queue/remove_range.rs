@@ -10,14 +10,14 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, hid, sus},
-        model::{AutocompleteCtx, BotAutocomplete, BotSlashCommand, SlashCommand},
-        Ctx,
+        model::{BotAutocomplete, BotSlashCommand},
+        AutocompleteCtx, SlashCtx,
     },
     component::queue::Remove,
     core::model::InteractionClient,
     error::command::{AutocompleteResult, Result as CommandResult},
     gateway::ExpectedGuildIdAware,
-    lavalink::ClientAware,
+    lavalink::{DelegateMethods, LavalinkAware},
 };
 
 enum RemoveRangeAutocompleteOptionsType {
@@ -150,7 +150,7 @@ pub struct RemoveRange {
 }
 
 impl BotSlashCommand for RemoveRange {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
         check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;

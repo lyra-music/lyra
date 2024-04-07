@@ -10,12 +10,12 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::bot::{
     command::{
         check,
-        model::{AutocompleteCtx, BotAutocomplete, BotSlashCommand, SlashCommand},
-        Ctx,
+        model::{BotAutocomplete, BotSlashCommand},
+        AutocompleteCtx, SlashCtx,
     },
     error::command::{AutocompleteResult, Result as CommandResult},
     gateway::ExpectedGuildIdAware,
-    lavalink::ClientAware,
+    lavalink::{DelegateMethods, LavalinkAware},
 };
 
 async fn generate_remove_choices(
@@ -121,7 +121,7 @@ pub struct Remove {
 }
 
 impl BotSlashCommand for Remove {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
         check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;

@@ -3,7 +3,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::bot::{
     command::{
         macros::out,
-        model::{BotSlashCommand, CommandInfoAware, Ctx, SlashCommand},
+        model::{BotSlashCommand, CommandInfoAware},
+        SlashCtx,
     },
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
@@ -24,7 +25,7 @@ pub enum NowPlaying {
 pub struct Toggle;
 
 impl BotSlashCommand for Toggle {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let new_now_playing = sqlx::query!(
             r"--sql
             UPDATE guild_configs SET now_playing = NOT now_playing WHERE id = $1 RETURNING now_playing;

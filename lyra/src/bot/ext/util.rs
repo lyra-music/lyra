@@ -263,8 +263,13 @@ impl From<PrettifiedTimestamp> for Duration {
     }
 }
 
-pub fn multi_interleave<I: Iterator>(iterators: Vec<I>) -> MultiInterleave<I> {
-    MultiInterleave::new(iterators)
+pub fn multi_interleave<T, I, J>(iters: impl IntoIterator<Item = I>) -> MultiInterleave<J>
+where
+    I: IntoIterator<Item = T>,
+    J: Iterator<Item = T>,
+    Vec<J>: FromIterator<<I as IntoIterator>::IntoIter>,
+{
+    MultiInterleave::new(iters.into_iter().map(IntoIterator::into_iter).collect())
 }
 
 pub struct MultiInterleave<I: Iterator> {
@@ -304,12 +309,19 @@ impl<I: Iterator> Iterator for MultiInterleave<I> {
     }
 }
 
-pub fn chunked_range(start: usize, chunk_sizes: Vec<usize>) -> impl Iterator<Item = Vec<usize>> {
-    let end = start + chunk_sizes.iter().sum::<usize>();
-    let mut range = start..end;
-    chunk_sizes
-        .into_iter()
-        .map(move |d| range.by_ref().take(d).collect())
+/* FIXME: make this generic over `T: std::ops::Add<Output = T> + std::ops::AddAssign + std::iter::Step + Copy`
+    once `std::iter::Step` is stablised: https://github.com/rust-lang/rust/issues/42168
+*/
+pub fn chunked_range(
+    start: usize,
+    chunk_sizes: impl IntoIterator<Item = usize>,
+) -> impl Iterator<Item = impl Iterator<Item = usize>> {
+    let mut current_start = start;
+    chunk_sizes.into_iter().map(move |chunk_size| {
+        let range = current_start..current_start + chunk_size;
+        current_start += chunk_size;
+        range
+    })
 }
 
 pub trait NestedTranspose<T, E, F> {
@@ -552,5 +564,360 @@ mod tests {
         #[case] expected: Result<PrettifiedTimestamp, PrettifiedTimestampParse>,
     ) {
         assert_eq!(PrettifiedTimestamp::from_str(input), expected);
+    }
+
+    #[rstest]
+    // 0 vec
+    #[case([], vec![])]
+    // 1 vec
+    #[case([vec![]], vec![])]
+    #[case([vec![1]], vec![1])]
+    #[case([vec![1, 2]], vec![1, 2])]
+    #[case([vec![1, 2, 3]], vec![1, 2, 3])]
+    // 2 vec
+    #[case([vec![], vec![]], vec![])]
+    #[case([vec![1], vec![]], vec![1])]
+    #[case([vec![1, 2], vec![]], vec![1, 2])]
+    #[case([vec![1, 2, 3], vec![]], vec![1, 2, 3])]
+    #[case([vec![], vec![1]], vec![1])]
+    #[case([vec![1], vec![1]], vec![1, 1])]
+    #[case([vec![1, 2], vec![1]], vec![1, 1, 2])]
+    #[case([vec![1, 2, 3], vec![1]], vec![1, 1, 2, 3])]
+    #[case([vec![], vec![1, 2]], vec![1, 2])]
+    #[case([vec![1], vec![1, 2]], vec![1, 1, 2])]
+    #[case([vec![1, 2], vec![1, 2]], vec![1, 1, 2, 2])]
+    #[case([vec![1, 2, 3], vec![1, 2]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![], vec![1, 2, 3]], vec![1, 2, 3])]
+    #[case([vec![1], vec![1, 2, 3]], vec![1, 1, 2, 3])]
+    #[case([vec![1, 2], vec![1, 2, 3]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 2, 2, 3, 3])]
+    // 3 vec
+    #[case([vec![], vec![], vec![]], vec![])]
+    #[case([vec![1], vec![], vec![]], vec![1])]
+    #[case([vec![1, 2], vec![], vec![]], vec![1, 2])]
+    #[case([vec![1, 2, 3], vec![], vec![]], vec![1, 2, 3])]
+    #[case([vec![], vec![1], vec![]], vec![1])]
+    #[case([vec![1], vec![1], vec![]], vec![1, 1])]
+    #[case([vec![1, 2], vec![1], vec![]], vec![1, 1, 2])]
+    #[case([vec![1, 2, 3], vec![1], vec![]], vec![1, 1, 2, 3])]
+    #[case([vec![], vec![1, 2], vec![]], vec![1, 2])]
+    #[case([vec![1], vec![1, 2], vec![]], vec![1, 1, 2])]
+    #[case([vec![1, 2], vec![1, 2], vec![]], vec![1, 1, 2, 2])]
+    #[case([vec![1, 2, 3], vec![1, 2], vec![]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![], vec![1, 2, 3], vec![]], vec![1, 2, 3])]
+    #[case([vec![1], vec![1, 2, 3], vec![]], vec![1, 1, 2, 3])]
+    #[case([vec![1, 2], vec![1, 2, 3], vec![]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2, 3], vec![]], vec![1, 1, 2, 2, 3, 3])]
+    #[case([vec![], vec![], vec![1]], vec![1])]
+    #[case([vec![1], vec![], vec![1]], vec![1, 1])]
+    #[case([vec![1, 2], vec![], vec![1]], vec![1, 1, 2])]
+    #[case([vec![1, 2, 3], vec![], vec![1]], vec![1, 1, 2, 3])]
+    #[case([vec![], vec![1], vec![1]], vec![1, 1])]
+    #[case([vec![1], vec![1], vec![1]], vec![1, 1, 1])]
+    #[case([vec![1, 2], vec![1], vec![1]], vec![1, 1, 1, 2])]
+    #[case([vec![1, 2, 3], vec![1], vec![1]], vec![1, 1, 1, 2, 3])]
+    #[case([vec![], vec![1, 2], vec![1]], vec![1, 1, 2])]
+    #[case([vec![1], vec![1, 2], vec![1]], vec![1, 1, 1, 2])]
+    #[case([vec![1, 2], vec![1, 2], vec![1]], vec![1, 1, 1, 2, 2])]
+    #[case([vec![1, 2, 3], vec![1, 2], vec![1]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![], vec![1, 2, 3], vec![1]], vec![1, 1, 2, 3])]
+    #[case([vec![1], vec![1, 2, 3], vec![1]], vec![1, 1, 1, 2, 3])]
+    #[case([vec![1, 2], vec![1, 2, 3], vec![1]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2, 3], vec![1]], vec![1, 1, 1, 2, 2, 3, 3])]
+    #[case([vec![], vec![], vec![1, 2]], vec![1, 2])]
+    #[case([vec![1], vec![], vec![1, 2]], vec![1, 1, 2])]
+    #[case([vec![1, 2], vec![], vec![1, 2]], vec![1, 1, 2, 2])]
+    #[case([vec![1, 2, 3], vec![], vec![1, 2]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![], vec![1], vec![1, 2]], vec![1, 1, 2])]
+    #[case([vec![1], vec![1], vec![1, 2]], vec![1, 1, 1, 2])]
+    #[case([vec![1, 2], vec![1], vec![1, 2]], vec![1, 1, 1, 2, 2])]
+    #[case([vec![1, 2, 3], vec![1], vec![1, 2]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![], vec![1, 2], vec![1, 2]], vec![1, 1, 2, 2])]
+    #[case([vec![1], vec![1, 2], vec![1, 2]], vec![1, 1, 1, 2, 2])]
+    #[case([vec![1, 2], vec![1, 2], vec![1, 2]], vec![1, 1, 1, 2, 2, 2])]
+    #[case([vec![1, 2, 3], vec![1, 2], vec![1, 2]], vec![1, 1, 1, 2, 2, 2, 3])]
+    #[case([vec![], vec![1, 2, 3], vec![1, 2]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![1], vec![1, 2, 3], vec![1, 2]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![1, 2], vec![1, 2, 3], vec![1, 2]], vec![1, 1, 1, 2, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2, 3], vec![1, 2]], vec![1, 1, 1, 2, 2, 2, 3, 3])]
+    #[case([vec![], vec![], vec![1, 2, 3]], vec![1, 2, 3])]
+    #[case([vec![1], vec![], vec![1, 2, 3]], vec![1, 1, 2, 3])]
+    #[case([vec![1, 2], vec![], vec![1, 2, 3]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![], vec![1, 2, 3]], vec![1, 1, 2, 2, 3, 3])]
+    #[case([vec![], vec![1], vec![1, 2, 3]], vec![1, 1, 2, 3])]
+    #[case([vec![1], vec![1], vec![1, 2, 3]], vec![1, 1, 1, 2, 3])]
+    #[case([vec![1, 2], vec![1], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 3, 3])]
+    #[case([vec![], vec![1, 2], vec![1, 2, 3]], vec![1, 1, 2, 2, 3])]
+    #[case([vec![1], vec![1, 2], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 3])]
+    #[case([vec![1, 2], vec![1, 2], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3, 3])]
+    #[case([vec![], vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 2, 2, 3, 3])]
+    #[case([vec![1], vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 3, 3])]
+    #[case([vec![1, 2], vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3, 3])]
+    #[case([vec![1, 2, 3], vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3, 3, 3])]
+    fn multi_interleave<const N: usize>(#[case] input: [Vec<u8>; N], #[case] expected: Vec<u8>) {
+        assert_eq!(super::multi_interleave(input).collect::<Vec<_>>(), expected);
+    }
+
+    #[rstest]
+    // 0 chunks
+    #[case(0, [], [])]
+    #[case(1, [], [])]
+    // 1 chunk
+    #[case(0, [0], [vec![]])]
+    #[case(1, [0], [vec![]])]
+    #[case(0, [1], [vec![0]])]
+    #[case(1, [1], [vec![1]])]
+    #[case(0, [2], [vec![0, 1]])]
+    #[case(1, [2], [vec![1, 2]])]
+    #[case(0, [3], [vec![0, 1, 2]])]
+    #[case(1, [3], [vec![1, 2, 3]])]
+    // 2 chunks
+    #[case(0, [0, 0], [vec![], vec![]])]
+    #[case(1, [0, 0], [vec![], vec![]])]
+    #[case(0, [0, 1], [vec![], vec![0]])]
+    #[case(1, [0, 1], [vec![], vec![1]])]
+    #[case(0, [0, 2], [vec![], vec![0, 1]])]
+    #[case(1, [0, 2], [vec![], vec![1, 2]])]
+    #[case(0, [0, 3], [vec![], vec![0, 1, 2]])]
+    #[case(1, [0, 3], [vec![], vec![1, 2, 3]])]
+    #[case(0, [1, 0], [vec![0], vec![]])]
+    #[case(1, [1, 0], [vec![1], vec![]])]
+    #[case(0, [1, 1], [vec![0], vec![1]])]
+    #[case(1, [1, 1], [vec![1], vec![2]])]
+    #[case(0, [1, 2], [vec![0], vec![1, 2]])]
+    #[case(1, [1, 2], [vec![1], vec![2, 3]])]
+    #[case(0, [1, 3], [vec![0], vec![1, 2, 3]])]
+    #[case(1, [1, 3], [vec![1], vec![2, 3, 4]])]
+    #[case(0, [2, 0], [vec![0, 1], vec![]])]
+    #[case(1, [2, 0], [vec![1, 2], vec![]])]
+    #[case(0, [2, 1], [vec![0, 1], vec![2]])]
+    #[case(1, [2, 1], [vec![1, 2], vec![3]])]
+    #[case(0, [2, 2], [vec![0, 1], vec![2, 3]])]
+    #[case(1, [2, 2], [vec![1, 2], vec![3, 4]])]
+    #[case(0, [2, 3], [vec![0, 1], vec![2, 3, 4]])]
+    #[case(1, [2, 3], [vec![1, 2], vec![3, 4, 5]])]
+    #[case(0, [3, 0], [vec![0, 1, 2], vec![]])]
+    #[case(1, [3, 0], [vec![1, 2, 3], vec![]])]
+    #[case(0, [3, 1], [vec![0, 1, 2], vec![3]])]
+    #[case(1, [3, 1], [vec![1, 2, 3], vec![4]])]
+    #[case(0, [3, 2], [vec![0, 1, 2], vec![3, 4]])]
+    #[case(1, [3, 2], [vec![1, 2, 3], vec![4, 5]])]
+    #[case(0, [3, 3], [vec![0, 1, 2], vec![3, 4, 5]])]
+    #[case(1, [3, 3], [vec![1, 2, 3], vec![4, 5, 6]])]
+    // 3 chunks
+    #[case(0, [0, 0, 0], [vec![], vec![], vec![]])]
+    #[case(1, [0, 0, 0], [vec![], vec![], vec![]])]
+    #[case(0, [0, 1, 0], [vec![], vec![0], vec![]])]
+    #[case(1, [0, 1, 0], [vec![], vec![1], vec![]])]
+    #[case(0, [0, 2, 0], [vec![], vec![0, 1], vec![]])]
+    #[case(1, [0, 2, 0], [vec![], vec![1, 2], vec![]])]
+    #[case(0, [0, 3, 0], [vec![], vec![0, 1, 2], vec![]])]
+    #[case(1, [0, 3, 0], [vec![], vec![1, 2, 3], vec![]])]
+    #[case(0, [1, 0, 0], [vec![0], vec![], vec![]])]
+    #[case(1, [1, 0, 0], [vec![1], vec![], vec![]])]
+    #[case(0, [1, 1, 0], [vec![0], vec![1], vec![]])]
+    #[case(1, [1, 1, 0], [vec![1], vec![2], vec![]])]
+    #[case(0, [1, 2, 0], [vec![0], vec![1, 2], vec![]])]
+    #[case(1, [1, 2, 0], [vec![1], vec![2, 3], vec![]])]
+    #[case(0, [1, 3, 0], [vec![0], vec![1, 2, 3], vec![]])]
+    #[case(1, [1, 3, 0], [vec![1], vec![2, 3, 4], vec![]])]
+    #[case(0, [2, 0, 0], [vec![0, 1], vec![], vec![]])]
+    #[case(1, [2, 0, 0], [vec![1, 2], vec![], vec![]])]
+    #[case(0, [2, 1, 0], [vec![0, 1], vec![2], vec![]])]
+    #[case(1, [2, 1, 0], [vec![1, 2], vec![3], vec![]])]
+    #[case(0, [2, 2, 0], [vec![0, 1], vec![2, 3], vec![]])]
+    #[case(1, [2, 2, 0], [vec![1, 2], vec![3, 4], vec![]])]
+    #[case(0, [2, 3, 0], [vec![0, 1], vec![2, 3, 4], vec![]])]
+    #[case(1, [2, 3, 0], [vec![1, 2], vec![3, 4, 5], vec![]])]
+    #[case(0, [3, 0, 0], [vec![0, 1, 2], vec![], vec![]])]
+    #[case(1, [3, 0, 0], [vec![1, 2, 3], vec![], vec![]])]
+    #[case(0, [3, 1, 0], [vec![0, 1, 2], vec![3], vec![]])]
+    #[case(1, [3, 1, 0], [vec![1, 2, 3], vec![4], vec![]])]
+    #[case(0, [3, 2, 0], [vec![0, 1, 2], vec![3, 4], vec![]])]
+    #[case(1, [3, 2, 0], [vec![1, 2, 3], vec![4, 5], vec![]])]
+    #[case(0, [3, 3, 0], [vec![0, 1, 2], vec![3, 4, 5], vec![]])]
+    #[case(1, [3, 3, 0], [vec![1, 2, 3], vec![4, 5, 6], vec![]])]
+    #[case(0, [0, 0, 1], [vec![], vec![], vec![0]])]
+    #[case(1, [0, 0, 1], [vec![], vec![], vec![1]])]
+    #[case(0, [0, 1, 1], [vec![], vec![0], vec![1]])]
+    #[case(1, [0, 1, 1], [vec![], vec![1], vec![2]])]
+    #[case(0, [0, 2, 1], [vec![], vec![0, 1], vec![2]])]
+    #[case(1, [0, 2, 1], [vec![], vec![1, 2], vec![3]])]
+    #[case(0, [0, 3, 1], [vec![], vec![0, 1, 2], vec![3]])]
+    #[case(1, [0, 3, 1], [vec![], vec![1, 2, 3], vec![4]])]
+    #[case(0, [1, 0, 1], [vec![0], vec![], vec![1]])]
+    #[case(1, [1, 0, 1], [vec![1], vec![], vec![2]])]
+    #[case(0, [1, 1, 1], [vec![0], vec![1], vec![2]])]
+    #[case(1, [1, 1, 1], [vec![1], vec![2], vec![3]])]
+    #[case(0, [1, 2, 1], [vec![0], vec![1, 2], vec![3]])]
+    #[case(1, [1, 2, 1], [vec![1], vec![2, 3], vec![4]])]
+    #[case(0, [1, 3, 1], [vec![0], vec![1, 2, 3], vec![4]])]
+    #[case(1, [1, 3, 1], [vec![1], vec![2, 3, 4], vec![5]])]
+    #[case(0, [2, 0, 1], [vec![0, 1], vec![], vec![2]])]
+    #[case(1, [2, 0, 1], [vec![1, 2], vec![], vec![3]])]
+    #[case(0, [2, 1, 1], [vec![0, 1], vec![2], vec![3]])]
+    #[case(1, [2, 1, 1], [vec![1, 2], vec![3], vec![4]])]
+    #[case(0, [2, 2, 1], [vec![0, 1], vec![2, 3], vec![4]])]
+    #[case(1, [2, 2, 1], [vec![1, 2], vec![3, 4], vec![5]])]
+    #[case(0, [2, 3, 1], [vec![0, 1], vec![2, 3, 4], vec![5]])]
+    #[case(1, [2, 3, 1], [vec![1, 2], vec![3, 4, 5], vec![6]])]
+    #[case(0, [3, 0, 1], [vec![0, 1, 2], vec![], vec![3]])]
+    #[case(1, [3, 0, 1], [vec![1, 2, 3], vec![], vec![4]])]
+    #[case(0, [3, 1, 1], [vec![0, 1, 2], vec![3], vec![4]])]
+    #[case(1, [3, 1, 1], [vec![1, 2, 3], vec![4], vec![5]])]
+    #[case(0, [3, 2, 1], [vec![0, 1, 2], vec![3, 4], vec![5]])]
+    #[case(1, [3, 2, 1], [vec![1, 2, 3], vec![4, 5], vec![6]])]
+    #[case(0, [3, 3, 1], [vec![0, 1, 2], vec![3, 4, 5], vec![6]])]
+    #[case(1, [3, 3, 1], [vec![1, 2, 3], vec![4, 5, 6], vec![7]])]
+    #[case(0, [0, 0, 2], [vec![], vec![], vec![0, 1]])]
+    #[case(1, [0, 0, 2], [vec![], vec![], vec![1, 2]])]
+    #[case(0, [0, 1, 2], [vec![], vec![0], vec![1, 2]])]
+    #[case(1, [0, 1, 2], [vec![], vec![1], vec![2, 3]])]
+    #[case(0, [0, 2, 2], [vec![], vec![0, 1], vec![2, 3]])]
+    #[case(1, [0, 2, 2], [vec![], vec![1, 2], vec![3, 4]])]
+    #[case(0, [0, 3, 2], [vec![], vec![0, 1, 2], vec![3, 4]])]
+    #[case(1, [0, 3, 2], [vec![], vec![1, 2, 3], vec![4, 5]])]
+    #[case(0, [1, 0, 2], [vec![0], vec![], vec![1, 2]])]
+    #[case(1, [1, 0, 2], [vec![1], vec![], vec![2, 3]])]
+    #[case(0, [1, 1, 2], [vec![0], vec![1], vec![2, 3]])]
+    #[case(1, [1, 1, 2], [vec![1], vec![2], vec![3, 4]])]
+    #[case(0, [1, 2, 2], [vec![0], vec![1, 2], vec![3, 4]])]
+    #[case(1, [1, 2, 2], [vec![1], vec![2, 3], vec![4, 5]])]
+    #[case(0, [1, 3, 2], [vec![0], vec![1, 2, 3], vec![4, 5]])]
+    #[case(1, [1, 3, 2], [vec![1], vec![2, 3, 4], vec![5, 6]])]
+    #[case(0, [2, 0, 2], [vec![0, 1], vec![], vec![2, 3]])]
+    #[case(1, [2, 0, 2], [vec![1, 2], vec![], vec![3, 4]])]
+    #[case(0, [2, 1, 2], [vec![0, 1], vec![2], vec![3, 4]])]
+    #[case(1, [2, 1, 2], [vec![1, 2], vec![3], vec![4, 5]])]
+    #[case(0, [2, 2, 2], [vec![0, 1], vec![2, 3], vec![4, 5]])]
+    #[case(1, [2, 2, 2], [vec![1, 2], vec![3, 4], vec![5, 6]])]
+    #[case(0, [2, 3, 2], [vec![0, 1], vec![2, 3, 4], vec![5, 6]])]
+    #[case(1, [2, 3, 2], [vec![1, 2], vec![3, 4, 5], vec![6, 7]])]
+    #[case(0, [3, 0, 2], [vec![0, 1, 2], vec![], vec![3, 4]])]
+    #[case(1, [3, 0, 2], [vec![1, 2, 3], vec![], vec![4, 5]])]
+    #[case(0, [3, 1, 2], [vec![0, 1, 2], vec![3], vec![4, 5]])]
+    #[case(1, [3, 1, 2], [vec![1, 2, 3], vec![4], vec![5, 6]])]
+    #[case(0, [3, 2, 2], [vec![0, 1, 2], vec![3, 4], vec![5, 6]])]
+    #[case(1, [3, 2, 2], [vec![1, 2, 3], vec![4, 5], vec![6, 7]])]
+    #[case(0, [3, 3, 2], [vec![0, 1, 2], vec![3, 4, 5], vec![6, 7]])]
+    #[case(1, [3, 3, 2], [vec![1, 2, 3], vec![4, 5, 6], vec![7, 8]])]
+    #[case(0, [0, 0, 3], [vec![], vec![], vec![0, 1, 2]])]
+    #[case(1, [0, 0, 3], [vec![], vec![], vec![1, 2, 3]])]
+    #[case(0, [0, 1, 3], [vec![], vec![0], vec![1, 2, 3]])]
+    #[case(1, [0, 1, 3], [vec![], vec![1], vec![2, 3, 4]])]
+    #[case(0, [0, 2, 3], [vec![], vec![0, 1], vec![2, 3, 4]])]
+    #[case(1, [0, 2, 3], [vec![], vec![1, 2], vec![3, 4, 5]])]
+    #[case(0, [0, 3, 3], [vec![], vec![0, 1, 2], vec![3, 4, 5]])]
+    #[case(1, [0, 3, 3], [vec![], vec![1, 2, 3], vec![4, 5, 6]])]
+    #[case(0, [1, 0, 3], [vec![0], vec![], vec![1, 2, 3]])]
+    #[case(1, [1, 0, 3], [vec![1], vec![], vec![2, 3, 4]])]
+    #[case(0, [1, 1, 3], [vec![0], vec![1], vec![2, 3, 4]])]
+    #[case(1, [1, 1, 3], [vec![1], vec![2], vec![3, 4, 5]])]
+    #[case(0, [1, 2, 3], [vec![0], vec![1, 2], vec![3, 4, 5]])]
+    #[case(1, [1, 2, 3], [vec![1], vec![2, 3], vec![4, 5, 6]])]
+    #[case(0, [1, 3, 3], [vec![0], vec![1, 2, 3], vec![4, 5, 6]])]
+    #[case(1, [1, 3, 3], [vec![1], vec![2, 3, 4], vec![5, 6, 7]])]
+    #[case(0, [2, 0, 3], [vec![0, 1], vec![], vec![2, 3, 4]])]
+    #[case(1, [2, 0, 3], [vec![1, 2], vec![], vec![3, 4, 5]])]
+    #[case(0, [2, 1, 3], [vec![0, 1], vec![2], vec![3, 4, 5]])]
+    #[case(1, [2, 1, 3], [vec![1, 2], vec![3], vec![4, 5, 6]])]
+    #[case(0, [2, 2, 3], [vec![0, 1], vec![2, 3], vec![4, 5, 6]])]
+    #[case(1, [2, 2, 3], [vec![1, 2], vec![3, 4], vec![5, 6, 7]])]
+    #[case(0, [2, 3, 3], [vec![0, 1], vec![2, 3, 4], vec![5, 6, 7]])]
+    #[case(1, [2, 3, 3], [vec![1, 2], vec![3, 4, 5], vec![6, 7, 8]])]
+    #[case(0, [3, 0, 3], [vec![0, 1, 2], vec![], vec![3, 4, 5]])]
+    #[case(1, [3, 0, 3], [vec![1, 2, 3], vec![], vec![4, 5, 6]])]
+    #[case(0, [3, 1, 3], [vec![0, 1, 2], vec![3], vec![4, 5, 6]])]
+    #[case(1, [3, 1, 3], [vec![1, 2, 3], vec![4], vec![5, 6, 7]])]
+    #[case(0, [3, 2, 3], [vec![0, 1, 2], vec![3, 4], vec![5, 6, 7]])]
+    #[case(1, [3, 2, 3], [vec![1, 2, 3], vec![4, 5], vec![6, 7, 8]])]
+    #[case(0, [3, 3, 3], [vec![0, 1, 2], vec![3, 4, 5], vec![6, 7, 8]])]
+    #[case(1, [3, 3, 3], [vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]])]
+    fn chunked_range<const N: usize>(
+        #[case] input_start: usize,
+        #[case] input_chunk_sizes: [usize; N],
+        #[case] expected: [Vec<usize>; N],
+    ) {
+        assert_eq!(
+            super::chunked_range(input_start, input_chunk_sizes)
+                .map(Iterator::collect::<Vec<_>>)
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case(Ok(Ok(())), Ok(Ok(())))]
+    #[case(Ok(Err(())), Err(()))]
+    #[case(Err(()), Ok(Err(())))]
+    fn nested_transpose(
+        #[case] input: Result<Result<(), ()>, ()>,
+        #[case] expected: Result<Result<(), ()>, ()>,
+    ) {
+        use crate::bot::ext::util::NestedTranspose;
+
+        assert_eq!(input.transpose(), expected);
+    }
+
+    #[rstest]
+    #[case([0, 0, 0], 0x00_00_00)]
+    #[case([255, 0, 0], 0xFF_00_00)]
+    #[case([0, 255, 0], 0x00_FF_00)]
+    #[case([255, 255, 0], 0xFF_FF_00)]
+    #[case([0, 0, 255], 0x00_00_FF)]
+    #[case([255, 0, 255], 0xFF_00_FF)]
+    #[case([0, 255, 255], 0x00_FF_FF)]
+    #[case([255, 255, 255], 0xFF_FF_FF)]
+    #[case([123, 45, 67], 0x7B_2D_43)]
+    #[case([89, 101, 112], 0x59_65_70)]
+    fn rgb_to_hex(#[case] input: [u8; 3], #[case] expected: u32) {
+        assert_eq!(super::rgb_to_hex(input), expected);
+    }
+
+    #[rstest]
+    #[case(0x00_00_00, [0, 0, 0])]
+    #[case(0xFF_00_00, [255, 0, 0])]
+    #[case(0x00_FF_00, [0, 255, 0])]
+    #[case(0xFF_FF_00, [255, 255, 0])]
+    #[case(0x00_00_FF, [0, 0, 255])]
+    #[case(0xFF_00_FF, [255, 0, 255])]
+    #[case(0x00_FF_FF, [0, 255, 255])]
+    #[case(0xFF_FF_FF, [255, 255, 255])]
+    #[case(0x7B_2D_43, [123, 45, 67])]
+    #[case(0x59_65_70, [89, 101, 112])]
+    fn hex_to_rgb(#[case] input: u32, #[case] expected: [u8; 3]) {
+        assert_eq!(super::hex_to_rgb(input), expected);
+    }
+
+    #[rstest]
+    #[case([0, 0, 0])]
+    #[case([255, 0, 0])]
+    #[case([0, 255, 0])]
+    #[case([255, 255, 0])]
+    #[case([0, 0, 255])]
+    #[case([255, 0, 255])]
+    #[case([0, 255, 255])]
+    #[case([255, 255, 255])]
+    #[case([123, 45, 67])]
+    #[case([89, 101, 112])]
+    fn rgb_to_hex_to_rgb(#[case] input: [u8; 3]) {
+        assert_eq!(super::hex_to_rgb(super::rgb_to_hex(input)), input);
+    }
+
+    #[rstest]
+    #[case(0x00_00_00)]
+    #[case(0xFF_00_00)]
+    #[case(0x00_FF_00)]
+    #[case(0xFF_FF_00)]
+    #[case(0x00_00_FF)]
+    #[case(0xFF_00_FF)]
+    #[case(0x00_FF_FF)]
+    #[case(0xFF_FF_FF)]
+    #[case(0x7B_2D_43)]
+    #[case(0x59_65_70)]
+    fn hex_to_rgb_to_hex(#[case] input: u32) {
+        assert_eq!(super::rgb_to_hex(super::hex_to_rgb(input)), input);
     }
 }

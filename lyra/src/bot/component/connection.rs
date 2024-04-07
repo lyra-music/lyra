@@ -34,7 +34,7 @@ use crate::bot::{
         },
     },
     gateway::{voice, ExpectedGuildIdAware, SenderAware},
-    lavalink::{self, ClientAware},
+    lavalink::{self, LavalinkAware},
 };
 
 fn users_in_voice(ctx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
@@ -56,7 +56,7 @@ struct InactivityTimeoutContext {
 }
 
 impl InactivityTimeoutContext {
-    fn from_ctx(ctx: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
+    fn new_via(ctx: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
         Self {
             inner: ctx.bot_owned(),
             sender: ctx.sender().clone(),
@@ -77,7 +77,7 @@ impl CacheAware for InactivityTimeoutContext {
     }
 }
 
-impl lavalink::ClientAware for InactivityTimeoutContext {
+impl lavalink::LavalinkAware for InactivityTimeoutContext {
     fn lavalink(&self) -> &lavalink::Lavalink {
         self.inner.lavalink()
     }
@@ -165,7 +165,7 @@ pub async fn handle_voice_state_update(
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::from_ctx(ctx),
+                    InactivityTimeoutContext::new_via(ctx),
                     connected_channel_id,
                     text_channel_id,
                 ));
@@ -261,7 +261,7 @@ async fn match_state_channel_id(
 
             if voice_is_empty {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::from_ctx(ctx),
+                    InactivityTimeoutContext::new_via(ctx),
                     channel_id,
                     text_channel_id,
                 ));

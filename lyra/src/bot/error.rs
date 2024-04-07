@@ -156,3 +156,11 @@ pub struct LoadFailed(pub Box<str>);
 #[derive(PartialEq, Eq, Error, Debug)]
 #[error("invalid timestamp")]
 pub struct PrettifiedTimestampParse;
+
+#[derive(Error, Debug)]
+#[error("error running the bot starter: {}", .0)]
+pub enum RunError {
+    ColorEyre(#[from] color_eyre::Report),
+    Dotenvy(#[from] dotenvy::Error),
+    StartError(#[from] runner::StartError),
+}

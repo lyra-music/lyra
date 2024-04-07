@@ -84,7 +84,7 @@ pub(super) fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
 
     quote! {
         impl BotSlashCommand for #name {
-            async fn run(self, ctx: Ctx<SlashCommand>) -> CommandResult {
+            async fn run(self, ctx: SlashCtx) -> CommandResult {
                 match self {
                     #sub_cmd_matches
                 }

@@ -22,11 +22,8 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::bot::{
     command::{
         macros::{bad, crit, hid, out_or_fol, what},
-        model::{
-            AutocompleteCtx, BotAutocomplete, BotMessageCommand, BotSlashCommand, MessageCommand,
-            RespondViaMessage, SlashCommand,
-        },
-        util, Ctx,
+        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, Ctx, RespondViaMessage},
+        util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
     core::r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
     error::{
@@ -36,7 +33,7 @@ use crate::bot::{
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, CorrectPlaylistInfo, CorrectTrackInfo},
+    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, DelegateMethods, LavalinkAware},
 };
 
 struct LoadTrackContext {
@@ -45,7 +42,7 @@ struct LoadTrackContext {
 }
 
 impl LoadTrackContext {
-    fn with_ctx(ctx: &(impl ExpectedGuildIdAware + ClientAware)) -> Self {
+    fn new_via(ctx: &(impl ExpectedGuildIdAware + LavalinkAware)) -> Self {
         Self {
             guild_id: ctx.guild_id(),
             lavalink: ctx.lavalink().clone_inner(),
@@ -310,7 +307,7 @@ async fn play(
 ) -> Result<(), play::Error> {
     let guild_id = ctx.guild_id();
 
-    let load_ctx = LoadTrackContext::with_ctx(ctx);
+    let load_ctx = LoadTrackContext::new_via(ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
             let (tracks, playlists) = results.split();
@@ -412,6 +409,8 @@ async fn play(
 #[derive(CommandOption, CreateOption, Default)]
 enum PlaySource {
     #[default]
+    #[option(name = "Deezer", value = "dz")]
+    Deezer,
     #[option(name = "Youtube", value = "yt")]
     Youtube,
     #[option(name = "Youtube Music", value = "ytm")]
@@ -447,7 +446,7 @@ pub struct Play {
 }
 
 impl BotSlashCommand for Play {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let queries = [
             Some(self.query),
             self.query_2,
@@ -480,7 +479,7 @@ pub struct File {
 }
 
 impl BotSlashCommand for File {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let files = [
             Some(self.track),
             self.track_2,
@@ -534,7 +533,7 @@ impl AddToQueue {
 }
 
 impl BotMessageCommand for AddToQueue {
-    async fn run(mut ctx: Ctx<MessageCommand>) -> CommandResult {
+    async fn run(mut ctx: MessageCtx) -> CommandResult {
         let message = ctx.target_message();
 
         let queries = extract_queries(message);

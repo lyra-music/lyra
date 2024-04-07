@@ -8,11 +8,8 @@ use twilight_model::application::{
 use crate::bot::{
     command::{
         check,
-        model::{
-            AutocompleteCtx, BotAutocomplete, BotMessageCommand, BotSlashCommand, CommandInfoAware,
-            MessageCommand, SlashCommand,
-        },
-        Ctx,
+        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, CommandInfoAware},
+        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{
         config::Config,
@@ -50,7 +47,7 @@ macro_rules! declare_slash_commands {
             }
         )*
 
-        impl Ctx<SlashCommand> {
+        impl SlashCtx {
             pub async fn execute(mut self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
@@ -93,7 +90,7 @@ macro_rules! declare_message_commands {
             }
         )*
 
-        impl Ctx<MessageCommand> {
+        impl MessageCtx {
             pub async fn execute(mut self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 

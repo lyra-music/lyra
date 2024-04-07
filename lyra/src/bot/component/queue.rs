@@ -8,9 +8,7 @@ mod repeat;
 mod shuffle;
 
 pub use clear::Clear;
-#[allow(clippy::module_name_repetitions)]
 pub use fair_queue::FairQueue;
-#[allow(clippy::module_name_repetitions)]
 pub use play::{AddToQueue, Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
@@ -28,8 +26,7 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 use crate::bot::{
     command::{
         macros::{hid_fol, note_fol, out},
-        model::{CtxKind, RespondViaMessage},
-        Ctx,
+        model::{Ctx, CtxKind, RespondViaMessage},
     },
     core::{
         model::{CacheAware, InteractionClient},
@@ -40,7 +37,7 @@ use crate::bot::{
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, CorrectTrackInfo, QueueItem},
+    lavalink::{CorrectTrackInfo, DelegateMethods, LavalinkAware, QueueItem},
 };
 
 fn generate_position_choice(

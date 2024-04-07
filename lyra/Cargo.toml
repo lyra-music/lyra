@@ -7,8 +7,17 @@ edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
 authors = ["fdnt7"]
+build = "build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+vergen = { version = "8.3.1", features = [
+    "build",
+    "cargo",
+    "git",
+    "gitoxide",
+    "rustc",
+    "si",
+] }
 
 [lints.rust]
 unsafe_code = "forbid"
@@ -24,46 +33,44 @@ cast_possible_wrap = "allow"
 cast_sign_loss = "allow"
 cast_precision_loss = "allow"
 significant_drop_tightening = { level = "allow", priority = 1 }
+module_name_repetitions = "allow"
 
 [dependencies]
 lyra_proc = { path = "./lyra_proc" }
 
-const-str = "0.5.6"
+const-str = "0.5.7"
 const_panic = { version = "0.2.8", features = ["derive"] }
-heck = "0.4.1"
-bitflags = "2.4.2"
+heck = "0.5.0"
+bitflags = "2.5.0"
 unicode-segmentation = "1.11.0"
 dashmap = "5.5.3"
-version_check = "0.9.4"
-os_info = "3.7.0"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
-thiserror = "1.0.57"
-color-eyre = "0.6.2"
+thiserror = "1.0.58"
+color-eyre = "0.6.3"
 rstest = "0.18.2"
 futures = "0.3.30"
-tokio = { version = "1.36.0", features = [
+tokio = { version = "1.37.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
     "macros",
 ] }
-regex = "1.10.3"
+regex = "1.10.4"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
-log = "0.4.20"
+log = "0.4.21"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rand = "0.8.5"
 itertools = "0.12.1"
-rayon = "1.8.1"
+rayon = "1.10.0"
 lazy_static = "1.4.0"
-chrono = "0.4.34"
-sqlx = { version = "0.7.3", features = ["postgres", "runtime-tokio-rustls"] }
+chrono = "0.4.37"
+sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
-lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs", rev = "716373c9", features = [
-    "twilight",
-] }
+lavalink-rs = { version = "0.11.0", features = ["twilight"] }
+aho-corasick = "1.1.3"
 
 twilight = "0.15.1"
 twilight-cache-inmemory = { version = "0.15.4", features = [
@@ -87,12 +94,12 @@ features = ["palette_color"]
 default-features = false
 
 [dependencies.image]
-version = "0.24.9"
+version = "0.25.1"
 features = ["jpeg", "png", "gif", "tiff"]
 default-features = false
 
 [dependencies.palette]
-version = "0.7.4"
+version = "0.7.5"
 features = ["std"]
 default-features = false
 

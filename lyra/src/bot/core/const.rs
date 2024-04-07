@@ -1,15 +1,68 @@
 pub mod metadata {
-    use version_check::Version;
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
+    const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+    const BUILD_TIMESTAMP: &str = env!("VERGEN_BUILD_TIMESTAMP");
 
-    pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-    pub const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
-    pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-    pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
-    pub const SUPPORT: &str = "https://discord.com/invite/d4UerJpvTp";
+    const CARGO_TARGET_TRIPLE: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");
+    const CARGO_OPT_LEVEL: &str = env!("VERGEN_CARGO_OPT_LEVEL");
+
+    const RUSTC_SEMVER: &str = env!("VERGEN_RUSTC_SEMVER");
+    const RUSTC_CHANNEL: &str = env!("VERGEN_RUSTC_CHANNEL");
+    const RUSTC_HOST_TRIPLE: &str = env!("VERGEN_RUSTC_HOST_TRIPLE");
+    const RUSTC_COMMIT_HASH: &str = env!("VERGEN_RUSTC_COMMIT_HASH");
+
+    const GIT_DESCRIBE: &str = env!("VERGEN_GIT_DESCRIBE");
+    const GIT_SHA: &str = env!("VERGEN_GIT_SHA");
+    const GIT_BRANCH: &str = env!("VERGEN_GIT_BRANCH");
+    const GIT_COMMIT_TIMESTAMP: &str = env!("VERGEN_GIT_COMMIT_TIMESTAMP");
+
+    const METADATA_N: usize = 14;
+    const METADATA_REPLACEMENTS: [&str; METADATA_N] = [
+        VERSION,
+        AUTHORS,
+        COPYRIGHT,
+        BUILD_TIMESTAMP,
+        GIT_DESCRIBE,
+        GIT_SHA,
+        GIT_COMMIT_TIMESTAMP,
+        GIT_BRANCH,
+        RUSTC_SEMVER,
+        RUSTC_CHANNEL,
+        RUSTC_HOST_TRIPLE,
+        RUSTC_COMMIT_HASH,
+        CARGO_TARGET_TRIPLE,
+        CARGO_OPT_LEVEL,
+    ];
+
+    const METADATA_PATTERNS: [&str; METADATA_N] = [
+        "%version",
+        "%authors",
+        "%copyright",
+        "%build_timestamp",
+        "%git_describe",
+        "%git_sha",
+        "%git_commit_timestamp",
+        "%git_branch",
+        "%rustc_semver",
+        "%rustc_channel",
+        "%rustc_host",
+        "%rustc_commit_hash",
+        "%cargo_target_triple",
+        "%cargo_opt_level",
+    ];
 
     lazy_static::lazy_static! {
-        pub static ref RUST_VERSION: Box<str> = Version::read().expect("rustc version must exist").to_string().into();
-        pub static ref OS_INFO: Box<str> = os_info::get().to_string().into();
+        pub static ref BANNER: Box<str> = {
+            use aho_corasick::AhoCorasick;
+
+            let rdr = include_str!("../../../../assets/lyra2-ascii.ans");
+            let mut wtr = Vec::new();
+
+            let ac = AhoCorasick::new(METADATA_PATTERNS).expect("pattern must be valid");
+            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS).expect("searching must not fail");
+            String::from_utf8(wtr).expect("slice must be UTF-8").into()
+        };
     }
 }
 

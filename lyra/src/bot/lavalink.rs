@@ -5,8 +5,9 @@ mod track;
 
 pub use self::{
     model::{
-        ClientAware, CorrectPlaylistInfo, CorrectTrackInfo, Event, EventRecvResult, Lavalink,
-        PlayerData, Queue, QueueIndexerType, QueueItem, RepeatMode,
+        wait_for_with, ClientAware as LavalinkAware, CorrectPlaylistInfo, CorrectTrackInfo,
+        DelegateMethods, Event, EventRecvResult, IndexerType, Lavalink, Queue, QueueItem,
+        RepeatMode,
     },
     process::handlers,
 };

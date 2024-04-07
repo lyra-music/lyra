@@ -18,8 +18,8 @@ use crate::bot::{
     command::{
         check,
         macros::{hid, out, sus},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
     error::command::Result as CommandResult,
@@ -158,7 +158,7 @@ pub struct MemberRole {
 }
 
 impl BotSlashCommand for MemberRole {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let inputted_mentionables = [
@@ -262,7 +262,7 @@ pub struct Channel {
 }
 
 impl BotSlashCommand for Channel {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let inputted_channels = [

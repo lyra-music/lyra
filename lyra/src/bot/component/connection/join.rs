@@ -19,8 +19,8 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, cant, hid, hid_fol, nope, note, note_fol, out, sus_fol},
-        model::{BotSlashCommand, CtxKind, RespondViaMessage, SlashCommand},
-        Ctx,
+        model::{BotSlashCommand, Ctx, CtxKind, RespondViaMessage},
+        SlashCtx,
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
@@ -39,7 +39,7 @@ use crate::bot::{
         Cache as CacheError, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::ClientAware,
+    lavalink::LavalinkAware,
 };
 
 pub(super) enum Response {
@@ -336,7 +336,7 @@ async fn handle_response(
         );
 
         traced::tokio_spawn(start_inactivity_timeout(
-            super::InactivityTimeoutContext::from_ctx(ctx),
+            super::InactivityTimeoutContext::new_via(ctx),
             joined.id,
             text_channel_id,
         ));
@@ -381,7 +381,7 @@ pub struct Join {
 }
 
 impl BotSlashCommand for Join {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let Err(e) = join(&mut ctx, self.channel).await else {
             return Ok(());
         };

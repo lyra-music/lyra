@@ -1,49 +1,33 @@
-use std::{
-    ops::Deref,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+mod interaction;
+
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
 use twilight_cache_inmemory::InMemoryCache;
-use twilight_http::{request::application::interaction::UpdateResponse, Client, Response};
+use twilight_gateway::ShardId;
+use twilight_http::Client;
 use twilight_model::{
-    application::{command::CommandOptionChoice, interaction::Interaction},
-    channel::{
-        message::{component::ActionRow, AllowedMentions, Embed, MessageFlags},
-        Message,
-    },
     guild::Permissions,
-    http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
-    id::{
-        marker::{InteractionMarker, MessageMarker, UserMarker},
-        Id,
-    },
+    id::{marker::UserMarker, Id},
     oauth::Application,
     user::CurrentUser,
 };
 use twilight_standby::Standby;
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::{
-    command::{
-        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
-        model::CommandInfoAware,
-    },
-    error::core::{
-        DeserializeBodyFromHttpError, FollowupResult, RegisterGlobalCommandsError, RespondResult,
-    },
+    error::core::DeserializeBodyFromHttpError,
     lavalink::{self, Lavalink},
 };
 
-pub type MessageResponse = Response<Message>;
-pub type UnitRespondResult = RespondResult<()>;
-pub type MessageRespondResult = RespondResult<MessageResponse>;
-pub type UnitFollowupResult = FollowupResult<()>;
-pub type MessageFollowupResult = FollowupResult<MessageResponse>;
+pub use self::interaction::{
+    Client as InteractionClient, Interface as InteractionInterface, MessageResponse,
+    UnitFollowupResult, UnitRespondResult,
+};
 
 pub struct Config {
     pub token: &'static str,
@@ -52,259 +36,66 @@ pub struct Config {
     pub database_url: &'static str,
 }
 
-pub struct BotInfo {
-    started: DateTime<Utc>,
-    guild_count: AtomicUsize,
+struct GuildCounter {
+    total: AtomicUsize,
+    counters: DashMap<ShardId, usize>,
 }
 
-impl BotInfo {
-    pub fn guild_count(&self) -> usize {
-        self.guild_count.load(Ordering::Relaxed)
-    }
-
-    pub fn set_guild_count(&self, guild_count: usize) {
-        self.guild_count.store(guild_count, Ordering::Relaxed);
-    }
-
-    pub fn increment_guild_count(&self) {
-        self.guild_count.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn decrement_guild_count(&self) {
-        self.guild_count.fetch_sub(1, Ordering::Relaxed);
-    }
-}
-
-pub struct InteractionClient<'a> {
-    inner: twilight_http::client::InteractionClient<'a>,
-}
-
-pub struct InteractionInterface<'a> {
-    inner: InteractionClient<'a>,
-    interaction_token: String,
-    interaction_id: Id<InteractionMarker>,
-}
-
-impl InteractionInterface<'_> {
-    fn base_response_data_builder() -> InteractionResponseDataBuilder {
-        InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
-    }
-
-    const fn interaction_token(&self) -> &String {
-        &self.interaction_token
-    }
-
-    pub async fn respond_with(
-        &self,
-        data: Option<InteractionResponseData>,
-    ) -> MessageRespondResult {
-        let interaction_token = self.interaction_token();
-        self.inner
-            .create_response(
-                self.interaction_id,
-                interaction_token,
-                &InteractionResponse {
-                    kind: InteractionResponseType::ChannelMessageWithSource,
-                    data,
-                },
-            )
-            .await?;
-
-        self.inner.response(interaction_token).await
-    }
-
-    pub async fn update_message_with(
-        &self,
-        data: Option<InteractionResponseData>,
-    ) -> MessageRespondResult {
-        let interaction_token = self.interaction_token();
-        self.inner
-            .create_response(
-                self.interaction_id,
-                interaction_token,
-                &InteractionResponse {
-                    kind: InteractionResponseType::UpdateMessage,
-                    data,
-                },
-            )
-            .await?;
-
-        self.inner.response(interaction_token).await
-    }
-
-    fn update(&self) -> UpdateResponse<'_> {
-        self.inner.update_response(self.interaction_token())
-    }
-
-    pub async fn update_no_components_embeds(&self, content: &str) -> MessageFollowupResult {
-        Ok(self
-            .update()
-            .components(None)?
-            .embeds(None)?
-            .content(Some(content))?
-            .await?)
-    }
-
-    pub async fn update_message_embeds_only(
-        &self,
-        embeds: impl IntoIterator<Item = Embed> + Send,
-    ) -> MessageFollowupResult {
-        let data = InteractionResponseDataBuilder::new().embeds(embeds).build();
-        Ok(self.update_message_with(Some(data)).await?)
-    }
-
-    pub async fn ephem(&self, content: impl Into<String> + Send) -> MessageRespondResult {
-        let data = Self::base_response_data_builder()
-            .content(content)
-            .flags(MessageFlags::EPHEMERAL)
-            .build();
-        self.respond_with(Some(data)).await
-    }
-
-    pub async fn followup(&self, content: &str) -> MessageFollowupResult {
-        Ok(self
-            .inner
-            .create_followup(self.interaction_token())
-            .content(content)?
-            .await?)
-    }
-
-    pub async fn followup_ephem(&self, content: &str) -> MessageFollowupResult {
-        Ok(self
-            .inner
-            .create_followup(self.interaction_token())
-            .flags(MessageFlags::EPHEMERAL)
-            .content(content)?
-            .await?)
-    }
-
-    pub async fn modal(
-        &self,
-        custom_id: impl Into<String> + Send,
-        title: impl Into<String> + Send,
-        text_inputs: impl IntoIterator<Item = impl Into<twilight_model::channel::message::Component>>
-            + Send,
-    ) -> UnitRespondResult {
-        let data = InteractionResponseDataBuilder::new()
-            .custom_id(custom_id)
-            .title(title)
-            .components(text_inputs.into_iter().map(|t| {
-                ActionRow {
-                    components: vec![t.into()],
-                }
-                .into()
-            }))
-            .build()
-            .into();
-
-        self.inner
-            .create_response(
-                self.interaction_id,
-                self.interaction_token(),
-                &InteractionResponse {
-                    kind: InteractionResponseType::Modal,
-                    data,
-                },
-            )
-            .await?;
-        Ok(())
-    }
-
-    pub async fn autocomplete(
-        &self,
-        choices: impl IntoIterator<Item = CommandOptionChoice> + Send,
-    ) -> UnitRespondResult {
-        let data = InteractionResponseDataBuilder::new()
-            .choices(choices)
-            .build()
-            .into();
-
-        self.inner
-            .create_response(
-                self.interaction_id,
-                self.interaction_token(),
-                &InteractionResponse {
-                    kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
-                    data,
-                },
-            )
-            .await?;
-        Ok(())
-    }
-
-    pub async fn update_followup(
-        &self,
-        message_id: Id<MessageMarker>,
-        content: &str,
-    ) -> UnitFollowupResult {
-        self.inner
-            .update_followup(self.interaction_token(), message_id)
-            .content(Some(content))?
-            .await?;
-        Ok(())
-    }
-
-    pub async fn delete_followup(&self, message_id: Id<MessageMarker>) -> UnitRespondResult {
-        self.inner
-            .delete_followup(self.interaction_token(), message_id)
-            .await?;
-        Ok(())
-    }
-}
-
-impl<'a> InteractionClient<'a> {
-    pub const fn new(client: twilight_http::client::InteractionClient<'a>) -> Self {
-        Self { inner: client }
-    }
-
-    pub fn interfaces(self, interaction: &Interaction) -> InteractionInterface<'a> {
-        InteractionInterface {
-            inner: self,
-            interaction_token: interaction.token.clone(),
-            interaction_id: interaction.id,
+impl GuildCounter {
+    pub fn new() -> Self {
+        Self {
+            total: AtomicUsize::new(0),
+            counters: DashMap::new(),
         }
     }
 
-    pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
-        let commands = self
-            .set_global_commands(&[SLASH_COMMANDS.as_ref(), MESSAGE_COMMANDS.as_ref()].concat())
-            .await?
-            .models()
-            .await?;
-
-        POPULATED_COMMANDS_MAP.get_or_init(|| {
-            commands
-                .into_iter()
-                .map(|c| (c.name.clone().into(), c))
-                .collect()
-        });
-
-        Ok(())
+    pub fn total(&self) -> usize {
+        self.total.load(Ordering::Relaxed)
     }
 
-    pub fn populated_command<T: CommandInfoAware>(
-    ) -> &'static twilight_model::application::command::Command {
-        POPULATED_COMMANDS_MAP
-            .get()
-            .expect("`POPULATED_COMMANDS_MAP` must be populated")
-            .get(T::name())
-            .unwrap_or_else(|| panic!("command must exist: {}", T::name()))
+    pub fn reset(&self, shard_id: ShardId, guild_count: usize) {
+        let old_shard_guild_count = self.counters.get(&shard_id).map_or(0, |v| *v);
+
+        self.counters.insert(shard_id, guild_count);
+        let _ = self
+            .total
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                (guild_count - old_shard_guild_count != 0)
+                    .then_some(n + guild_count - old_shard_guild_count)
+            });
     }
 
-    pub fn mention_command<T: CommandInfoAware>() -> Box<str> {
-        let cmd = Self::populated_command::<T>();
+    pub fn increment(&self, shard_id: ShardId) {
+        self.counters.entry(shard_id).and_modify(|v| *v += 1);
+        self.total.fetch_add(1, Ordering::Relaxed);
+    }
 
-        let name = &cmd.name;
-        let id = cmd.id.expect("id must exist");
-        format!("</{name}:{id}>").into_boxed_str()
+    pub fn decrement(&self, shard_id: ShardId) {
+        self.counters.entry(shard_id).and_modify(|v| *v -= 1);
+        self.total.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
-impl<'a> Deref for InteractionClient<'a> {
-    type Target = twilight_http::client::InteractionClient<'a>;
+pub struct BotInfo {
+    started: DateTime<Utc>,
+    guild_counter: GuildCounter,
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+impl BotInfo {
+    pub fn total_guild_count(&self) -> usize {
+        self.guild_counter.total()
+    }
+
+    pub fn reset_guild_count(&self, shard_id: ShardId, guild_count: usize) {
+        self.guild_counter.reset(shard_id, guild_count);
+    }
+
+    pub fn increment_guild_count(&self, shard_id: ShardId) {
+        self.guild_counter.increment(shard_id);
+    }
+
+    pub fn decrement_guild_count(&self, shard_id: ShardId) {
+        self.guild_counter.decrement(shard_id);
     }
 }
 
@@ -344,7 +135,7 @@ impl BotState {
     pub fn new(db: Pool<Postgres>, http: Client, lavalink: Lavalink) -> Self {
         let info = BotInfo {
             started: Utc::now(),
-            guild_count: AtomicUsize::default(),
+            guild_counter: GuildCounter::new(),
         };
 
         Self {
@@ -391,7 +182,7 @@ impl BotState {
     }
 }
 
-impl lavalink::ClientAware for BotState {
+impl lavalink::LavalinkAware for BotState {
     fn lavalink(&self) -> &Lavalink {
         &self.lavalink
     }

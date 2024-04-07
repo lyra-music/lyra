@@ -18,7 +18,7 @@ use twilight_model::{
 };
 
 use crate::bot::{
-    command::{model::CtxKind, Ctx},
+    command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
         model::{AuthorPermissionsAware, BotState, CacheAware, OwnedBotStateAware},
@@ -37,7 +37,7 @@ use crate::bot::{
         UserNotStageManager as UserNotStageManagerError,
     },
     gateway::{ExpectedGuildIdAware, GuildIdAware},
-    lavalink::{self, ClientAware, CorrectTrackInfo, Event, PlayerData, QueueItem},
+    lavalink::{self, CorrectTrackInfo, DelegateMethods, Event, LavalinkAware, QueueItem},
 };
 
 use super::{
@@ -345,7 +345,7 @@ async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, 
         position,
         title,
         channel_id,
-        context: CurrentlyPlayingContext::from_ctx(ctx),
+        context: CurrentlyPlayingContext::new_via(ctx),
     })
 }
 
@@ -355,7 +355,7 @@ struct CurrentlyPlayingContext {
 }
 
 impl CurrentlyPlayingContext {
-    fn from_ctx(ctx: &Ctx<impl CtxKind>) -> Self {
+    fn new_via(ctx: &Ctx<impl CtxKind>) -> Self {
         Self {
             author_id: ctx.author_id(),
             author_permissions: ctx.author_permissions(),
@@ -769,7 +769,7 @@ async fn handle_poll(
 
             let mut rx = connection.subscribe();
 
-            if let Some(event) = PlayerData::wait_for_via(&mut rx, |e| {
+            if let Some(event) = lavalink::wait_for_with(&mut rx, |e| {
                 matches!(
                     e,
                     Event::AlternateVoteCastDenied | Event::AlternateVoteCastedAlready(_)

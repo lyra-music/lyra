@@ -20,8 +20,8 @@ use twilight_model::{
 use super::{
     check,
     macros::{hid_fol, note_fol},
-    model::{CommandDataAware, CtxKind, ModalCtx, RespondViaMessage, RespondViaModal},
-    Ctx,
+    model::{CommandDataAware, Ctx, CtxKind, RespondViaMessage, RespondViaModal},
+    ModalCtx,
 };
 use crate::bot::{
     component::connection::auto_join,
@@ -43,7 +43,7 @@ use crate::bot::{
         Suppressed as SuppressedError,
     },
     gateway::ExpectedGuildIdAware,
-    lavalink::ClientAware,
+    lavalink::{DelegateMethods, LavalinkAware},
 };
 
 pub trait MessageLinkAware {
