@@ -18,7 +18,7 @@ nursery = "deny"
 unwrap_used = "deny"
 
 [dependencies]
-syn = "2.0.51"
+syn = "2.0.58"
 quote = "1.0.35"
 itertools = "0.12.1"
-heck = "0.4.1"
+heck = "0.5.0"
