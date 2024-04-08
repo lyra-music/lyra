@@ -86,7 +86,7 @@ twilight-util = { version = "=0.16.0-rc.1", features = [
     "permission-calculator",
     "builder",
 ] }
-twilight-interactions = "0.15.2"
+twilight-interactions = { git = "https://github.com/fdnt7/twilight-interactions", rev = "82b707f" }
 
 [dependencies.kmeans_colors]
 version = "0.6.0"

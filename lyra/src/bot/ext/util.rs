@@ -8,7 +8,6 @@ use bitflags::Flags;
 use chrono::Duration;
 use heck::ToTitleCase;
 use itertools::Itertools;
-use twilight_model::guild::Permissions;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::bot::{
@@ -159,19 +158,6 @@ impl PrettyTruncator for str {
     }
 }
 
-pub trait BitFlagsPrettify: Debug {
-    fn prettify_code(&self) -> String {
-        format!("{self:?}")
-            .split(" | ")
-            .map(|s| format!("`{}`", s.to_title_case()))
-            .collect::<Vec<_>>()
-            .pretty_join_with_and()
-    }
-}
-
-impl BitFlagsPrettify for Permissions {}
-
-// FIXME: Use this impl instead once twilight updated bitflags to 2.x.x
 pub trait FlagsPrettify: Flags {
     fn prettify(&self) -> String {
         self.iter_names()
@@ -309,8 +295,8 @@ impl<I: Iterator> Iterator for MultiInterleave<I> {
     }
 }
 
-/* FIXME: make this generic over `T: std::ops::Add<Output = T> + std::ops::AddAssign + std::iter::Step + Copy`
-    once `std::iter::Step` is stablised: https://github.com/rust-lang/rust/issues/42168
+/* FIXME: make this generic over `T: std::ops::Add<Output = T> + std::ops::AddAssign + std::iter::Step + Copy` once `std::iter::Step` is stablised:
+    https://github.com/rust-lang/rust/issues/42168
 */
 pub fn chunked_range(
     start: usize,

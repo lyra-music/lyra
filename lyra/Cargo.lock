@@ -1757,7 +1757,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
  "url",
  "version_check",
 ]
@@ -1902,7 +1902,7 @@ dependencies = [
  "twilight-http",
  "twilight-interactions",
  "twilight-mention",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
  "twilight-standby",
  "twilight-util",
  "twilight-validate",
@@ -3582,7 +3582,7 @@ dependencies = [
  "bitflags 2.5.0",
  "dashmap",
  "serde",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
  "twilight-util",
 ]
 
@@ -3604,7 +3604,7 @@ dependencies = [
  "tracing",
  "twilight-gateway-queue",
  "twilight-http",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
 ]
 
 [[package]]
@@ -3636,7 +3636,7 @@ dependencies = [
  "tokio",
  "tracing",
  "twilight-http-ratelimiting",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
  "twilight-validate",
 ]
 
@@ -3652,19 +3652,17 @@ dependencies = [
 
 [[package]]
 name = "twilight-interactions"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f147662174686043822ade9d0abb388d8ac460edb77ba908145fd96edb285795"
+version = "0.16.0-rc.1"
+source = "git+https://github.com/fdnt7/twilight-interactions?rev=82b707f#82b707f016768bff8dad331394c229852df08262"
 dependencies = [
  "twilight-interactions-derive",
- "twilight-model 0.15.4",
+ "twilight-model",
 ]
 
 [[package]]
 name = "twilight-interactions-derive"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a297ef39ee60e672ff47624acb4f4fff5f700dcb2b509230664916f20a7d489"
+version = "0.16.0-rc.1"
+source = "git+https://github.com/fdnt7/twilight-interactions?rev=82b707f#82b707f016768bff8dad331394c229852df08262"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3677,20 +3675,7 @@ version = "0.16.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3dc35d15fbaf51d2a4a0ca961e746bca9a01f26f338f99d9134c15b6561b4c5b"
 dependencies = [
- "twilight-model 0.16.0-rc.1",
-]
-
-[[package]]
-name = "twilight-model"
-version = "0.15.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "276bd50f4817b3b421395afac89f5d7b61fdfd0f00a28b2a7db983e4878b4a1a"
-dependencies = [
- "bitflags 1.3.2",
- "serde",
- "serde-value",
- "serde_repr",
- "time",
+ "twilight-model",
 ]
 
 [[package]]
@@ -3716,7 +3701,7 @@ dependencies = [
  "futures-core",
  "tokio",
  "tracing",
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
 ]
 
 [[package]]
@@ -3725,7 +3710,7 @@ version = "0.16.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c8a5a519ea63090a9e009974bf25e8cb3be9284da7248011ed37377d4180295"
 dependencies = [
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
  "twilight-validate",
 ]
 
@@ -3735,7 +3720,7 @@ version = "0.16.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d71bf2b683421a1674080e821eef108a35cef841ed73562f835bc5cdd478b49"
 dependencies = [
- "twilight-model 0.16.0-rc.1",
+ "twilight-model",
 ]
 
 [[package]]
