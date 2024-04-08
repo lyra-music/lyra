@@ -12,15 +12,15 @@ use crate::bot::{
     command::{
         check,
         macros::{caut, hid, out},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::{BotSlashCommand, Ctx, CtxKind},
+        SlashCtx,
     },
     error::{
         command::Result as CommandResult,
         component::connection::leave::{self, PreDisconnectCleanupError},
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::{self, ClientAware},
+    lavalink::{self, LavalinkAware},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -32,31 +32,27 @@ impl Display for LeaveResponse {
 }
 
 pub(super) fn disconnect(ctx: &(impl SenderAware + ExpectedGuildIdAware)) -> Result<(), SendError> {
-    ctx.sender().command(&UpdateVoiceState::new(
-        ctx.guild_id_expected(),
-        None,
-        false,
-        false,
-    ))?;
+    ctx.sender()
+        .command(&UpdateVoiceState::new(ctx.guild_id(), None, false, false))?;
 
     Ok(())
 }
 
 pub(super) async fn pre_disconnect_cleanup(
-    ctx: &(impl ExpectedGuildIdAware + lavalink::ClientAware + Sync),
+    ctx: &(impl ExpectedGuildIdAware + lavalink::LavalinkAware + Sync),
 ) -> Result<(), PreDisconnectCleanupError> {
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
     lavalink.dispatch_queue_clear(guild_id);
-    lavalink.remove_connection(guild_id);
-    lavalink.destroy_player(guild_id)?;
+    lavalink.drop_connection(guild_id);
+    lavalink.delete_player(guild_id).await?;
 
     Ok(())
 }
 
-async fn leave(ctx: &Ctx<SlashCommand>) -> Result<LeaveResponse, leave::Error> {
-    let guild_id = ctx.guild_id_expected();
+async fn leave(ctx: &Ctx<impl CtxKind>) -> Result<LeaveResponse, leave::Error> {
+    let guild_id = ctx.guild_id();
 
     let in_voice = check::in_voice(ctx)?;
     let channel_id = in_voice.channel_id();
@@ -77,7 +73,7 @@ async fn leave(ctx: &Ctx<SlashCommand>) -> Result<LeaveResponse, leave::Error> {
 pub struct Leave;
 
 impl BotSlashCommand for Leave {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
                 out!(format!("📎 ~~{}~~", voice.mention()), ctx);

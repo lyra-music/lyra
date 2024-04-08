@@ -3,8 +3,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::bot::{
     command::{
         macros::{caut, hid, out},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     error::command::Result as CommandResult,
 };
@@ -15,7 +15,7 @@ use crate::bot::{
 pub struct Ping;
 
 impl BotSlashCommand for Ping {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         if let Some(latency) = ctx.latency().average() {
             out!(format!("🏓 Pong! `({}ms)`", latency.as_millis()), ctx);
         } else {

@@ -43,13 +43,12 @@ use crate::bot::{
     },
     ext::util::hex_to_rgb,
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, Event, EventRecvResult},
+    lavalink::{Event, EventRecvResult, LavalinkAware},
 };
 
 use super::{
-    model::RespondViaMessage,
+    model::{Ctx, RespondViaMessage},
     util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware, MessageLinkAware},
-    Ctx,
 };
 
 #[derive(Hash)]
@@ -80,6 +79,7 @@ impl std::fmt::Display for Topic {
     }
 }
 
+#[derive(Debug)]
 pub struct Poll {
     topic_hash: u64,
     message: super::util::MessageLinkComponent,
@@ -121,7 +121,7 @@ impl crate::bot::core::model::AuthorPermissionsAware for Voter {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, const_panic::PanicFmt)]
 pub struct Vote(bool);
 
 impl Vote {
@@ -152,7 +152,7 @@ impl VoidingEvent {
         match event {
             Event::QueueClear => Self::QueueClear,
             Event::QueueRepeat => Self::QueueRepeat,
-            _ => panic!(""),
+            _ => const_panic::concat_panic!("invalid event: ", {}: event),
         }
     }
 }
@@ -324,7 +324,7 @@ fn get_users_in_voice(
 ) -> Result<HashSet<Id<UserMarker>>, CacheError> {
     let users_in_voice = ctx
         .cache()
-        .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id())
+        .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id)
         .expect("bot must be in voice")
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
@@ -339,7 +339,7 @@ async fn wait_for_poll_actions(
     tokio::select! {
         event = rx.recv() => {
             Ok(match event? {
-                Event::AlternateVoteCast(id) => Some(PollAction::AlternateCast(id)),
+                Event::AlternateVoteCast(id) => Some(PollAction::AlternateCast(id.into())),
                 Event::AlternateVoteDjCast => Some(PollAction::AlternateDjCast),
                 e if ctx.topic.is_voided_by(&e) => Some(PollAction::Void(VoidingEvent::new(&e))),
                 _ => None
@@ -442,7 +442,7 @@ pub async fn start(
     topic: &Topic,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<Resolution, StartPollError> {
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
 
     let (author_name, author_icon) = get_author_info(guild_id, ctx);
     let embed_latent = generate_latent_embed_colours();
@@ -469,8 +469,9 @@ pub async fn start(
 
     let message_id = message.id();
     {
-        let mut connection = ctx.lavalink().connection_mut(guild_id);
-        connection.set_poll(Some(Poll::new(topic, message.clone())));
+        ctx.lavalink()
+            .connection_mut(guild_id)
+            .set_poll(Poll::new(topic, message.clone()));
     }
     let components = &mut ctx
         .bot()

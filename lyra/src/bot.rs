@@ -6,6 +6,6 @@ mod error;
 mod ext;
 mod gateway;
 mod lavalink;
-mod manager;
+mod runner;
 
 pub use client::run;

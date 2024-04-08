@@ -18,11 +18,10 @@ use twilight_model::{
 };
 
 use crate::bot::{
-    command::{model::CtxKind, Ctx},
+    command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
         model::{AuthorPermissionsAware, BotState, CacheAware, OwnedBotStateAware},
-        r#const::text::UNTITLED_TRACK,
         traced,
     },
     error::{
@@ -37,8 +36,8 @@ use crate::bot::{
         UserNotAllowed as UserNotAllowedError, UserNotDj as UserNotDjError,
         UserNotStageManager as UserNotStageManagerError,
     },
-    gateway::ExpectedGuildIdAware,
-    lavalink::{self, ClientAware, ConnectionInfo, Event, QueueItem},
+    gateway::{ExpectedGuildIdAware, GuildIdAware},
+    lavalink::{self, CorrectTrackInfo, DelegateMethods, Event, LavalinkAware, QueueItem},
 };
 
 use super::{
@@ -95,7 +94,7 @@ pub fn user_is_stage_manager(
 }
 
 pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserAllowedError> {
-    let Some(guild_id) = ctx.guild_id() else {
+    let Some(guild_id) = ctx.get_guild_id() else {
         return Ok(());
     };
 
@@ -149,7 +148,7 @@ pub async fn user_allowed_to_use(
         return Ok(());
     }
 
-    let guild_id = ctx.guild_id_expected();
+    let guild_id = ctx.guild_id();
     let mut access_calculator_builder =
         CalculatorBuilder::new(guild_id, ctx.db().clone()).voice_channel(channel_id);
 
@@ -185,7 +184,7 @@ pub fn user_in<T: CtxKind>(
 
     let result = ctx
         .cache()
-        .voice_state(ctx.author_id(), ctx.guild_id_expected())
+        .voice_state(ctx.author_id(), ctx.guild_id())
         .filter(|voice_state| voice_state.channel_id() == channel_id)
         .ok_or(InVoiceWithoutUserError(channel_id))?;
 
@@ -223,7 +222,7 @@ impl<'a, T: CtxKind> InVoice<'a, T> {
         let channel_id = self.channel_id();
         let result = ctx
             .cache()
-            .voice_state(ctx.author_id(), ctx.guild_id_expected())
+            .voice_state(ctx.author_id(), ctx.guild_id())
             .filter(|voice_state| voice_state.channel_id() == channel_id)
             .ok_or(InVoiceWithoutUserError(channel_id))?;
 
@@ -313,39 +312,40 @@ pub fn not_suppressed(ctx: &Ctx<impl CtxKind>) -> Result<(), check::NotSuppresse
     Ok(())
 }
 
-pub fn queue_not_empty(ctx: &Ctx<impl CtxKind>) -> Result<(), error::QueueEmpty> {
-    let guild_id = ctx.guild_id_expected();
-    if ctx.lavalink().connection(guild_id).queue().is_empty() {
+pub async fn queue_not_empty(ctx: &Ctx<impl CtxKind>) -> Result<(), error::QueueEmpty> {
+    let guild_id = ctx.guild_id();
+    if ctx
+        .lavalink()
+        .player_data(guild_id)
+        .read()
+        .await
+        .queue()
+        .is_empty()
+    {
         return Err(error::QueueEmpty);
     }
 
     Ok(())
 }
 
-fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, NotPlayingError> {
-    let guild_id = ctx.guild_id_expected();
-    let connection = ctx.lavalink().connection(guild_id);
-    let queue = connection.queue();
+async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, NotPlayingError> {
+    let guild_id = ctx.guild_id();
+    let data = ctx.lavalink().player_data(guild_id);
+    let data_r = data.read().await;
+    let queue = data_r.queue();
     let (current, index) = queue.current_and_index().ok_or(NotPlayingError)?;
 
     let requester = current.requester();
     let position = NonZeroUsize::new(index + 1).expect("`index + 1` must be nonzero");
-    let title = current
-        .track()
-        .info
-        .title
-        .as_deref()
-        .unwrap_or(UNTITLED_TRACK)
-        .into();
-    let channel_id = connection.channel_id();
-    drop(connection);
+    let title = current.track().info.corrected_title().into();
+    let channel_id = ctx.lavalink().connection(guild_id).channel_id;
 
     Ok(CurrentlyPlaying {
         requester,
         position,
         title,
         channel_id,
-        context: CurrentlyPlayingContext::from_ctx(ctx),
+        context: CurrentlyPlayingContext::new_via(ctx),
     })
 }
 
@@ -355,7 +355,7 @@ struct CurrentlyPlayingContext {
 }
 
 impl CurrentlyPlayingContext {
-    fn from_ctx(ctx: &Ctx<impl CtxKind>) -> Self {
+    fn new_via(ctx: &Ctx<impl CtxKind>) -> Self {
         Self {
             author_id: ctx.author_id(),
             author_permissions: ctx.author_permissions(),
@@ -411,14 +411,15 @@ impl CurrentlyPlaying {
     }
 }
 
-fn currently_playing_users_track(
+async fn currently_playing_users_track(
     ctx: &Ctx<impl CtxKind>,
 ) -> Result<(), check::CurrentlyPlayingUsersTrackError> {
-    Ok(currently_playing(ctx)?.users_track()?)
+    Ok(currently_playing(ctx).await?.users_track()?)
 }
 
-fn queue_seekable(ctx: &Ctx<impl CtxKind>) -> Result<(), check::QueueSeekableError> {
+async fn queue_seekable(ctx: &Ctx<impl CtxKind>) -> Result<(), check::QueueSeekableError> {
     Ok(currently_playing(ctx)
+        .await
         .map_err(|_| error::QueueNotSeekable)?
         .users_track()?)
 }
@@ -432,13 +433,7 @@ fn impl_users_track(
         check::UserOnlyInError::InVoiceWithSomeoneElse(e) => e.0,
         check::UserOnlyInError::Cache(e) => return e.into(),
     };
-    let title = track
-        .track()
-        .info
-        .title
-        .as_deref()
-        .unwrap_or(UNTITLED_TRACK)
-        .into();
+    let title = track.track().info.corrected_title().into();
     let requester = track.requester();
 
     NotUsersTrackError {
@@ -683,14 +678,14 @@ impl Checker {
 
         let in_voice = in_voice(ctx)?;
         if checks.queue_not_empty {
-            queue_not_empty(ctx)?;
+            queue_not_empty(ctx).await?;
         }
         if checks.not_suppressed {
             not_suppressed(ctx)?;
         }
 
         let playing = match checks.currently_playing {
-            CurrentlyPlayingFlag::CheckUsersTrack(_) => Some(currently_playing(ctx)?),
+            CurrentlyPlayingFlag::CheckUsersTrack(_) => Some(currently_playing(ctx).await?),
             _ => None,
         };
 
@@ -726,6 +721,7 @@ impl Checker {
         let e = {
             match (&self.checks.currently_playing, playing) {
                 (CurrentlyPlayingFlag::CheckQueueSeekable, _) => queue_seekable(ctx)
+                    .await
                     .map_err(check::PollResolvableError::from)
                     .err(),
                 (CurrentlyPlayingFlag::CheckUsersTrack(true), Some(playing)) => playing
@@ -753,9 +749,8 @@ async fn handle_poll(
     topic: &PollTopic,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), check::HandlePollError> {
-    let guild_id = ctx.guild_id_expected();
-    let lavalink = ctx.lavalink();
-    let connection = lavalink.connection(guild_id);
+    let guild_id = ctx.guild_id();
+    let connection = ctx.lavalink().connection(guild_id);
     if let Some(poll) = connection.poll() {
         let message = poll.message_owned();
 
@@ -770,11 +765,11 @@ async fn handle_poll(
                     alternate_vote: Some(AlternateVoteResponse::DjCasted),
                 })?;
             }
-            connection.dispatch(Event::AlternateVoteCast(ctx.author_id()));
+            connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
 
             let mut rx = connection.subscribe();
 
-            if let Some(event) = ConnectionInfo::wait_for_via(&mut rx, |e| {
+            if let Some(event) = lavalink::wait_for_with(&mut rx, |e| {
                 matches!(
                     e,
                     Event::AlternateVoteCastDenied | Event::AlternateVoteCastedAlready(_)
@@ -803,10 +798,10 @@ async fn handle_poll(
             alternate_vote: None,
         })?;
     }
-    drop(connection);
 
+    drop(connection);
     let resolution = Box::pin(poll::start(topic, ctx)).await;
-    ctx.lavalink().connection_mut(guild_id).set_poll(None);
+    ctx.lavalink().connection_mut(guild_id).reset_poll();
     match resolution? {
         PollResolution::UnanimousWin => Ok(()),
         PollResolution::UnanimousLoss => Err(check::PollLossError {

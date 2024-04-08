@@ -39,7 +39,7 @@ fn process(
             let impl_for_inner = match sub_cmd_inner {
                 Some(inner) => quote! {
                     impl CommandInfoAware for #inner {
-                        fn name() -> Box<str> {
+                        fn name() -> &'static str {
                             #name::name()
                         }
                     }
@@ -54,7 +54,7 @@ fn process(
                 quote! {
                     #impl_resolved_command_data
                     impl CommandInfoAware for #sub_cmd {
-                        fn name() -> Box<str> {
+                        fn name() -> &'static str {
                             #name::name()
                         }
                     }
@@ -84,7 +84,7 @@ pub(super) fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
 
     quote! {
         impl BotSlashCommand for #name {
-            async fn run(self, ctx: Ctx<SlashCommand>) -> CommandResult {
+            async fn run(self, ctx: SlashCtx) -> CommandResult {
                 match self {
                     #sub_cmd_matches
                 }

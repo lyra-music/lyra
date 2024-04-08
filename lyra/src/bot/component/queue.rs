@@ -8,9 +8,7 @@ mod repeat;
 mod shuffle;
 
 pub use clear::Clear;
-#[allow(clippy::module_name_repetitions)]
 pub use fair_queue::FairQueue;
-#[allow(clippy::module_name_repetitions)]
 pub use play::{AddToQueue, Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
@@ -28,21 +26,18 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 use crate::bot::{
     command::{
         macros::{hid_fol, note_fol, out},
-        model::{CommandInfoAware, CtxKind, RespondViaMessage},
-        Ctx,
+        model::{Ctx, CtxKind, RespondViaMessage},
     },
     core::{
-        model::{BotStateAware, CacheAware},
+        model::{CacheAware, InteractionClient},
         r#const::{
-            discord::COMMAND_CHOICES_LIMIT,
-            misc::ADD_TRACKS_WRAP_LIMIT,
-            text::{FUZZY_MATCHER, UNTITLED_TRACK},
+            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
     },
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator},
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, QueueItem},
+    lavalink::{CorrectTrackInfo, DelegateMethods, LavalinkAware, QueueItem},
 };
 
 fn generate_position_choice(
@@ -62,7 +57,6 @@ fn generate_position_choice(
                 .to_string()
         },
     );
-    let title = track_info.title.as_deref();
 
     CommandOptionChoice {
         name: format!(
@@ -70,7 +64,7 @@ fn generate_position_choice(
             position,
             track_length,
             requester,
-            title.unwrap_or(UNTITLED_TRACK).pretty_truncate(53)
+            track_info.corrected_title().pretty_truncate(53)
         ),
         name_localizations: None,
         value: CommandOptionChoiceValue::Integer(position.get() as i64),
@@ -150,8 +144,8 @@ fn generate_position_choices_from_fuzzy_match<'a>(
     let queue_iter = queue_iter
         .filter_map(|(p, t)| {
             let track_info = &t.track().info;
-            let author = track_info.author.clone().unwrap_or_default();
-            let title = track_info.title.clone().unwrap_or_default();
+            let author = track_info.corrected_author();
+            let title = track_info.corrected_title();
             let requester = t.requester();
             Some((
                 p,
@@ -200,8 +194,9 @@ async fn remove_range(
     end: i64,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let mut connection = ctx.lavalink().connection_mut(ctx.guild_id_expected());
-    let queue = connection.queue_mut();
+    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let mut data_w = data.write().await;
+    let queue = data_w.queue_mut();
 
     let range = (start - 1) as usize..=(end - 1) as usize;
     let queue_len = queue.len();
@@ -213,10 +208,11 @@ async fn remove_range(
         queue.drain(range).collect()
     };
 
-    drop(connection);
     let positions = (start..=end)
         .filter_map(|p| NonZeroUsize::new(p as usize))
         .collect();
+
+    drop(data_w);
     impl_remove(positions, removed, queue_cleared, ctx).await
 }
 
@@ -224,8 +220,9 @@ async fn remove(
     positions: Box<[NonZeroUsize]>,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let mut connection = ctx.lavalink().connection_mut(ctx.guild_id_expected());
-    let queue = connection.queue_mut();
+    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let mut data_w = data.write().await;
+    let queue = data_w.queue_mut();
 
     let queue_len = queue.len();
     let positions_len = positions.len();
@@ -236,7 +233,7 @@ async fn remove(
         queue.dequeue(&positions).collect()
     };
 
-    drop(connection);
+    drop(data_w);
     impl_remove(positions, removed, queue_cleared, ctx).await
 }
 
@@ -246,24 +243,16 @@ async fn impl_remove(
     queue_cleared: bool,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let mut connection = ctx.lavalink().connection_mut(ctx.guild_id_expected());
-    let queue = connection.queue_mut();
+    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let mut data_w = data.write().await;
+    let queue = data_w.queue_mut();
 
     let removed_len = removed.len();
     let removed_text = match removed_len {
         0 => String::new(),
         1..=ADD_TRACKS_WRAP_LIMIT => removed
             .into_iter()
-            .map(|t| {
-                format!(
-                    "`{}`",
-                    t.into_track()
-                        .info
-                        .title
-                        .as_deref()
-                        .unwrap_or(UNTITLED_TRACK),
-                )
-            })
+            .map(|t| format!("`{}`", t.into_track().info.corrected_title()))
             .collect::<Vec<_>>()
             .pretty_join_with_and(),
         _ => format!("`{removed_len} tracks`"),
@@ -280,29 +269,23 @@ async fn impl_remove(
 
     if positions.binary_search(&current).is_ok() {
         queue.adjust_repeat_mode();
-        let next = queue.current().map(|t| t.track().track.clone());
-        let guild_id = ctx.guild_id_expected();
+        let next = queue.current().map(|t| t.track().clone());
+        let guild_id = ctx.guild_id();
 
         queue
-            .with_advance_lock_and_stopped(guild_id, ctx.lavalink(), |player| {
-                if let Some(next) = next {
-                    player.send(twilight_lavalink::model::Play::from((guild_id, next)))?;
+            .with_advance_lock_and_stopped(guild_id, ctx.lavalink(), |player| async move {
+                if let Some(ref next) = next {
+                    player.play(next).await?;
                 }
                 Ok(())
             })
             .await?;
     }
 
-    drop(connection);
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);
 
     if queue_cleared {
-        let clear = ctx
-            .bot()
-            .interaction()
-            .await?
-            .mention_global_command(Clear::name())
-            .await?;
+        let clear = InteractionClient::mention_command::<Clear>();
 
         note_fol!(
             format!("For clearing the entire queue, use {} instead.", clear),

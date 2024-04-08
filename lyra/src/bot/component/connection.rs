@@ -4,7 +4,7 @@ mod leave;
 pub use join::{auto as auto_join, Join};
 pub use leave::Leave;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use chrono::Utc;
 use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
@@ -24,12 +24,7 @@ use crate::bot::{
     },
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::{
-            connection::{
-                INACTIVITY_TIMEOUT, INACTIVITY_TIMEOUT_POLL_INTERVAL, INACTIVITY_TIMEOUT_POLL_N,
-            },
-            exit_code::NOTICE,
-        },
+        r#const::{connection as const_connection, exit_code::NOTICE},
         traced,
     },
     error::{
@@ -39,13 +34,13 @@ use crate::bot::{
         },
     },
     gateway::{voice, ExpectedGuildIdAware, SenderAware},
-    lavalink::{self, ClientAware},
+    lavalink::{self, LavalinkAware},
 };
 
 fn users_in_voice(ctx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
     ctx.cache()
         .voice_channel_states(channel_id)
-        .and_then(|voice_states| {
+        .map_or(Some(0), |voice_states| {
             let mut users = voice_states
                 .map(|v| ctx.cache().user(v.user_id()))
                 .collect::<Option<Vec<_>>>()?;
@@ -61,11 +56,11 @@ struct InactivityTimeoutContext {
 }
 
 impl InactivityTimeoutContext {
-    fn from_ctx(value: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
+    fn new_via(ctx: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
         Self {
-            inner: value.bot_owned(),
-            sender: value.sender().clone(),
-            guild_id: value.guild_id_expected(),
+            inner: ctx.bot_owned(),
+            sender: ctx.sender().clone(),
+            guild_id: ctx.guild_id(),
         }
     }
 }
@@ -82,7 +77,7 @@ impl CacheAware for InactivityTimeoutContext {
     }
 }
 
-impl lavalink::ClientAware for InactivityTimeoutContext {
+impl lavalink::LavalinkAware for InactivityTimeoutContext {
     fn lavalink(&self) -> &lavalink::Lavalink {
         self.inner.lavalink()
     }
@@ -95,7 +90,7 @@ impl HttpAware for InactivityTimeoutContext {
 }
 
 impl ExpectedGuildIdAware for InactivityTimeoutContext {
-    fn guild_id_expected(&self) -> Id<GuildMarker> {
+    fn guild_id(&self) -> Id<GuildMarker> {
         self.guild_id
     }
 }
@@ -112,8 +107,8 @@ async fn start_inactivity_timeout(
         channel_id
     );
 
-    for _ in 0..INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(Duration::from_secs(INACTIVITY_TIMEOUT_POLL_INTERVAL.into())).await;
+    for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
+        tokio::time::sleep(*const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
         if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
             return Ok(());
         }
@@ -137,6 +132,7 @@ async fn start_inactivity_timeout(
     Ok(())
 }
 
+#[tracing::instrument(skip_all, name = "voice_state_update")]
 pub async fn handle_voice_state_update(
     ctx: &voice::Context,
 ) -> Result<(), HandleVoiceStateUpdateError> {
@@ -146,16 +142,19 @@ pub async fn handle_voice_state_update(
     let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
+    tracing::trace!("handling voice state update");
     let (connected_channel_id, text_channel_id) = {
-        let Some(mut connection) = lavalink.connections().get_mut(&guild_id) else {
+        let Some(connection) = lavalink.get_connection(guild_id) else {
             return Ok(());
         };
 
-        if connection.just_changed().await {
+        if connection.changed().await {
+            tracing::trace!("connection changed");
             return Ok(());
         }
+        tracing::trace!("connection forced");
 
-        (connection.channel_id(), connection.text_channel_id())
+        (connection.channel_id, connection.text_channel_id)
     };
 
     match maybe_old_state {
@@ -166,7 +165,7 @@ pub async fn handle_voice_state_update(
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::from_ctx(ctx),
+                    InactivityTimeoutContext::new_via(ctx),
                     connected_channel_id,
                     text_channel_id,
                 ));
@@ -226,7 +225,7 @@ async fn match_state_channel_id(
             let forcefully_moved_notice = if voice_is_empty {
                 format!(
                     "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",
-                    Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT)
+                    Utc::now().timestamp() + i64::from(const_connection::INACTIVITY_TIMEOUT_SECS)
                 )
             } else {
                 "`(Bot was forcefully moved)`".into()
@@ -262,7 +261,7 @@ async fn match_state_channel_id(
 
             if voice_is_empty {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::from_ctx(ctx),
+                    InactivityTimeoutContext::new_via(ctx),
                     channel_id,
                     text_channel_id,
                 ));

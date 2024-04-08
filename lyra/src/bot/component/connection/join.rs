@@ -19,13 +19,13 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, cant, hid, hid_fol, nope, note, note_fol, out, sus_fol},
-        model::{BotSlashCommand, CtxKind, RespondViaMessage, SlashCommand},
-        Ctx,
+        model::{BotSlashCommand, Ctx, CtxKind, RespondViaMessage},
+        SlashCtx,
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::connection::INACTIVITY_TIMEOUT,
+        r#const::connection::INACTIVITY_TIMEOUT_SECS,
         traced,
     },
     error::{
@@ -39,7 +39,7 @@ use crate::bot::{
         Cache as CacheError, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::ClientAware,
+    lavalink::LavalinkAware,
 };
 
 pub(super) enum Response {
@@ -101,7 +101,7 @@ type GetUsersVoiceChannelResult =
 fn get_users_voice_channel(ctx: &Ctx<impl CtxKind>) -> GetUsersVoiceChannelResult {
     let voice_state = ctx
         .cache()
-        .voice_state(ctx.author_id(), ctx.guild_id_expected())
+        .voice_state(ctx.author_id(), ctx.guild_id())
         .ok_or(UserNotInVoiceError)?;
 
     let channel_id = voice_state.channel_id();
@@ -153,7 +153,7 @@ async fn connect_to_new(
         channel_parent_id,
         channel_type,
         None,
-        ctx.guild_id_expected(),
+        ctx.guild_id(),
         ctx,
     )
     .await?)
@@ -186,7 +186,7 @@ async fn connect_to(
         channel_parent_id,
         channel_type,
         old_channel_id,
-        ctx.guild_id_expected(),
+        ctx.guild_id(),
         ctx,
     )
     .await?)
@@ -212,6 +212,7 @@ async fn impl_connect_to(
     let joined = JoinedChannel::new(channel_id, channel_type);
 
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
+
     let response = old_channel_id.map_or_else(
         || {
             ctx.lavalink()
@@ -221,12 +222,10 @@ async fn impl_connect_to(
                 empty: voice_is_empty,
             }
         },
-        |old_channel_id| {
-            ctx.lavalink()
-                .connection_mut(guild_id)
-                .set_channel_id(channel_id);
+        |from| {
+            ctx.lavalink().connection_mut(guild_id).channel_id = channel_id;
             Response::Moved {
-                from: old_channel_id,
+                from,
                 to: joined,
                 empty: voice_is_empty,
             }
@@ -267,7 +266,7 @@ impl DeleteEmptyVoiceNotice {
         Self {
             message_id,
             channel_id,
-            guild_id: ctx.guild_id_expected(),
+            guild_id: ctx.guild_id(),
             interaction_token: ctx.interaction_token().to_string().into(),
             bot: ctx.bot_owned(),
         }
@@ -333,11 +332,11 @@ async fn handle_response(
         let text_channel_id = ctx.channel_id();
         let empty_voice_notice_txt = format!(
             "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in <t:{}:R>.",
-            Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT)
+            Utc::now().timestamp() + i64::from(INACTIVITY_TIMEOUT_SECS)
         );
 
         traced::tokio_spawn(start_inactivity_timeout(
-            super::InactivityTimeoutContext::from_ctx(ctx),
+            super::InactivityTimeoutContext::new_via(ctx),
             joined.id,
             text_channel_id,
         ));
@@ -382,7 +381,7 @@ pub struct Join {
 }
 
 impl BotSlashCommand for Join {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let Err(e) = join(&mut ctx, self.channel).await else {
             return Ok(());
         };

@@ -3,7 +3,7 @@ pub mod component;
 pub mod core;
 pub mod gateway;
 pub mod lavalink;
-pub mod manager;
+pub mod runner;
 
 use thiserror::Error;
 use twilight_mention::Mention;
@@ -156,3 +156,11 @@ pub struct LoadFailed(pub Box<str>);
 #[derive(PartialEq, Eq, Error, Debug)]
 #[error("invalid timestamp")]
 pub struct PrettifiedTimestampParse;
+
+#[derive(Error, Debug)]
+#[error("error running the bot starter: {}", .0)]
+pub enum RunError {
+    ColorEyre(#[from] color_eyre::Report),
+    Dotenvy(#[from] dotenvy::Error),
+    StartError(#[from] runner::StartError),
+}

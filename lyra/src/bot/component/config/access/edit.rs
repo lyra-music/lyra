@@ -18,8 +18,8 @@ use crate::bot::{
     command::{
         check,
         macros::{hid, out, sus},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
     error::command::Result as CommandResult,
@@ -158,7 +158,7 @@ pub struct MemberRole {
 }
 
 impl BotSlashCommand for MemberRole {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let inputted_mentionables = [
@@ -197,7 +197,7 @@ impl BotSlashCommand for MemberRole {
             .filter(|(_, mentionables)| !mentionables.is_empty());
 
         let db = ctx.db();
-        let g = ctx.guild_id_expected().get() as i64;
+        let g = ctx.guild_id().get() as i64;
         match self.action {
             EditAction::Add => categorized_mentionables.for_each(|(cat, mentionables)| {
                 add_access(&mut set, db.clone(), &cat, g, mentionables);
@@ -262,7 +262,7 @@ pub struct Channel {
 }
 
 impl BotSlashCommand for Channel {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let inputted_channels = [
@@ -329,7 +329,7 @@ impl BotSlashCommand for Channel {
             .filter(|(_, channels)| !channels.is_empty());
 
         let db = ctx.db();
-        let g = ctx.guild_id_expected().get() as i64;
+        let g = ctx.guild_id().get() as i64;
         match self.action {
             EditAction::Add => categorized_channels
                 .for_each(|(cat, channels)| add_access(&mut set, db.clone(), &cat, g, channels)),

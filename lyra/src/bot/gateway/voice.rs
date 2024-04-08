@@ -13,7 +13,7 @@ use crate::bot::core::model::{BotState, BotStateAware, CacheAware, HttpAware, Ow
 use crate::bot::error::gateway::ProcessResult;
 use crate::bot::{
     gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::{ClientAware as LavalinkAware, Lavalink},
+    lavalink::{Lavalink, LavalinkAware},
 };
 
 use super::{LastCachedStates, Process};
@@ -90,7 +90,7 @@ impl SenderAware for Context {
 }
 
 impl ExpectedGuildIdAware for Context {
-    fn guild_id_expected(&self) -> Id<GuildMarker> {
+    fn guild_id(&self) -> Id<GuildMarker> {
         self.inner
             .guild_id
             .expect("`VoiceStateUpdate::guild_id` must exist")

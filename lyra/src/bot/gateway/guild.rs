@@ -1,3 +1,4 @@
+use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::{GuildCreate, GuildDelete};
 
 use super::model::Process;
@@ -8,6 +9,7 @@ use crate::bot::{
 
 pub(super) struct CreateContext<'a> {
     inner: &'a GuildCreate,
+    shard_id: ShardId,
     bot: BotStateRef<'a>,
 }
 
@@ -32,7 +34,7 @@ impl CreateContext<'_> {
         .execute(self.bot.db())
         .await?;
 
-        self.bot.info().increment_guild_count();
+        self.bot.info().increment_guild_count(self.shard_id);
         Ok(())
     }
 }
@@ -46,7 +48,8 @@ impl Process for CreateContext<'_> {
 }
 
 pub(super) struct DeleteContext<'a> {
-    inner: &'a GuildDelete,
+    _inner: &'a GuildDelete,
+    shard_id: ShardId,
     bot: BotStateRef<'a>,
 }
 
@@ -54,21 +57,31 @@ impl BotState {
     pub(super) const fn as_guild_create_context<'a>(
         &'a self,
         inner: &'a GuildCreate,
+        shard_id: ShardId,
     ) -> CreateContext {
-        CreateContext { inner, bot: self }
+        CreateContext {
+            inner,
+            shard_id,
+            bot: self,
+        }
     }
 
     pub(super) const fn as_guild_delete_context<'a>(
         &'a self,
         inner: &'a GuildDelete,
+        shard_id: ShardId,
     ) -> DeleteContext {
-        DeleteContext { inner, bot: self }
+        DeleteContext {
+            _inner: inner,
+            shard_id,
+            bot: self,
+        }
     }
 }
 
 impl DeleteContext<'_> {
     fn decrement_guild_count(&self) {
-        self.bot.info().decrement_guild_count();
+        self.bot.info().decrement_guild_count(self.shard_id);
     }
 }
 

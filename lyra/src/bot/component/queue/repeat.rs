@@ -2,15 +2,11 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 
 use crate::bot::{
     command::{
-        check::CheckerBuilder,
-        macros::out_or_upd,
-        model::{BotSlashCommand, SlashCommand},
-        poll::Topic,
-        Ctx,
+        check::CheckerBuilder, macros::out_or_upd, model::BotSlashCommand, poll::Topic, SlashCtx,
     },
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
-    lavalink::{self, ClientAware},
+    lavalink::{self, DelegateMethods, LavalinkAware},
 };
 
 #[derive(CommandOption, CreateOption)]
@@ -42,19 +38,19 @@ pub struct Repeat {
 }
 
 impl BotSlashCommand for Repeat {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
-        let guild_id = ctx.guild_id_expected();
-        let mode = self.mode.map_or_else(
-            || {
-                let mode = ctx
-                    .lavalink()
-                    .connections()
-                    .get_mut(&guild_id)
-                    .map_or(lavalink::RepeatMode::Off, |c| c.queue().repeat_mode());
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+        let guild_id = ctx.guild_id();
+        let mode = {
+            if let Some(mode) = self.mode {
+                mode.into()
+            } else {
+                let mode = match ctx.lavalink().get_player_data(guild_id) {
+                    Some(data) => data.write().await.queue().repeat_mode(),
+                    None => lavalink::RepeatMode::Off,
+                };
                 mode.next()
-            },
-            Into::into,
-        );
+            }
+        };
 
         CheckerBuilder::new()
             .in_voice_with_user_only_with_poll(Topic::Repeat(mode))
@@ -66,7 +62,9 @@ impl BotSlashCommand for Repeat {
         let lavalink = ctx.lavalink();
         lavalink.dispatch(guild_id, lavalink::Event::QueueRepeat);
         lavalink
-            .connection_mut(guild_id)
+            .player_data(guild_id)
+            .write()
+            .await
             .queue_mut()
             .set_repeat_mode(mode);
 

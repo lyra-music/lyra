@@ -20,8 +20,10 @@ pub use self::{
     view::View,
 };
 use crate::bot::{
-    command::model::{BotSlashCommand, CommandInfoAware, Ctx},
-    component::config::SlashCommand,
+    command::{
+        model::{BotSlashCommand, CommandInfoAware},
+        SlashCtx,
+    },
     error::command::{check::AccessCalculatorBuildError, Result as CommandResult},
     ext::util::{FlagsPrettify, OptionMap},
 };
@@ -68,7 +70,7 @@ impl CalculatorBuilder {
     fn query(mut self, column: &'static str, id: i64) -> Self {
         let db = self.db.clone();
         self.set.spawn(async move {
-            let (Some(in_access_controls),) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
+            let in_access_controls = sqlx::query_as::<_, (Option<bool>,)>(&format!(
                 "--sql
                 SELECT EXISTS (SELECT 1 FROM {column} WHERE guild = $1 AND id = $2) 
                 "
@@ -77,9 +79,8 @@ impl CalculatorBuilder {
             .bind(id)
             .fetch_one(&db)
             .await?
-            else {
-                panic!("`exists` must not be `NULL`")
-            };
+            .0
+            .expect("`exists` must not be `NULL`");
 
             let (access_mode,) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
                 "--sql

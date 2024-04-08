@@ -9,10 +9,7 @@ use twilight_model::id::{
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use crate::bot::{
-    command::{
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
-    },
+    command::{model::BotSlashCommand, SlashCtx},
     component::config::access::mode::AccessModePrettify,
     core::r#const::{colours::EMBED_DEFAULT, text::EMPTY_EMBED_FIELD},
     error::command::Result as CommandResult,
@@ -26,8 +23,8 @@ use crate::bot::{
 pub struct View;
 
 impl BotSlashCommand for View {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
-        let guild_id = ctx.guild_id_expected().get() as i64;
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+        let guild_id = ctx.guild_id().get() as i64;
         let db = ctx.db();
 
         let embed = EmbedBuilder::new()

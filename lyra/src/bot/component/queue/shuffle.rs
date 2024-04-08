@@ -4,12 +4,12 @@ use crate::bot::{
     command::{
         check::CheckerBuilder,
         macros::{bad, hid, out},
-        model::{BotSlashCommand, SlashCommand},
-        Ctx,
+        model::BotSlashCommand,
+        SlashCtx,
     },
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
-    lavalink::{ClientAware, QueueIndexerType},
+    lavalink::{DelegateMethods, IndexerType, LavalinkAware},
 };
 
 /// Toggles queue shuffling
@@ -18,7 +18,7 @@ use crate::bot::{
 pub struct Shuffle;
 
 impl BotSlashCommand for Shuffle {
-    async fn run(self, mut ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         CheckerBuilder::new()
             .in_voice_with_user_only()
             .queue_not_empty()
@@ -26,28 +26,30 @@ impl BotSlashCommand for Shuffle {
             .run(&mut ctx)
             .await?;
 
-        let guild_id = ctx.guild_id_expected();
-        let indexer_type = ctx.lavalink().connection(guild_id).queue().indexer_type();
+        let guild_id = ctx.guild_id();
+        let data = ctx.lavalink().player_data(guild_id);
+        let data_r = data.read().await;
+        let indexer_type = data_r.queue().indexer_type();
 
         match indexer_type {
-            QueueIndexerType::Shuffled => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+            IndexerType::Shuffled => {
+                data.write()
+                    .await
                     .queue_mut()
-                    .set_indexer_type(QueueIndexerType::Standard);
+                    .set_indexer_type(IndexerType::Standard);
                 out!("**` ⮆ `** Disabled shuffle", ctx);
             }
-            QueueIndexerType::Fair => {
+            IndexerType::Fair => {
                 bad!(
                     "Cannot enable shuffle as fair queue is currently enabled",
                     ctx
                 );
             }
-            QueueIndexerType::Standard => {
-                ctx.lavalink()
-                    .connection_mut(guild_id)
+            IndexerType::Standard => {
+                data.write()
+                    .await
                     .queue_mut()
-                    .set_indexer_type(QueueIndexerType::Shuffled);
+                    .set_indexer_type(IndexerType::Shuffled);
                 out!("🔀 Enabled shuffle", ctx);
             }
         }

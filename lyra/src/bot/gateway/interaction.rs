@@ -14,13 +14,14 @@ use super::model::Process;
 use crate::bot::{
     command::{
         macros::{bad, cant, caut, crit, err, hid, hid_fol, nope, note, out_upd, sus, sus_fol},
-        model::{AutocompleteCtx, CommandInfoAware, Ctx, MessageCommand, SlashCommand},
         util::MessageLinkAware,
+        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{connection::Join, queue::Play},
     core::{
         model::{
-            BotState, InteractionInterface, OwnedBotState, UnitFollowupResult, UnitRespondResult,
+            BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
+            UnitRespondResult,
         },
         r#const::exit_code::{DUBIOUS, FORBIDDEN, WARNING},
     },
@@ -37,6 +38,7 @@ use crate::bot::{
         AutoJoinAttemptFailed as AutoJoinAttemptFailedError, EPrint,
         PositionOutOfRange as PositionOutOfRangeError, Suppressed as SuppressedError,
     },
+    lavalink::LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -84,10 +86,17 @@ impl Context {
         };
 
         let name = data.name.clone().into();
+        let inner_guild_id = self.inner.guild_id;
+        let channel_id = self
+            .inner
+            .channel
+            .as_ref()
+            .map(|c| c.id)
+            .expect("channel must exist");
 
         let result = match data.kind {
             CommandType::ChatInput => {
-                <Ctx<SlashCommand>>::from_partial_data(
+                <SlashCtx>::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -99,7 +108,7 @@ impl Context {
             }
             CommandType::User => todo!(),
             CommandType::Message => {
-                <Ctx<MessageCommand>>::from_partial_data(
+                <MessageCtx>::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -111,6 +120,17 @@ impl Context {
             }
             _ => unimplemented!(),
         };
+
+        if let Some(guild_id) = inner_guild_id {
+            let lavalink = bot.lavalink();
+
+            if lavalink
+                .get_connection(guild_id)
+                .is_some_and(|c| c.text_channel_id != channel_id)
+            {
+                lavalink.connection_mut(guild_id).text_channel_id = channel_id;
+            }
+        }
 
         let Err(source) = result else {
             return Ok(());
@@ -124,7 +144,7 @@ impl Context {
                 let CommandExecuteError::Command(error) = source else {
                     unreachable!()
                 };
-                match_error(error, name, i, &bot).await
+                match_error(error, name, i).await
             }
             _ => {
                 crit!(format!(
@@ -168,10 +188,11 @@ async fn match_error(
     error: CommandError,
     command_name: Box<str>,
     i: InteractionInterface<'_>,
-    bot: &BotState,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         Fe::Cache(_) => {
+            tracing::warn!("cache error: {:#?}", error);
+
             crit!("Something isn't working at the moment, try again later.", i);
         }
         Fe::UserNotDj(_) => {
@@ -184,9 +205,8 @@ async fn match_error(
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
         // }
         Fe::NotInVoice(_) => {
-            let inter = bot.interaction().await?;
-            let join = inter.mention_global_command(Join::name()).await?;
-            let play = inter.mention_global_command(Play::name()).await?;
+            let join = InteractionClient::mention_command::<Join>();
+            let play = InteractionClient::mention_command::<Play>();
             caut!(
                 format!(
                     "Not currently connected to a voice channel. Use {} or {} first.",
@@ -212,7 +232,7 @@ async fn match_error(
         }
         Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i, bot).await?),
+        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
         Fe::Stopped(_) => todo!(),
         Fe::NotPlaying(_) => todo!(),
         Fe::Paused(_) => todo!(),
@@ -282,15 +302,10 @@ async fn match_autojoin_suppressed(
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
     i: InteractionInterface<'_>,
-    bot: &BotState,
 ) -> Result<(), RespondError> {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
-            let join = bot
-                .interaction()
-                .await?
-                .mention_global_command(Join::name())
-                .await?;
+            let join = InteractionClient::mention_command::<Join>();
             bad!(
                 format!(
                     "Please join a voice channel, or use {} to connect to a channel.",

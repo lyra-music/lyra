@@ -25,6 +25,7 @@ pub mod join {
         Cache(#[from] crate::bot::error::Cache),
         GatewaySend(#[from] twilight_gateway::error::SendError),
         TwilightHttp(#[from] twilight_http::Error),
+        Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -123,6 +124,7 @@ pub mod join {
         Cache(#[from] crate::bot::error::Cache),
         GatewaySend(#[from] twilight_gateway::error::SendError),
         TwilightHttp(#[from] twilight_http::Error),
+        Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -196,6 +198,11 @@ pub mod join {
                         ResidualImplConnectToError::TwilightHttp(e),
                     )),
                 )),
+                ImplConnectToError::Lavalink(e) => Self::Other(ResidualError::ImplJoin(
+                    ResidualImplJoinError::ConnectTo(ResidualConnectToError::ImplConnectTo(
+                        ResidualImplConnectToError::Lavalink(e),
+                    )),
+                )),
                 ImplConnectToError::CheckUserAllowed(e) => Self::from_check_user_allowed(e),
             }
         }
@@ -248,7 +255,7 @@ pub mod leave {
     #[error(transparent)]
     pub enum PreDisconnectCleanupError {
         EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::bot::lavalink::Event>),
-        NodeSender(#[from] twilight_lavalink::node::NodeSenderError),
+        Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -302,7 +309,6 @@ use thiserror::Error;
 #[error("starting inactivity timeout failed: {:?}", .0)]
 pub enum StartInactivityTimeoutError {
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::bot::lavalink::Event>),
-    NodeSender(#[from] twilight_lavalink::node::NodeSenderError),
     GatewaySend(#[from] twilight_gateway::error::SendError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Http(#[from] twilight_http::Error),
@@ -315,7 +321,6 @@ pub enum HandleVoiceStateUpdateError {
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::bot::lavalink::Event>),
     Http(#[from] twilight_http::Error),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
-    NodeSender(#[from] twilight_lavalink::node::NodeSenderError),
     MatchStateChannelID(#[from] MatchStateChannelIdError),
     PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),
 }

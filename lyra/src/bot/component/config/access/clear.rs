@@ -6,9 +6,9 @@ use crate::bot::{
     command::{
         check,
         macros::{hid, out, sus},
-        model::{BotSlashCommand, SlashCommand},
+        model::BotSlashCommand,
         util::prompt_for_confirmation,
-        Ctx,
+        SlashCtx,
     },
     component::config::access::AccessCategoryFlags,
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
@@ -26,7 +26,7 @@ pub struct Clear {
 }
 
 impl BotSlashCommand for Clear {
-    async fn run(self, ctx: Ctx<SlashCommand>) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let category_flags = AccessCategoryFlags::from(self.category);
@@ -34,7 +34,7 @@ impl BotSlashCommand for Clear {
         let mut set = JoinSet::new();
         category_flags.iter_names_as_column().for_each(|c| {
             let db = ctx.db().clone();
-            let g = ctx.guild_id_expected().get() as i64;
+            let g = ctx.guild_id().get() as i64;
 
             set.spawn(async move {
                 sqlx::query(&format!(

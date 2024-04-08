@@ -8,6 +8,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  BOT_TOKEN: ~
+  SERVER_ADDRESS: ~
+  SERVER_PORT: ~
+  LAVALINK_SERVER_PASSWORD: ~
   DATABASE_URL: postgres://user:password@localhost:5432/db
 
 jobs:
@@ -40,6 +44,9 @@ jobs:
           path: lyra
           ignore_words_list: crate,ans,cant
 
+      - name: Setup Mold
+        uses: rui314/setup-mold@v1
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2.5.0
 
@@ -48,6 +55,9 @@ jobs:
         run: |
           cargo install sqlx-cli --no-default-features --features native-tls,postgres
           cargo sqlx database setup
+
+      - name: Setup .env
+        run: touch .env
 
       - name: Build And Test
         working-directory: lyra

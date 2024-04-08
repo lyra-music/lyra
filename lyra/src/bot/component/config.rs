@@ -5,7 +5,10 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use self::{access::Access, now_playing::NowPlaying};
 use crate::bot::{
-    command::model::{BotSlashCommand, CommandInfoAware, Ctx, SlashCommand},
+    command::{
+        model::{BotSlashCommand, CommandInfoAware},
+        SlashCtx,
+    },
     error::command::Result as CommandResult,
 };
 use lyra_proc::BotCommandGroup;

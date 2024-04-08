@@ -18,4 +18,8 @@ pub enum DeserializeBodyFromHttpError {
 }
 
 #[derive(Error, Debug)]
-pub enum TaskError {}
+#[error(transparent)]
+pub enum RegisterGlobalCommandsError {
+    TwilightHttp(#[from] twilight_http::Error),
+    DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
+}

@@ -12,11 +12,7 @@ pub enum ProcessError {
     #[error(transparent)]
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::bot::lavalink::Event>),
     #[error(transparent)]
-    NodeSender(#[from] twilight_lavalink::node::NodeSenderError),
-    #[error(transparent)]
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
-    #[error(transparent)]
-    DeserializeBodyFromHttpArc(#[from] std::sync::Arc<super::core::DeserializeBodyFromHttpError>),
     #[error(transparent)]
     Http(#[from] twilight_http::Error),
     #[error(transparent)]
