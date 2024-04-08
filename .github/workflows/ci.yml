@@ -8,6 +8,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  BOT_TOKEN: ~
+  SERVER_ADDRESS: ~
+  SERVER_PORT: ~
+  LAVALINK_SERVER_PASSWORD: ~
   DATABASE_URL: postgres://user:password@localhost:5432/db
 
 jobs:
