@@ -198,7 +198,7 @@ struct WaitForPollActionsContext<'a> {
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
     let user_id = inter.author_id().expect("author id must exist");
 
-    let Some(InteractionData::MessageComponent(component)) = inter.data else {
+    let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
         unreachable!()
     };
 
