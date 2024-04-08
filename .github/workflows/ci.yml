@@ -56,6 +56,9 @@ jobs:
           cargo install sqlx-cli --no-default-features --features native-tls,postgres
           cargo sqlx database setup
 
+      - name: Setup .env
+        run: touch .env
+
       - name: Build And Test
         working-directory: lyra
         run: |
