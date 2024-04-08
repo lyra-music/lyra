@@ -5,7 +5,7 @@ use twilight_interactions::command::{
     CommandModel, CommandOption, CreateCommand, CreateOption, ResolvedMentionable,
 };
 use twilight_model::{
-    application::interaction::application_command::InteractionChannel,
+    application::interaction::InteractionChannel,
     channel::ChannelType,
     id::{
         marker::{ChannelMarker, GenericMarker},

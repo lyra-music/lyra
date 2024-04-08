@@ -837,7 +837,7 @@ async fn send_superseded_win_notice(
         .await?
         .create_followup(&interaction_token)
         .flags(MessageFlags::EPHEMERAL)
-        .content("🪄 The poll was superseded to win by a DJ.")?
+        .content("🪄 The poll was superseded to win by a DJ.")
         .await?;
 
     Ok(())

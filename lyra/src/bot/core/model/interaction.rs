@@ -83,9 +83,9 @@ impl Interface<'_> {
     pub async fn update_no_components_embeds(&self, content: &str) -> MessageFollowupResult {
         Ok(self
             .update()
-            .components(None)?
-            .embeds(None)?
-            .content(Some(content))?
+            .components(None)
+            .embeds(None)
+            .content(Some(content))
             .await?)
     }
 
@@ -109,7 +109,7 @@ impl Interface<'_> {
         Ok(self
             .inner
             .create_followup(self.interaction_token())
-            .content(content)?
+            .content(content)
             .await?)
     }
 
@@ -118,7 +118,7 @@ impl Interface<'_> {
             .inner
             .create_followup(self.interaction_token())
             .flags(MessageFlags::EPHEMERAL)
-            .content(content)?
+            .content(content)
             .await?)
     }
 
@@ -183,7 +183,7 @@ impl Interface<'_> {
     ) -> UnitFollowupResult {
         self.inner
             .update_followup(self.interaction_token(), message_id)
-            .content(Some(content))?
+            .content(Some(content))
             .await?;
         Ok(())
     }

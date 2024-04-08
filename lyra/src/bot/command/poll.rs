@@ -11,9 +11,7 @@ use futures::StreamExt;
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_model::{
-    application::interaction::{
-        message_component::MessageComponentInteractionData, Interaction, InteractionData,
-    },
+    application::interaction::{Interaction, InteractionData},
     channel::message::{
         component::{ActionRow, Button, ButtonStyle},
         Component, Embed, ReactionType,
@@ -199,11 +197,8 @@ struct WaitForPollActionsContext<'a> {
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
     let user_id = inter.author_id().expect("author id must exist");
-    let Some(InteractionData::MessageComponent(MessageComponentInteractionData {
-        custom_id: ref button_id,
-        ..
-    })) = inter.data
-    else {
+
+    let Some(InteractionData::MessageComponent(component)) = inter.data else {
         unreachable!()
     };
 
@@ -216,7 +211,7 @@ fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAct
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),
-        button_id == upvote_button_id,
+        component.custom_id == *upvote_button_id,
     ) {
         (true, true) => PollAction::DjUpvote(inter),
         (true, false) => PollAction::DjDownvote(inter),
@@ -369,7 +364,7 @@ impl EmbedUpdate<'_> {
             } => {
                 client
                     .update_message(channel_id, message_id)
-                    .embeds(Some(&[embed]))?
+                    .embeds(Some(&[embed]))
                     .await?
             }
         };

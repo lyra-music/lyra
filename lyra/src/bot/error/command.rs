@@ -76,7 +76,7 @@ pub enum FlattenedError<'a> {
     PollVoided(&'a check::PollVoidedError),
     StandbyCanceled(&'a twilight_standby::future::Canceled),
     Confirmation(&'a util::ConfirmationError),
-    GatewaySend(&'a twilight_gateway::error::SendError),
+    GatewaySend(&'a twilight_gateway::error::ChannelError),
     AutoJoinSuppressed(&'a util::AutoJoinSuppressedError),
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
     Lavalink(&'a lavalink_rs::error::LavalinkError),

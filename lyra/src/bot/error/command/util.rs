@@ -34,7 +34,7 @@ pub enum ResidualUserAllowedError {
 pub enum ResidualImplConnectToError {
     CheckUserAllowed(#[from] ResidualUserAllowedError),
     Cache(#[from] crate::bot::error::Cache),
-    GatewaySend(#[from] twilight_gateway::error::SendError),
+    GatewaySend(#[from] twilight_gateway::error::ChannelError),
     TwilightHttp(#[from] twilight_http::Error),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
