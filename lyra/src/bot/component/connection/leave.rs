@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use twilight_gateway::error::SendError;
+use twilight_gateway::error::ChannelError;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::Mention;
 use twilight_model::{
@@ -31,7 +31,9 @@ impl Display for LeaveResponse {
     }
 }
 
-pub(super) fn disconnect(ctx: &(impl SenderAware + ExpectedGuildIdAware)) -> Result<(), SendError> {
+pub(super) fn disconnect(
+    ctx: &(impl SenderAware + ExpectedGuildIdAware),
+) -> Result<(), ChannelError> {
     ctx.sender()
         .command(&UpdateVoiceState::new(ctx.guild_id(), None, false, false))?;
 

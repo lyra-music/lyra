@@ -32,9 +32,7 @@ impl LastCachedStates {
             Event::VoiceStateUpdate(event) => cache
                 .voice_state(
                     event.user_id,
-                    event
-                        .guild_id
-                        .expect("`VoiceStateUpdate::guild_id` must exist"),
+                    event.guild_id.expect("event received in a guild"),
                 )
                 .as_deref()
                 .cloned(),

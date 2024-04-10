@@ -126,7 +126,7 @@ async fn start_inactivity_timeout(
         .content(&format!(
             "💤📎 ~~{}~~ `(Left due to inactivity)`",
             channel_id.mention()
-        ))?
+        ))
         .await?;
 
     Ok(())
@@ -186,7 +186,7 @@ pub async fn handle_voice_state_update(
                     "{}📎 ~~{}~~ `(Bot was forcefully disconnected)`",
                     NOTICE,
                     old_channel_id.mention()
-                ))?
+                ))
                 .await?;
         }
         Some(old_state) => {
@@ -247,7 +247,7 @@ async fn match_state_channel_id(
                     old_channel_id.mention(),
                     channel_id.mention(),
                     forcefully_moved_notice
-                ))?
+                ))
                 .await?;
 
             if matches!(joined.kind, JoinedChannelType::Stage) {

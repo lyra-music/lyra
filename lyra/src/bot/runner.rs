@@ -1,4 +1,10 @@
-use std::{str::FromStr, sync::Arc};
+use std::{
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use dotenvy_macro::dotenv;
 use lavalink_rs::{client::LavalinkClient, model::client::NodeDistributionStrategy};
@@ -7,12 +13,12 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions,
 };
-use tokio::{sync::watch, task::JoinSet};
+use tokio::task::JoinHandle;
 use twilight_gateway::{
-    stream::{self, StartRecommendedError},
-    CloseFrame, Config as ShardConfig, Event,
+    error::{ReceiveMessageErrorType, StartRecommendedError},
+    CloseFrame, Config as ShardConfig, ConfigBuilder, Event, EventTypeFlags, Intents,
+    MessageSender, Shard, StreamExt as _,
 };
-use twilight_gateway::{ConfigBuilder, Intents, Shard};
 use twilight_http::{client::ClientBuilder, Client};
 use twilight_model::{
     channel::message::AllowedMentions,
@@ -44,6 +50,8 @@ const CONFIG: Config = Config {
 };
 const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
 
+static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
 fn build_http_client() -> Client {
     ClientBuilder::default()
         .default_allowed_mentions(AllowedMentions::default())
@@ -64,7 +72,7 @@ fn build_shard_config() -> ShardConfig {
                 None,
                 Status::Online,
             )
-            .expect("activities must not be empty"),
+            .expect("activities is non-empty"),
         )
         .build()
 }
@@ -85,35 +93,28 @@ pub(super) async fn start() -> Result<(), StartError> {
     let lavalink = build_lavalink_client(user_id).await;
 
     let shards = build_and_split_shards(&http).await?;
+    let shards_len = shards.len();
+    let mut senders = Vec::with_capacity(shards_len);
+    let mut tasks = Vec::with_capacity(shards_len);
     let bot = Arc::new(BotState::new(db, http, lavalink));
     bot.interaction().await?.register_global_commands().await?;
 
-    let (tx, rx) = watch::channel(false);
-    let mut set = JoinSet::new();
-    for mut shard in shards {
-        let mut rx = rx.clone();
-        let bot = bot.clone();
-
-        set.spawn(async move {
-            tokio::select! {
-                () = handle_gateway_events(&mut shard, bot.clone()) => {},
-                _ = rx.changed() => {
-                    _ = shard.close(CloseFrame::NORMAL).await;
-                }
-            }
-        });
+    for shard in shards {
+        senders.push(shard.sender());
+        tasks.push(tokio::spawn(handle_gateway_events(shard, bot.clone())));
     }
 
-    print_banner();
-    Ok(wait_until_shutdown(tx, set).await?)
+    println!("{}", *BANNER);
+    Ok(wait_until_shutdown(senders, tasks).await?)
 }
 
 async fn build_and_split_shards(
     client: &Client,
-) -> Result<impl Iterator<Item = Shard>, StartRecommendedError> {
+) -> Result<impl ExactSizeIterator<Item = Shard>, StartRecommendedError> {
     let shard_config = build_shard_config();
     let shards =
-        stream::create_recommended(client, shard_config, |_, builder| builder.build()).await?;
+        twilight_gateway::create_recommended(client, shard_config, |_, builder| builder.build())
+            .await?;
     Ok(shards)
 }
 
@@ -133,22 +134,26 @@ async fn build_lavalink_client(user_id: Id<UserMarker>) -> Lavalink {
 }
 
 #[tracing::instrument(skip_all, name = "gateway")]
-async fn handle_gateway_events(shard: &mut Shard, bot: Arc<BotState>) {
-    loop {
-        let event = match shard.next_event().await {
+async fn handle_gateway_events(mut shard: Shard, bot: Arc<BotState>) {
+    while let Some(item) = shard.next_event(EventTypeFlags::all()).await {
+        let event = match item {
+            Ok(Event::GatewayClose(_)) if SHUTDOWN.load(Ordering::Relaxed) => break,
             Ok(event) => event,
+            Err(source)
+                if SHUTDOWN.load(Ordering::Relaxed)
+                    && matches!(source.kind(), ReceiveMessageErrorType::WebSocket) =>
+            {
+                break
+            }
             Err(source) => {
                 tracing::warn!(?source, "error receiving event");
-
-                if source.is_fatal() {
-                    break;
-                }
 
                 continue;
             }
         };
 
-        process_gateway_events(shard, event, bot.clone());
+        tracing::trace!(?event, shard = ?shard.id(), "received event");
+        process_gateway_events(&shard, event, bot.clone());
     }
 }
 
@@ -167,10 +172,6 @@ fn process_gateway_events(shard: &Shard, event: Event, bot: Arc<BotState>) {
         shard.latency().clone(),
         shard.sender(),
     ));
-}
-
-fn print_banner() {
-    println!("{}", *BANNER);
 }
 
 #[tracing::instrument]
@@ -200,14 +201,19 @@ async fn wait_for_signal() -> Result<(), WaitForSignalError> {
 
 #[tracing::instrument(skip_all, name = "shutdown")]
 async fn wait_until_shutdown(
-    tx: watch::Sender<bool>,
-    mut set: JoinSet<()>,
+    senders: Vec<MessageSender>,
+    tasks: Vec<JoinHandle<()>>,
 ) -> Result<(), WaitUntilShutdownError> {
     wait_for_signal().await?;
     tracing::info!("gracefully shutting down...");
-    tx.send(true)?;
-    while set.join_next().await.is_some() {}
-    tracing::info!("shut down gracefully");
+    SHUTDOWN.store(true, Ordering::Relaxed);
+    for sender in senders {
+        _ = sender.close(CloseFrame::NORMAL);
+    }
+    for jh in tasks {
+        _ = jh.await;
+    }
 
+    tracing::info!("shut down gracefully");
     Ok(())
 }

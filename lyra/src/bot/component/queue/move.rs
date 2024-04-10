@@ -173,17 +173,17 @@ impl BotSlashCommand for Move {
             );
         }
 
-        let position = NonZeroUsize::new(self.position as usize)
-            .expect("`self.position as usize` must be nonzero");
+        let position =
+            NonZeroUsize::new(self.position as usize).expect("self.position is non-zero");
         check::users_track(position, in_voice_with_user, queue, &ctx)?;
 
         let track_position =
-            NonZeroUsize::new(self.track as usize).expect("`self.track as usize` must be nonzero");
+            NonZeroUsize::new(self.track as usize).expect("self.track is non-zero");
         let queue_position = queue.position();
 
         let track = queue
             .remove(track_position.get() - 1)
-            .expect("`self.track as usize - 1` must be in bounds");
+            .expect("self.track is in bounds");
         let track_title = track.track().info.corrected_title();
         let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 

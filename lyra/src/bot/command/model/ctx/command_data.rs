@@ -40,18 +40,27 @@ impl<T: CommandDataAware> Ctx<T> {
         }
     }
 
-    pub fn command_data(&self) -> &PartialCommandData {
+    fn interaction_data(&self) -> &PartialInteractionData {
+        self.data.as_ref().expect("T: CommandDataAware")
+    }
+
+    fn into_interaction_data(self) -> PartialInteractionData {
+        self.data.expect("T: CommandDataAware")
+    }
+
+    pub fn partial_command_data(&self) -> &PartialCommandData {
         let PartialInteractionData::Command(data) = self.interaction_data() else {
             unreachable!()
         };
         data
     }
 
-    pub fn take_partial_command_data(&mut self) -> Option<PartialCommandData> {
-        self.data.take().and_then(|d| match d {
-            PartialInteractionData::Command(data) => Some(data),
-            _ => None,
-        })
+    pub fn into_partial_command_data(self) -> PartialCommandData {
+        let data = self.into_interaction_data();
+        let PartialInteractionData::Command(command_data) = data else {
+            unreachable!()
+        };
+        command_data
     }
 
     pub fn command_name_full(&self) -> Box<str> {
@@ -74,14 +83,19 @@ impl<T: CommandDataAware> Ctx<T> {
         }
 
         recurse_through_names(
-            vec![self.command_data().name.clone()],
-            &self.command_data().options,
+            vec![self.partial_command_data().name.clone()],
+            &self.partial_command_data().options,
         )
         .join(" ")
         .into()
     }
 
     pub fn command_mention_full(&self) -> Box<str> {
-        format!("</{}:{}>", self.command_name_full(), self.command_data().id).into()
+        format!(
+            "</{}:{}>",
+            self.command_name_full(),
+            self.partial_command_data().id
+        )
+        .into()
     }
 }

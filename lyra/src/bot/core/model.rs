@@ -173,7 +173,7 @@ impl BotState {
     pub fn user(&self) -> CurrentUser {
         self.cache
             .current_user()
-            .expect("current user object must be available")
+            .expect("current user should be in cache")
     }
 
     #[inline]

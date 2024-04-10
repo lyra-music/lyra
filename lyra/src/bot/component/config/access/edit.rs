@@ -5,7 +5,7 @@ use twilight_interactions::command::{
     CommandModel, CommandOption, CreateCommand, CreateOption, ResolvedMentionable,
 };
 use twilight_model::{
-    application::interaction::application_command::InteractionChannel,
+    application::interaction::InteractionChannel,
     channel::ChannelType,
     id::{
         marker::{ChannelMarker, GenericMarker},
@@ -40,10 +40,7 @@ fn add_access<T: AccessCategoryMarker>(
     g: i64,
     ids: impl IntoIterator<Item = Id<T>>,
 ) {
-    let column = cat
-        .iter_names_as_column()
-        .next()
-        .expect("flags must not be empty");
+    let column = cat.iter_names_as_column().next().expect("cat is non-empty");
     let values_clause = ids.into_iter().map(|id| format!("($1,{id})")).join(",");
 
     set.spawn(async move {
@@ -72,10 +69,7 @@ fn remove_access<T: AccessCategoryMarker>(
     g: i64,
     ids: impl IntoIterator<Item = Id<T>>,
 ) {
-    let column = cat
-        .iter_names_as_column()
-        .next()
-        .expect("flags must not be empty");
+    let column = cat.iter_names_as_column().next().expect("cat is non-empty");
     let where_clause = ids.into_iter().map(|c| format!("id = {c}")).join(" OR ");
 
     set.spawn(async move {

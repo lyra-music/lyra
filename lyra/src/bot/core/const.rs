@@ -59,9 +59,9 @@ pub mod metadata {
             let rdr = include_str!("../../../../assets/lyra2-ascii.ans");
             let mut wtr = Vec::new();
 
-            let ac = AhoCorasick::new(METADATA_PATTERNS).expect("pattern must be valid");
-            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS).expect("searching must not fail");
-            String::from_utf8(wtr).expect("slice must be UTF-8").into()
+            let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
+            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS).expect("searching is infallible");
+            String::from_utf8(wtr).expect("slice is UTF-8").into()
         };
     }
 }
@@ -113,13 +113,13 @@ pub mod regex {
     lazy_static::lazy_static! {
         pub static ref URL: Regex =
             Regex::new(r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?")
-                .expect("regex must be valid");
+                .expect("regex is valid");
         pub static ref TIMESTAMP: Regex =
             Regex::new(r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$")
-                .expect("regex must be valild");
+                .expect("regex is valild");
         pub static ref TIMESTAMP_2: Regex =
             Regex::new(r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$")
-                .expect("regex must be valid");
+                .expect("regex is valid");
     }
 }
 

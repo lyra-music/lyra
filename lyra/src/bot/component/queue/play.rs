@@ -108,7 +108,7 @@ impl Playlist {
                     tracks: data.tracks.into(),
                 }
             }
-            _ => panic!("`loaded.load_type` must be `LoadType::PlaylistLoaded`"),
+            _ => panic!("`loaded.load_type` not `LoadType::PlaylistLoaded`"),
         }
     }
 }
@@ -222,7 +222,7 @@ impl BotAutocomplete for Autocomplete {
                 .then(|| format!("{}search:{}", source.value(), q).into_boxed_str())
                 .unwrap_or(q)
         })
-        .expect("at least one option must be focused");
+        .expect("exactly one option is focused");
 
         let guild_id = ctx.guild_id();
         let load_ctx = LoadTrackContext {
@@ -243,7 +243,7 @@ impl BotAutocomplete for Autocomplete {
                         name: t.prettify(),
                         name_localizations: None,
                         value: CommandOptionChoiceValue::String(
-                            t.info.uri.expect("uri must exist"),
+                            t.info.uri.expect("track is nonlocal"),
                         ),
                     })
                     .take(COMMAND_CHOICES_LIMIT)
@@ -258,7 +258,7 @@ impl BotAutocomplete for Autocomplete {
                     name: track.prettify(),
                     name_localizations: None,
                     value: CommandOptionChoiceValue::String(
-                        track.info.uri.expect("uri must exist"),
+                        track.info.uri.expect("track is nonlocal"),
                     ),
                 }]
             }
@@ -286,7 +286,7 @@ impl BotAutocomplete for Autocomplete {
                         name: track.prettify(),
                         name_localizations: None,
                         value: CommandOptionChoiceValue::String(
-                            track.info.uri.expect("uri must exist"),
+                            track.info.uri.expect("track is nonlocal"),
                         ),
                     });
                 }
@@ -321,7 +321,7 @@ async fn play(
                         format!(
                             "[`{}`](<{}>)",
                             t.info.corrected_title(),
-                            t.info.uri.as_ref().expect("uri must exist")
+                            t.info.uri.as_ref().expect("track is nonlocal")
                         )
                     })
                     .collect::<Vec<_>>()
@@ -365,10 +365,7 @@ async fn play(
             util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
 
             let total_tracks = Vec::from(results);
-            let first_track = total_tracks
-                .first()
-                .expect("first track must exist")
-                .clone();
+            let first_track = total_tracks.first().expect("results is non-empty").clone();
 
             util::auto_new_player_data(ctx).await?;
 

@@ -90,7 +90,7 @@ pub trait DelegateMethods {
             }
             twilight_gateway::Event::VoiceStateUpdate(e) => {
                 self._handle_voice_state_update(
-                    e.guild_id.expect("guild_id must exist"),
+                    e.guild_id.expect("event received in a guild"),
                     e.channel_id,
                     e.user_id,
                     e.session_id.clone(),
@@ -105,25 +105,6 @@ pub trait DelegateMethods {
         guild_id: impl Into<LavalinkGuildId> + Send,
         timeout: std::time::Duration,
     ) -> LavalinkResult<ConnectionInfo>;
-    async fn get_lavalink_connection_info(
-        &self,
-        guild_id: impl Into<LavalinkGuildId> + Send,
-    ) -> Option<ConnectionInfo> {
-        self._get_connection_info(
-            guild_id,
-            *r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
-        )
-        .await
-        .ok()
-    }
-    async fn lavalink_connection_info(
-        &self,
-        guild_id: impl Into<LavalinkGuildId> + Send,
-    ) -> ConnectionInfo {
-        self.get_lavalink_connection_info(guild_id)
-            .await
-            .expect("timeout should not have been reached")
-    }
 
     async fn _create_player_context_with_data<Data: std::any::Any + Send + Sync>(
         &self,
@@ -136,7 +117,12 @@ pub trait DelegateMethods {
         guild_id: impl Into<LavalinkGuildId> + Send + Copy,
     ) -> LavalinkResult<()> {
         let now = tokio::time::Instant::now();
-        let info = self.lavalink_connection_info(guild_id).await;
+        let info = self
+            ._get_connection_info(
+                guild_id,
+                *r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+            )
+            .await?;
         tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
 
         let data = Arc::new(RwLock::new(PlayerData::new()));
@@ -152,16 +138,14 @@ pub trait DelegateMethods {
         guild_id: impl Into<LavalinkGuildId> + Send,
     ) -> Option<Arc<RwLock<PlayerData>>> {
         self._get_player_context(guild_id)
-            .map(|c| c.data().expect("data type must be valid"))
+            .map(|c| c.data().expect("data type is valid"))
     }
     fn player(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> PlayerContext {
         self._get_player_context(guild_id)
-            .expect("player context must exist")
+            .expect("player context exists")
     }
     fn player_data(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> Arc<RwLock<PlayerData>> {
-        self.player(guild_id)
-            .data()
-            .expect("data type must be valid")
+        self.player(guild_id).data().expect("data type is valid")
     }
 }
 
@@ -193,13 +177,12 @@ impl Lavalink {
     }
 
     pub fn connection(&self, guild_id: Id<GuildMarker>) -> ConnectionRef {
-        self.get_connection(guild_id)
-            .expect("connection must exist")
+        self.get_connection(guild_id).expect("connection exists")
     }
 
     pub fn connection_mut(&self, guild_id: Id<GuildMarker>) -> ConnectionRefMut {
         self.get_connection_mut(guild_id)
-            .expect("connection must exist")
+            .expect("connection exists")
     }
 
     pub fn notify_connection_change(&self, guild_id: Id<GuildMarker>) {

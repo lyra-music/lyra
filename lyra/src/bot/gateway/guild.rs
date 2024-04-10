@@ -15,7 +15,9 @@ pub(super) struct CreateContext<'a> {
 
 impl CreateContext<'_> {
     async fn increment_guild_count(&self) -> Result<(), sqlx::Error> {
-        // FIXME: wait until twilight stop deserializing missing `Guild::unavailable` to false
+        /* FIXME: wait until twilight stop deserializing missing `Guild::unavailable` to false:
+            https://github.com/twilight-rs/twilight/pull/2330
+        */
         if !self.inner.unavailable {
             return Ok(());
         }

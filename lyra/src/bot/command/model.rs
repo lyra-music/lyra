@@ -3,8 +3,9 @@ mod ctx;
 use std::sync::Arc;
 
 use twilight_model::{
-    application::interaction::application_command::{
-        CommandData, CommandDataOption, CommandInteractionDataResolved,
+    application::interaction::{
+        application_command::{CommandData, CommandDataOption},
+        InteractionDataResolved,
     },
     id::{
         marker::{CommandMarker, GenericMarker},
@@ -24,7 +25,7 @@ pub struct PartialCommandData {
     pub id: Id<CommandMarker>,
     pub name: Arc<str>,
     pub target_id: Option<Id<GenericMarker>>,
-    pub resolved: Option<CommandInteractionDataResolved>,
+    pub resolved: Option<InteractionDataResolved>,
     pub options: Box<[CommandDataOption]>,
 }
 

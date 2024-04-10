@@ -11,9 +11,7 @@ use futures::StreamExt;
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_model::{
-    application::interaction::{
-        message_component::MessageComponentInteractionData, Interaction, InteractionData,
-    },
+    application::interaction::{Interaction, InteractionData},
     channel::message::{
         component::{ActionRow, Button, ButtonStyle},
         Component, Embed, ReactionType,
@@ -198,25 +196,22 @@ struct WaitForPollActionsContext<'a> {
 }
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
-    let user_id = inter.author_id().expect("author id must exist");
-    let Some(InteractionData::MessageComponent(MessageComponentInteractionData {
-        custom_id: ref button_id,
-        ..
-    })) = inter.data
-    else {
+    let user_id = inter.author_id().expect("interaction from a guild");
+
+    let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
         unreachable!()
     };
 
     let voter_permissions = inter
         .member
         .as_ref()
-        .expect("member must exist")
+        .expect("interaction from a guild")
         .permissions
-        .expect("permissions must exist");
+        .expect("member from an interaction");
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),
-        button_id == upvote_button_id,
+        component.custom_id == *upvote_button_id,
     ) {
         (true, true) => PollAction::DjUpvote(inter),
         (true, false) => PollAction::DjDownvote(inter),
@@ -325,7 +320,7 @@ fn get_users_in_voice(
     let users_in_voice = ctx
         .cache()
         .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id)
-        .expect("bot must be in voice")
+        .expect("bot is in voice")
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
         .collect::<Result<HashSet<_>, _>>()?;
@@ -369,7 +364,7 @@ impl EmbedUpdate<'_> {
             } => {
                 client
                     .update_message(channel_id, message_id)
-                    .embeds(Some(&[embed]))?
+                    .embeds(Some(&[embed]))
                     .await?
             }
         };

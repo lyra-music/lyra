@@ -5,7 +5,7 @@ use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::Mention;
 use twilight_model::{
-    application::interaction::application_command::InteractionChannel,
+    application::interaction::InteractionChannel,
     channel::ChannelType,
     gateway::payload::outgoing::UpdateVoiceState,
     guild::Permissions,

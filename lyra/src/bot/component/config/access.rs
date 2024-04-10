@@ -80,7 +80,7 @@ impl CalculatorBuilder {
             .fetch_one(&db)
             .await?
             .0
-            .expect("`exists` must not be `NULL`");
+            .expect("SELECT EXISTS is non-null");
 
             let (access_mode,) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
                 "--sql
@@ -118,7 +118,7 @@ impl CalculatorBuilder {
             .fetch_one(&db)
             .await?
             else {
-                panic!("`exists` must not be `NULL`")
+                panic!("`exists` is `NULL`")
             };
 
             let access_mode = sqlx::query!(

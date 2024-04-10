@@ -92,7 +92,7 @@ impl BotAutocomplete for Autocomplete {
                 AutocompleteValue::Focused(i) => Some(i),
                 _ => None,
             })
-            .expect("at least one option must be focused");
+            .expect("exactly one option is focused");
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)

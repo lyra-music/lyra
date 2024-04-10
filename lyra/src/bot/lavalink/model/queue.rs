@@ -117,13 +117,8 @@ impl Queue {
     }
 
     pub fn position(&self) -> NonZeroUsize {
-        NonZeroUsize::new(
-            self.index
-                + self
-                    .current()
-                    .map_or_else(|| usize::from(self.index == 0), |_| 1),
-        )
-        .expect("`self.index + 1` must be nonzero")
+        let d = usize::from(self.current().is_some() || self.index == 0);
+        NonZeroUsize::new(self.index + d).expect("self.index + d is non-zero")
     }
 
     pub const fn index(&self) -> &usize {

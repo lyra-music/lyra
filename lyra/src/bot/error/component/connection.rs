@@ -23,7 +23,7 @@ pub mod join {
         Forbidden(#[from] crate::bot::error::ConnectionForbidden),
         CheckUserAllowed(#[from] check::UserAllowedError),
         Cache(#[from] crate::bot::error::Cache),
-        GatewaySend(#[from] twilight_gateway::error::SendError),
+        GatewaySend(#[from] twilight_gateway::error::ChannelError),
         TwilightHttp(#[from] twilight_http::Error),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
@@ -122,7 +122,7 @@ pub mod join {
     pub enum ResidualImplConnectToError {
         CheckUserAllowed(#[from] ResidualUserAllowedError),
         Cache(#[from] crate::bot::error::Cache),
-        GatewaySend(#[from] twilight_gateway::error::SendError),
+        GatewaySend(#[from] twilight_gateway::error::ChannelError),
         TwilightHttp(#[from] twilight_http::Error),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
@@ -265,7 +265,7 @@ pub mod leave {
         InVoiceWithoutUser(#[from] crate::bot::error::InVoiceWithoutUser),
         CheckUserOnlyIn(#[from] crate::bot::error::command::check::UserOnlyInError),
         PreDisconnectCleanup(#[from] PreDisconnectCleanupError),
-        GatewaySend(#[from] twilight_gateway::error::SendError),
+        GatewaySend(#[from] twilight_gateway::error::ChannelError),
     }
 
     impl Error {
@@ -299,7 +299,7 @@ pub mod leave {
         InVoiceWithoutUser(#[from] crate::bot::error::InVoiceWithoutUser),
         CheckUserOnlyIn(#[from] crate::bot::error::command::check::UserOnlyInError),
         PreDisconnectCleanupError(#[from] PreDisconnectCleanupError),
-        GatewaySend(#[from] twilight_gateway::error::SendError),
+        GatewaySend(#[from] twilight_gateway::error::ChannelError),
     }
 }
 
@@ -309,7 +309,7 @@ use thiserror::Error;
 #[error("starting inactivity timeout failed: {:?}", .0)]
 pub enum StartInactivityTimeoutError {
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::bot::lavalink::Event>),
-    GatewaySend(#[from] twilight_gateway::error::SendError),
+    GatewaySend(#[from] twilight_gateway::error::ChannelError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Http(#[from] twilight_http::Error),
     PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),

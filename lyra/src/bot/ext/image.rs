@@ -40,7 +40,7 @@ impl DominantPalette for DynamicImage {
                 )
             })
             .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
-            .expect("`RUNS` must be greater or equal to 1");
+            .expect("RUNS is non-zero");
 
         let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
         res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));
