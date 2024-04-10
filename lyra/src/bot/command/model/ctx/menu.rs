@@ -27,9 +27,9 @@ impl TargetIdAware for MessageAppMarker {}
 
 impl<T: TargetIdAware + AppCtxKind> Ctx<AppCtxMarker<T>> {
     pub fn target_id(&self) -> Id<GenericMarker> {
-        self.command_data()
+        self.partial_command_data()
             .target_id
-            .expect("`self.command_data().target_id` must exist")
+            .expect("T: TargetIdAware")
     }
 }
 
@@ -40,13 +40,13 @@ impl UserCtx {
     }
 
     pub fn target_user(&self) -> &User {
-        self.command_data()
+        self.partial_command_data()
             .resolved
             .as_ref()
-            .expect("`self.command_data().resolved` must exist")
+            .expect("interaction type is application command")
             .users
             .get(&self.target_user_id())
-            .expect("user must exist")
+            .expect("user should be resolved")
     }
 }
 
@@ -57,12 +57,12 @@ impl MessageCtx {
     }
 
     pub fn target_message(&self) -> &Message {
-        self.command_data()
+        self.partial_command_data()
             .resolved
             .as_ref()
-            .expect("`self.command_data().resolved` must exist")
+            .expect("interaction type is application command")
             .messages
             .get(&self.target_message_id())
-            .expect("message must exist")
+            .expect("message should be resolved")
     }
 }

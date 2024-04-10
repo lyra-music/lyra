@@ -110,7 +110,7 @@ impl<T: CtxKind> Ctx<T> {
     pub fn bot_member(&self) -> CachedBotMember {
         self.cache()
             .member(self.guild_id(), self.bot().user_id())
-            .expect("bot's member object must exist")
+            .expect("bot's member should be in cache")
     }
 
     #[inline]
@@ -122,20 +122,18 @@ impl<T: CtxKind> Ctx<T> {
         self.inner
             .channel
             .as_ref()
-            .expect("`self.inner.channel` must not be `None`")
+            .expect("interaction type is not ping")
     }
 
     pub fn author(&self) -> &User {
-        self.inner
-            .author()
-            .expect("`self.inner.author()` must not be `None`")
+        self.inner.author().expect("interaction type is not ping")
     }
 
     pub fn member(&self) -> &PartialMember {
         self.inner
             .member
             .as_ref()
-            .expect("`self.inner.member` must not be `None`")
+            .expect("interaction invoked in a guild")
     }
 
     #[inline]
@@ -151,10 +149,6 @@ impl<T: CtxKind> Ctx<T> {
         &self.inner.token
     }
 
-    fn interaction_data(&self) -> &PartialInteractionData {
-        self.data.as_ref().expect("`self.data` must exist")
-    }
-
     pub async fn interface(&self) -> Result<InteractionInterface, DeserializeBodyFromHttpError> {
         Ok(self.bot.interaction().await?.interfaces(&self.inner))
     }
@@ -162,7 +156,7 @@ impl<T: CtxKind> Ctx<T> {
     pub fn bot_permissions(&self) -> Permissions {
         self.inner
             .app_permissions
-            .expect("this interaction must be executed in guilds")
+            .expect("interaction invoked in a guild")
     }
 
     pub fn bot_permissions_for(&self, channel_id: Id<ChannelMarker>) -> Permissions {
@@ -175,7 +169,7 @@ impl<T: CtxKind> Ctx<T> {
         let everyone_role = self
             .cache()
             .role(guild_id.cast())
-            .expect("`@everyone` role must exist");
+            .expect("@everyone role should be in cache");
         let member_roles = self
             .bot_member()
             .roles()
@@ -191,11 +185,11 @@ impl<T: CtxKind> Ctx<T> {
         let channel = self
             .cache()
             .channel(channel_id)
-            .expect("channel must exist");
+            .expect("channel should be in cache");
         let channel_overwrites = channel
             .permission_overwrites
             .as_ref()
-            .expect("permission overrwrites must exist");
+            .expect("channel is in a guild");
 
         twilight_util::permission_calculator::PermissionCalculator::new(
             guild_id,
@@ -256,8 +250,7 @@ impl<T: CtxKind> GuildIdAware for Ctx<T> {
 
 impl<T: CtxKind> ExpectedGuildIdAware for Ctx<T> {
     fn guild_id(&self) -> Id<GuildMarker> {
-        self.get_guild_id()
-            .expect("this interaction must be executed in guilds")
+        self.get_guild_id().expect("interaction invoked in a guild")
     }
 }
 
@@ -266,8 +259,8 @@ impl<T: CtxKind> AuthorPermissionsAware for Ctx<T> {
         self.inner
             .member
             .as_ref()
-            .expect("this interaction must be executed in guilds")
+            .expect("interaction invoked in a guild")
             .permissions
-            .expect("this field should exist")
+            .expect("member from an interaction")
     }
 }

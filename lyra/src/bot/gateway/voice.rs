@@ -47,9 +47,7 @@ impl Context {
     }
 
     pub fn guild_id(&self) -> Id<GuildMarker> {
-        self.inner
-            .guild_id
-            .expect("`VoiceStateUpdate::guild_id` must exist")
+        self.inner.guild_id.expect("event received in a guild")
     }
 }
 
@@ -91,9 +89,7 @@ impl SenderAware for Context {
 
 impl ExpectedGuildIdAware for Context {
     fn guild_id(&self) -> Id<GuildMarker> {
-        self.inner
-            .guild_id
-            .expect("`VoiceStateUpdate::guild_id` must exist")
+        self.inner.guild_id.expect("event received in a guild")
     }
 }
 

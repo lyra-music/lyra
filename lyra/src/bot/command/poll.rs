@@ -196,7 +196,7 @@ struct WaitForPollActionsContext<'a> {
 }
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
-    let user_id = inter.author_id().expect("author id must exist");
+    let user_id = inter.author_id().expect("interaction from a guild");
 
     let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
         unreachable!()
@@ -205,9 +205,9 @@ fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAct
     let voter_permissions = inter
         .member
         .as_ref()
-        .expect("member must exist")
+        .expect("interaction from a guild")
         .permissions
-        .expect("permissions must exist");
+        .expect("member from an interaction");
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),
@@ -320,7 +320,7 @@ fn get_users_in_voice(
     let users_in_voice = ctx
         .cache()
         .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id)
-        .expect("bot must be in voice")
+        .expect("bot is in voice")
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
         .collect::<Result<HashSet<_>, _>>()?;

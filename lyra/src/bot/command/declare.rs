@@ -41,14 +41,14 @@ macro_rules! declare_slash_commands {
                 fn name() -> &'static str {
                     let cmd_name = stringify!($raw_cmd);
                     &SLASH_COMMANDS_MAP.get(cmd_name)
-                        .unwrap_or_else(|| panic!("command {} must exist", cmd_name))
+                        .unwrap_or_else(|| panic!("command not found: {}", cmd_name))
                         .name
                 }
             }
         )*
 
         impl SlashCtx {
-            pub async fn execute(mut self, data: CommandData) -> Result<(), CommandExecuteError> {
+            pub async fn execute(self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
                 match data.name {
@@ -58,7 +58,7 @@ macro_rules! declare_slash_commands {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.take_partial_command_data().expect("`self.data` must exist");
+                        let cmd_data = self.into_partial_command_data();
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
@@ -84,14 +84,14 @@ macro_rules! declare_message_commands {
                 fn name() -> &'static str {
                     let cmd_name = stringify!($raw_cmd);
                     &MESSAGE_COMMANDS_MAP.get(cmd_name)
-                        .unwrap_or_else(|| panic!("command {} must exist", cmd_name))
+                        .unwrap_or_else(|| panic!("command not found: {}", cmd_name))
                         .name
                 }
             }
         )*
 
         impl MessageCtx {
-            pub async fn execute(mut self, data: CommandData) -> Result<(), CommandExecuteError> {
+            pub async fn execute(self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
                 match data.name {
@@ -101,7 +101,7 @@ macro_rules! declare_message_commands {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.take_partial_command_data().expect("`self.data` must exist");
+                        let cmd_data = self.into_partial_command_data();
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
@@ -114,7 +114,7 @@ macro_rules! declare_message_commands {
 macro_rules! declare_autocomplete {
     ($ ($raw_cmd: ident => $raw_autocomplete: ident) ,* $(,)? ) => {
         impl AutocompleteCtx {
-            pub async fn execute(mut self, data: CommandData) -> Result<(), AutocompleteExecuteError> {
+            pub async fn execute(self, data: CommandData) -> Result<(), AutocompleteExecuteError> {
                 match data.name {
                     $(
                         ref n if n == <$raw_cmd>::name() => {
@@ -122,7 +122,7 @@ macro_rules! declare_autocomplete {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.take_partial_command_data().expect("`self.data` must exist");
+                        let cmd_data = self.into_partial_command_data();
                         return Err(AutocompleteExecuteError::UnknownAutocomplete(cmd_data))
                     }
                 }

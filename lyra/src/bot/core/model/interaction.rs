@@ -230,16 +230,16 @@ impl<'a> Client<'a> {
     ) -> &'static twilight_model::application::command::Command {
         POPULATED_COMMANDS_MAP
             .get()
-            .expect("`POPULATED_COMMANDS_MAP` must be populated")
+            .expect("POPULATED_COMMANDS_MAP is populated")
             .get(T::name())
-            .unwrap_or_else(|| panic!("command must exist: {}", T::name()))
+            .unwrap_or_else(|| panic!("command not found: {}", T::name()))
     }
 
     pub fn mention_command<T: CommandInfoAware>() -> Box<str> {
         let cmd = Self::populated_command::<T>();
 
         let name = &cmd.name;
-        let id = cmd.id.expect("id must exist");
+        let id = cmd.id.expect("id exists");
         format!("</{name}:{id}>").into_boxed_str()
     }
 }

@@ -164,7 +164,7 @@ pub trait GuildAvatarUrlAware {
 
 impl GuildAvatarUrlAware for PartialMember {
     fn id(&self) -> Id<UserMarker> {
-        self.user.as_ref().expect("user must exist").id
+        self.user.as_ref().expect("member is not partial").id
     }
     fn avatar(&self) -> Option<ImageHash> {
         self.avatar

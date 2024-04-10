@@ -92,7 +92,7 @@ impl Context {
             .channel
             .as_ref()
             .map(|c| c.id)
-            .expect("channel must exist");
+            .expect("interaction type is not ping");
 
         let result = match data.kind {
             CommandType::ChatInput => {

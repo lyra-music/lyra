@@ -110,9 +110,7 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
         ChannelType::PublicThread
         | ChannelType::PrivateThread
         | ChannelType::AnnouncementThread => {
-            let parent_id = channel
-                .parent_id
-                .expect("threads must have a parent channel");
+            let parent_id = channel.parent_id.expect("threads always have a parent id");
             access_calculator_builder = access_calculator_builder
                 .thread(channel.id)
                 .text_channel(parent_id);
@@ -201,7 +199,7 @@ fn someone_else_in(channel_id: Id<ChannelMarker>, ctx: &Ctx<impl CtxKind>) -> Op
             states.any(|v| {
                 !ctx.cache()
                     .user(v.user_id())
-                    .expect("user of `v.user_id()` must exist in the cache")
+                    .expect("user should be in the cache")
                     .bot
                     && v.user_id() != ctx.author_id()
             })
@@ -336,7 +334,7 @@ async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, 
     let (current, index) = queue.current_and_index().ok_or(NotPlayingError)?;
 
     let requester = current.requester();
-    let position = NonZeroUsize::new(index + 1).expect("`index + 1` must be nonzero");
+    let position = NonZeroUsize::new(index + 1).expect("index + 1 is non-zero");
     let title = current.track().info.corrected_title().into();
     let channel_id = ctx.lavalink().connection(guild_id).channel_id;
 

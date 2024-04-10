@@ -72,7 +72,7 @@ fn build_shard_config() -> ShardConfig {
                 None,
                 Status::Online,
             )
-            .expect("activities must not be empty"),
+            .expect("activities is non-empty"),
         )
         .build()
 }
