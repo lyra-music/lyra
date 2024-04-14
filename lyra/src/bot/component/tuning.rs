@@ -1,44 +1,44 @@
-// use anyhow::Result;
-// use twilight_lavalink::model::Volume;
-// use twilight_model::gateway::payload::incoming::MessageCreate;
+mod equaliser;
+mod filter;
+mod volume;
 
-// use crate::bot::{
-//     commands::{models::App, Context},
-//     lavalink::LavalinkAware,
-// };
+use std::num::NonZeroU16;
 
-// pub async fn volume(ctx: Context<App>) -> Result<()> {
-//     let (author, channel_id) = (ctx.author(), ctx.channel_id());
+pub use volume::Volume;
 
-//     tracing::debug!(
-//         "volume command in channel {} by {}",
-//         channel_id,
-//         author.name
-//     );
-//     ctx.respond("What's the volume you want to set (0-1000, 100 being the default)?")
-//         .await?;
+use crate::bot::{
+    core::model::{BotStateAware, HttpAware},
+    gateway::{voice, ExpectedGuildIdAware},
+    lavalink::{DelegateMethods, LavalinkAware},
+};
 
-//     let author_id = author.id;
-//     let msg = ctx
-//         .bot()
-//         .standby()
-//         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
-//             new_msg.author.id == author_id
-//         })
-//         .await?;
-//     let guild_id = msg.guild_id.unwrap();
-//     let volume = msg.content.parse::<i64>()?;
+#[tracing::instrument(skip_all, name = "voice_state_update")]
+pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twilight_http::Error> {
+    let bot = ctx.bot();
+    let guild_id = ctx.guild_id();
+    let lavalink = bot.lavalink();
+    let Some(mut connection) = lavalink.get_connection_mut(guild_id) else {
+        return Ok(());
+    };
 
-//     if !(0..=1000).contains(&volume) {
-//         ctx.respond("That's more than 1000").await?;
+    let state_mute = ctx.inner.mute;
+    if connection.mute != state_mute {
+        connection.mute = state_mute;
 
-//         return Ok(());
-//     }
+        let emoji = volume::volume_emoji(if state_mute {
+            None
+        } else if let Some(d) = lavalink.get_player_data(guild_id) {
+            Some(d.read().await.volume())
+        } else {
+            Some(NonZeroU16::new(100).expect("volume is non-zero"))
+        });
+        let describe = if state_mute { "muted" } else { "unmuted" };
 
-//     let player = ctx.lavalink().player(guild_id).await.unwrap();
-//     player.send(Volume::from((guild_id, volume)))?;
-
-//     ctx.respond(&format!("Set the volume to {volume}")).await?;
-
-//     Ok(())
-// }
+        tracing::warn!("guild {} {} forcefully", guild_id, describe);
+        bot.http()
+            .create_message(connection.text_channel_id)
+            .content(&format!("{emoji} `(Bot was forcefully {describe})`"))
+            .await?;
+    }
+    Ok(())
+}

@@ -6,7 +6,7 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::bot::{
     command::{
         check,
-        macros::{bad, hid, out, sus},
+        macros::{bad, out, sus},
         model::{BotAutocomplete, BotSlashCommand},
         AutocompleteCtx, SlashCtx,
     },

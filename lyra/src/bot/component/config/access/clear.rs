@@ -5,7 +5,7 @@ use super::AccessCategory;
 use crate::bot::{
     command::{
         check,
-        macros::{hid, out, sus},
+        macros::{out, sus},
         model::BotSlashCommand,
         util::prompt_for_confirmation,
         SlashCtx,

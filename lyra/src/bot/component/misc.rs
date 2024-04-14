@@ -2,7 +2,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
     command::{
-        macros::{caut, hid, out},
+        macros::{caut, out},
         model::BotSlashCommand,
         SlashCtx,
     },

@@ -208,10 +208,10 @@ async fn wait_until_shutdown(
     tracing::info!("gracefully shutting down...");
     SHUTDOWN.store(true, Ordering::Relaxed);
     for sender in senders {
-        _ = sender.close(CloseFrame::NORMAL);
+        let _ = sender.close(CloseFrame::NORMAL);
     }
     for jh in tasks {
-        _ = jh.await;
+        let _ = jh.await;
     }
 
     tracing::info!("shut down gracefully");

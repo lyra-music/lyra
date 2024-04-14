@@ -1,17 +1,14 @@
 use proc_macro::TokenStream;
 use quote::{__private::TokenStream as QuoteTokenStream, quote};
-use syn::{Data, DeriveInput, Fields, FieldsUnnamed, Ident, PathSegment, Type, TypePath, Variant};
+use syn::{Data, DeriveInput, Fields, FieldsUnnamed, Ident, Path, Type, TypePath, Variant};
 
-fn unwrap(type_path: &TypePath, from: impl Into<String>) -> Option<&PathSegment> {
+fn unwrap(type_path: &TypePath, from: impl Into<String>) -> Option<&Path> {
     match type_path.path.segments.last() {
         Some(segment) if segment.ident == from.into() => match &segment.arguments {
             syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => match &args.args[0]
             {
                 syn::GenericArgument::Type(Type::Path(inner_type_path)) => {
-                    match inner_type_path.path.segments.last() {
-                        Some(inner_segment) => Some(&inner_segment),
-                        _ => None,
-                    }
+                    Some(&inner_type_path.path)
                 }
                 _ => None,
             },
@@ -36,9 +33,12 @@ fn process(
         Type::Path(ref type_path) => {
             let (sub_cmd_match, impl_resolved_command_data) = c;
             let sub_cmd_inner = unwrap(type_path, "Box");
+            let command_info_aware_path =
+                syn::parse_str::<Path>("crate::bot::command::model::CommandInfoAware")
+                    .expect("path is valid");
             let impl_for_inner = match sub_cmd_inner {
                 Some(inner) => quote! {
-                    impl CommandInfoAware for #inner {
+                    impl #command_info_aware_path for #inner {
                         fn name() -> &'static str {
                             #name::name()
                         }
@@ -46,6 +46,7 @@ fn process(
                 },
                 None => quote! {},
             };
+
             (
                 quote! {
                     #sub_cmd_match
@@ -53,7 +54,7 @@ fn process(
                 },
                 quote! {
                     #impl_resolved_command_data
-                    impl CommandInfoAware for #sub_cmd {
+                    impl #command_info_aware_path for #sub_cmd {
                         fn name() -> &'static str {
                             #name::name()
                         }
@@ -82,9 +83,16 @@ pub(super) fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
         _ => panic!("this can only be derived from an enum"),
     };
 
+    let bot_slash_command_path =
+        syn::parse_str::<Path>("crate::bot::command::model::BotSlashCommand")
+            .expect("path is valid");
+    let slash_ctx_path =
+        syn::parse_str::<Path>("crate::bot::command::model::SlashCtx").expect("path is valid");
+    let result_path =
+        syn::parse_str::<Path>("crate::bot::error::command::Result").expect("path is valid");
     quote! {
-        impl BotSlashCommand for #name {
-            async fn run(self, ctx: SlashCtx) -> CommandResult {
+        impl #bot_slash_command_path for #name {
+            async fn run(self, ctx: #slash_ctx_path) -> #result_path {
                 match self {
                     #sub_cmd_matches
                 }

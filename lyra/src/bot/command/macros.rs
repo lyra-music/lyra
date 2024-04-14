@@ -107,12 +107,10 @@ macro_rules! generate_hid_variants {
         $(
             macro_rules! $name {
                 ($cnt: expr, $ctx: expr) => {
-                    use crate::bot::core::r#const::exit_code;
-                    hid!(format!("{} {}", exit_code::$emoji, $cnt), $ctx);
+                    crate::bot::command::macros::hid!(format!("{} {}", crate::bot::core::r#const::exit_code::$emoji, $cnt), $ctx);
                 };
                 ($cnt: expr, ?$ctx: expr) => {
-                    use crate::bot::core::r#const::exit_code;
-                    hid!(format!("{} {}", exit_code::$emoji, $cnt), ?$ctx);
+                    crate::bot::command::macros::hid!(format!("{} {}", crate::bot::core::r#const::exit_code::$emoji, $cnt), ?$ctx);
                 };
             }
         )+
@@ -126,13 +124,11 @@ macro_rules! generate_hid_fol_variants {
         $(
             macro_rules! $name {
                 ($cnt: expr, $ctx: expr) => {
-                    use crate::bot::core::r#const::exit_code;
-                    hid_fol!(format!("{} {}", exit_code::$emoji, $cnt), $ctx);
+                    crate::bot::command::macros::hid_fol!(format!("{} {}", crate::bot::core::r#const::exit_code::$emoji, $cnt), $ctx);
                 };
                 ($cnt: expr, ?$ctx: expr) => {
                     {
-                        use crate::bot::core::r#const::exit_code;
-                        hid_fol!(format!("{} {}", exit_code::$emoji, $cnt), ?$ctx)
+                        crate::bot::command::macros::hid_fol!(format!("{} {}", crate::bot::core::r#const::exit_code::$emoji, $cnt), ?$ctx)
                     }
                 };
             }

@@ -3,7 +3,7 @@ mod correct_info;
 mod queue;
 mod queue_indexer;
 
-use std::{ops::Deref, sync::Arc};
+use std::{num::NonZeroU16, ops::Deref, sync::Arc};
 
 use lavalink_rs::{
     client::LavalinkClient, error::LavalinkResult, model::player::ConnectionInfo,
@@ -32,12 +32,14 @@ pub trait ClientAware {
 
 pub struct PlayerData {
     queue: Queue,
+    volume: NonZeroU16,
     now_playing_message_id: Option<Id<MessageMarker>>,
 }
 
 impl PlayerData {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            volume: NonZeroU16::new(100).expect("volume is non-zero"),
             queue: Queue::new(),
             now_playing_message_id: None,
         }
@@ -49,6 +51,14 @@ impl PlayerData {
 
     pub fn queue_mut(&mut self) -> &mut Queue {
         &mut self.queue
+    }
+
+    pub const fn volume(&self) -> NonZeroU16 {
+        self.volume
+    }
+
+    pub fn set_volume(&mut self, volume: NonZeroU16) {
+        self.volume = volume;
     }
 }
 

@@ -18,7 +18,7 @@ use twilight_model::{
 use crate::bot::{
     command::{
         check,
-        macros::{bad, cant, hid, hid_fol, nope, note, note_fol, out, sus_fol},
+        macros::{bad, cant, nope, note, note_fol, out, sus_fol},
         model::{BotSlashCommand, Ctx, CtxKind, RespondViaMessage},
         SlashCtx,
     },

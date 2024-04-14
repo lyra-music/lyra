@@ -17,7 +17,7 @@ use super::AccessCategoryFlags;
 use crate::bot::{
     command::{
         check,
-        macros::{hid, out, sus},
+        macros::{out, sus},
         model::BotSlashCommand,
         SlashCtx,
     },

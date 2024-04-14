@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::bot::{
     command::{
         check::CheckerBuilder,
-        macros::{bad, hid, out},
+        macros::{bad, out},
         model::BotSlashCommand,
         SlashCtx,
     },

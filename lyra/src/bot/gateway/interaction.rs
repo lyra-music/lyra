@@ -13,7 +13,7 @@ use twilight_model::{
 use super::model::Process;
 use crate::bot::{
     command::{
-        macros::{bad, cant, caut, crit, err, hid, hid_fol, nope, note, out_upd, sus, sus_fol},
+        macros::{bad, cant, caut, crit, err, hid, nope, note, out_upd, sus, sus_fol},
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },

@@ -1,19 +1,14 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{
-        macros::out,
-        model::{BotSlashCommand, CommandInfoAware},
-        SlashCtx,
-    },
+    command::{macros::out, model::BotSlashCommand, SlashCtx},
     error::command::Result as CommandResult,
     gateway::ExpectedGuildIdAware,
 };
 use lyra_proc::BotCommandGroup;
 
-/// -
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "now-playing")]
+#[command(name = "now-playing", desc = ".")]
 pub enum NowPlaying {
     #[command(name = "toggle")]
     Toggle(Toggle),

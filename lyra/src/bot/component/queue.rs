@@ -25,7 +25,7 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 
 use crate::bot::{
     command::{
-        macros::{hid_fol, note_fol, out},
+        macros::{note_fol, out},
         model::{Ctx, CtxKind, RespondViaMessage},
     },
     core::{

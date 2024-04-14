@@ -19,6 +19,7 @@ use crate::bot::{
             AddToQueue, Clear, FairQueue, Move, MoveAutocomplete, Play, PlayAutocomplete, PlayFile,
             Remove, RemoveAutocomplete, RemoveRange, RemoveRangeAutocomplete, Repeat, Shuffle,
         },
+        tuning::Volume,
     },
     error::command::declare::{AutocompleteExecuteError, CommandExecuteError},
 };
@@ -146,6 +147,7 @@ declare_slash_commands![
     RemoveRange,
     Clear,
     Move,
+    Volume,
 ];
 declare_message_commands![AddToQueue,];
 

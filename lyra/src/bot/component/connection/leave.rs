@@ -11,7 +11,7 @@ use twilight_model::{
 use crate::bot::{
     command::{
         check,
-        macros::{caut, hid, out},
+        macros::{caut, out},
         model::{BotSlashCommand, Ctx, CtxKind},
         SlashCtx,
     },

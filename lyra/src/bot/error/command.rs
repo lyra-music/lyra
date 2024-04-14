@@ -44,6 +44,8 @@ pub enum Error {
     Play(#[from] super::component::queue::play::Error),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
     RemoveTracks(#[from] super::component::queue::RemoveTracksError),
+    TwilightHttp(#[from] twilight_http::Error),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 
 pub enum FlattenedError<'a> {
@@ -524,6 +526,8 @@ impl Error {
             Self::QueueEmpty(e) => Fe::QueueEmpty(e),
             Self::PositionOutOfRange(e) => Fe::PositionOutOfRange(e),
             Self::UserNotDj(e) => Fe::UserNotDj(e),
+            Self::TwilightHttp(e) => Fe::TwilightHttp(e),
+            Self::Lavalink(e) => Fe::Lavalink(e),
             Self::CheckNotSuppressed(e) => Fe::from_check_not_suppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
             Self::InVoiceWithSomeoneElse(e) => Fe::from_in_voice_with_someone_else_error(e),
