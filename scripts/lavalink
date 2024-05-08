@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # For starting the lavalink server (Linux)
 
 set -a # automatically export all variables
 source .env
 set +a
 
-(cd lavalink && ./java -jar Lavalink.jar)
+(cd lavalink && java -jar Lavalink.jar)
