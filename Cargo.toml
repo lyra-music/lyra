@@ -1,0 +1,6 @@
+[workspace]
+members = ["lyra", "lyra_proc"]
+resolver = "2"
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3

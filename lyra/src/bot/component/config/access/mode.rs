@@ -5,13 +5,13 @@ use super::AccessCategory;
 use crate::bot::{
     command::{
         check,
-        macros::{hid, out, sus},
+        macros::{out, sus},
         model::BotSlashCommand,
         SlashCtx,
     },
     component::config::access::AccessCategoryFlags,
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
-    error::command::Result as CommandResult,
+    error::CommandResult,
     ext::util::FlagsPrettify,
     gateway::ExpectedGuildIdAware,
 };

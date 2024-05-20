@@ -11,13 +11,13 @@ use twilight_model::{
 use crate::bot::{
     command::{
         check,
-        macros::{caut, hid, out},
+        macros::{caut, out},
         model::{BotSlashCommand, Ctx, CtxKind},
         SlashCtx,
     },
     error::{
-        command::Result as CommandResult,
         component::connection::leave::{self, PreDisconnectCleanupError},
+        CommandResult,
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
     lavalink::{self, LavalinkAware},

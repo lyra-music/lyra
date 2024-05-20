@@ -5,6 +5,8 @@ pub mod gateway;
 pub mod lavalink;
 pub mod runner;
 
+pub use command::Result as CommandResult;
+
 use thiserror::Error;
 use twilight_mention::Mention;
 use twilight_model::id::{

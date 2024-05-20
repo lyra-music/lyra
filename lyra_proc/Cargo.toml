@@ -1,0 +1,26 @@
+[package]
+name = "lyra_proc"
+version = "0.6.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+enum_glob_use = "deny"
+pedantic = "deny"
+nursery = "deny"
+unwrap_used = "deny"
+
+[dependencies]
+syn = "2"
+quote = "1"
+itertools = "*"
+heck = "*"
+toml = "*"
+serde = "1"

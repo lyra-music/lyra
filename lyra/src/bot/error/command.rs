@@ -44,6 +44,9 @@ pub enum Error {
     Play(#[from] super::component::queue::play::Error),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
     RemoveTracks(#[from] super::component::queue::RemoveTracksError),
+    TwilightHttp(#[from] twilight_http::Error),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    NoPlayer(#[from] super::lavalink::NoPlayerError),
 }
 
 pub enum FlattenedError<'a> {
@@ -80,6 +83,7 @@ pub enum FlattenedError<'a> {
     AutoJoinSuppressed(&'a util::AutoJoinSuppressedError),
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
     Lavalink(&'a lavalink_rs::error::LavalinkError),
+    NoPlayer(&'a super::lavalink::NoPlayerError),
 }
 
 pub use FlattenedError as Fe;
@@ -524,6 +528,9 @@ impl Error {
             Self::QueueEmpty(e) => Fe::QueueEmpty(e),
             Self::PositionOutOfRange(e) => Fe::PositionOutOfRange(e),
             Self::UserNotDj(e) => Fe::UserNotDj(e),
+            Self::TwilightHttp(e) => Fe::TwilightHttp(e),
+            Self::Lavalink(e) => Fe::Lavalink(e),
+            Self::NoPlayer(e) => Fe::NoPlayer(e),
             Self::CheckNotSuppressed(e) => Fe::from_check_not_suppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
             Self::InVoiceWithSomeoneElse(e) => Fe::from_in_voice_with_someone_else_error(e),

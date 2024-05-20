@@ -105,7 +105,7 @@ impl std::ops::DerefMut for Queue {
 }
 
 impl Queue {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             inner: VecDeque::new(),
             indexer: QueueIndexer::Standard,

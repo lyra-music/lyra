@@ -10,6 +10,7 @@ use crate::bot::{command::poll::Poll, core::r#const, ext::util::NestedTranspose}
 pub struct Connection {
     pub channel_id: Id<ChannelMarker>,
     pub text_channel_id: Id<ChannelMarker>,
+    pub mute: bool,
     poll: Option<Poll>,
     change: Notify,
     event_sender: broadcast::Sender<Event>,
@@ -24,6 +25,7 @@ impl Connection {
         Self {
             channel_id,
             text_channel_id,
+            mute: false,
             change: Notify::new(),
             event_sender: broadcast::channel(16).0,
             poll: None,

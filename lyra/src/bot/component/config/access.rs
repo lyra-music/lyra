@@ -20,11 +20,7 @@ pub use self::{
     view::View,
 };
 use crate::bot::{
-    command::{
-        model::{BotSlashCommand, CommandInfoAware},
-        SlashCtx,
-    },
-    error::command::{check::AccessCalculatorBuildError, Result as CommandResult},
+    error::command::check::AccessCalculatorBuildError,
     ext::util::{FlagsPrettify, OptionMap},
 };
 use lyra_proc::BotCommandGroup;
@@ -213,9 +209,8 @@ impl AccessCategoryFlags {
     }
 }
 
-/// -
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "access")]
+#[command(name = "access", desc = ".")]
 pub enum Access {
     #[command(name = "view")]
     View(View),

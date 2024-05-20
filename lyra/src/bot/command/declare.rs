@@ -19,6 +19,7 @@ use crate::bot::{
             AddToQueue, Clear, FairQueue, Move, MoveAutocomplete, Play, PlayAutocomplete, PlayFile,
             Remove, RemoveAutocomplete, RemoveRange, RemoveRangeAutocomplete, Repeat, Shuffle,
         },
+        tuning::{Equaliser, Filter, Speed, Volume},
     },
     error::command::declare::{AutocompleteExecuteError, CommandExecuteError},
 };
@@ -62,7 +63,6 @@ macro_rules! declare_slash_commands {
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
-
             }
         }
     };
@@ -105,7 +105,6 @@ macro_rules! declare_message_commands {
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
-
             }
         }
     };
@@ -126,7 +125,6 @@ macro_rules! declare_autocomplete {
                         return Err(AutocompleteExecuteError::UnknownAutocomplete(cmd_data))
                     }
                 }
-
             }
         }
     };
@@ -146,6 +144,10 @@ declare_slash_commands![
     RemoveRange,
     Clear,
     Move,
+    Volume,
+    Filter,
+    Speed,
+    Equaliser,
 ];
 declare_message_commands![AddToQueue,];
 

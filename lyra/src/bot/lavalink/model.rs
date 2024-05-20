@@ -1,9 +1,10 @@
 mod connection;
 mod correct_info;
+mod pitch;
 mod queue;
 mod queue_indexer;
 
-use std::{ops::Deref, sync::Arc};
+use std::{num::NonZeroU16, ops::Deref, sync::Arc};
 
 use lavalink_rs::{
     client::LavalinkClient, error::LavalinkResult, model::player::ConnectionInfo,
@@ -15,29 +16,62 @@ use twilight_model::id::{
     Id,
 };
 
-use crate::bot::core::r#const;
+use crate::bot::{
+    core::r#const,
+    gateway::{ExpectedGuildIdAware, GuildIdAware},
+};
 
 use self::connection::{Connection, ConnectionRef, ConnectionRefMut};
 
 pub use self::{
     connection::{wait_for_with, Event, EventRecvResult},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
+    pitch::Pitch,
     queue::{Item as QueueItem, Queue, RepeatMode},
     queue_indexer::IndexerType,
 };
+
+type PlayerDataRwLockArc = Arc<RwLock<PlayerData>>;
 
 pub trait ClientAware {
     fn lavalink(&self) -> &Lavalink;
 }
 
+pub trait PlayerDataAware: ClientAware + GuildIdAware {
+    fn get_player_data(&self) -> Option<PlayerDataRwLockArc> {
+        self.lavalink().get_player_data(self.get_guild_id()?)
+    }
+}
+pub trait ExpectedPlayerDataAware: ClientAware + ExpectedGuildIdAware {
+    fn player_data(&self) -> PlayerDataRwLockArc {
+        self.lavalink().player_data(self.guild_id())
+    }
+}
+
+pub trait PlayerAware: ClientAware + GuildIdAware {
+    fn get_player(&self) -> Option<PlayerContext> {
+        self.lavalink().get_player_context(self.get_guild_id()?)
+    }
+}
+
+pub trait ExpectedPlayerAware: ClientAware + ExpectedGuildIdAware {
+    fn player(&self) -> PlayerContext {
+        self.lavalink().player(self.guild_id())
+    }
+}
+
 pub struct PlayerData {
     queue: Queue,
+    volume: NonZeroU16,
+    pitch: Pitch,
     now_playing_message_id: Option<Id<MessageMarker>>,
 }
 
 impl PlayerData {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            volume: NonZeroU16::new(100).expect("volume is non-zero"),
+            pitch: Pitch::new(),
             queue: Queue::new(),
             now_playing_message_id: None,
         }
@@ -50,9 +84,20 @@ impl PlayerData {
     pub fn queue_mut(&mut self) -> &mut Queue {
         &mut self.queue
     }
+
+    pub const fn volume(&self) -> NonZeroU16 {
+        self.volume
+    }
+
+    pub fn set_volume(&mut self, volume: NonZeroU16) {
+        self.volume = volume;
+    }
+
+    pub fn pitch_mut(&mut self) -> &mut Pitch {
+        &mut self.pitch
+    }
 }
 
-#[derive(Debug)]
 pub struct Lavalink {
     inner: LavalinkClient,
     connections: dashmap::DashMap<Id<GuildMarker>, Connection>,
@@ -136,7 +181,7 @@ pub trait DelegateMethods {
     fn get_player_data(
         &self,
         guild_id: impl Into<LavalinkGuildId> + Send,
-    ) -> Option<Arc<RwLock<PlayerData>>> {
+    ) -> Option<PlayerDataRwLockArc> {
         self._get_player_context(guild_id)
             .map(|c| c.data().expect("data type is valid"))
     }
@@ -144,7 +189,7 @@ pub trait DelegateMethods {
         self._get_player_context(guild_id)
             .expect("player context exists")
     }
-    fn player_data(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> Arc<RwLock<PlayerData>> {
+    fn player_data(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> PlayerDataRwLockArc {
         self.player(guild_id).data().expect("data type is valid")
     }
 }

@@ -1,4 +1,4 @@
-#[tracing::instrument(err)]
+#[tracing::instrument(err, skip_all)]
 async fn impl_ready(
     lavalink: lavalink_rs::client::LavalinkClient,
 ) -> crate::bot::error::lavalink::ProcessResult {

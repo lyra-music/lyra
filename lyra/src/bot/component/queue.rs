@@ -25,7 +25,7 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 
 use crate::bot::{
     command::{
-        macros::{hid_fol, note_fol, out},
+        macros::{note_fol, out},
         model::{Ctx, CtxKind, RespondViaMessage},
     },
     core::{
@@ -37,7 +37,7 @@ use crate::bot::{
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator},
     gateway::ExpectedGuildIdAware,
-    lavalink::{CorrectTrackInfo, DelegateMethods, LavalinkAware, QueueItem},
+    lavalink::{CorrectTrackInfo, ExpectedPlayerDataAware, LavalinkAware, QueueItem},
 };
 
 fn generate_position_choice(
@@ -91,7 +91,7 @@ fn generate_position_choices<'a>(
 fn generate_position_choices_reversed<'a>(
     position: NonZeroUsize,
     queue_len: NonZeroUsize,
-    queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone + DoubleEndedIterator,
+    queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
     ctx: &Ctx<impl CtxKind>,
 ) -> Vec<CommandOptionChoice> {
@@ -121,7 +121,7 @@ fn impl_generate_position_choices<'a>(
 fn generate_position_choices_from_input<'a>(
     input: i64,
     queue_len: NonZeroUsize,
-    queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone + DoubleEndedIterator,
+    queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
     ctx: &Ctx<impl CtxKind>,
 ) -> Vec<CommandOptionChoice> {
@@ -194,7 +194,7 @@ async fn remove_range(
     end: i64,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let data = ctx.player_data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
@@ -220,7 +220,7 @@ async fn remove(
     positions: Box<[NonZeroUsize]>,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let data = ctx.player_data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
@@ -243,7 +243,7 @@ async fn impl_remove(
     queue_cleared: bool,
     ctx: &mut Ctx<impl RespondViaMessage>,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.lavalink().player_data(ctx.guild_id());
+    let data = ctx.player_data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 

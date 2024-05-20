@@ -8,7 +8,7 @@ use twilight_http::Client;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 
-use crate::bot::component::connection;
+use crate::bot::component::{connection, tuning};
 use crate::bot::core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware};
 use crate::bot::error::gateway::ProcessResult;
 use crate::bot::{
@@ -44,10 +44,6 @@ impl BotState {
 impl Context {
     pub const fn old_voice_state(&self) -> Option<&CachedVoiceState> {
         self.states.voice_state.as_ref()
-    }
-
-    pub fn guild_id(&self) -> Id<GuildMarker> {
-        self.inner.guild_id.expect("event received in a guild")
     }
 }
 
@@ -96,6 +92,7 @@ impl ExpectedGuildIdAware for Context {
 impl Process for Context {
     async fn process(self) -> ProcessResult {
         connection::handle_voice_state_update(&self).await?;
+        tuning::handle_voice_state_update(&self).await?;
 
         Ok(())
     }

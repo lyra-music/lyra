@@ -19,7 +19,7 @@ use twilight_model::{
 
 use super::{
     check,
-    macros::{hid_fol, note_fol},
+    macros::note_fol,
     model::{CommandDataAware, Ctx, CtxKind, RespondViaMessage, RespondViaModal},
     ModalCtx,
 };

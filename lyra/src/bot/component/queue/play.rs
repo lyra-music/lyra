@@ -21,15 +21,15 @@ use twilight_util::builder::command::CommandBuilder;
 
 use crate::bot::{
     command::{
-        macros::{bad, crit, hid, out_or_fol, what},
+        macros::{bad, crit, out_or_fol, what},
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, Ctx, RespondViaMessage},
         util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
     core::r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
     error::{
-        command::{AutocompleteResult, Result as CommandResult},
+        command::AutocompleteResult,
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
-        LoadFailed as LoadFailedError,
+        CommandResult, LoadFailed as LoadFailedError,
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
     gateway::ExpectedGuildIdAware,
@@ -213,14 +213,14 @@ impl BotAutocomplete for Autocomplete {
         ]
         .into_iter()
         .find_map(|q| match q {
-            AutocompleteValue::Focused(q) => Some(q.into_boxed_str()),
+            AutocompleteValue::Focused(q) => Some(q),
             _ => None,
         })
         .map(|q| {
             let source = self.source.unwrap_or_default();
             (!regex::URL.is_match(&q))
-                .then(|| format!("{}search:{}", source.value(), q).into_boxed_str())
-                .unwrap_or(q)
+                .then(|| format!("{}{}", source.value(), q).into_boxed_str())
+                .unwrap_or_else(|| q.into_boxed_str())
         })
         .expect("exactly one option is focused");
 
@@ -406,15 +406,17 @@ async fn play(
 #[derive(CommandOption, CreateOption, Default)]
 enum PlaySource {
     #[default]
-    #[option(name = "Deezer", value = "dz")]
-    Deezer,
-    #[option(name = "Youtube", value = "yt")]
+    #[option(name = "Youtube", value = "ytsearch:")]
     Youtube,
-    #[option(name = "Youtube Music", value = "ytm")]
+    #[option(name = "Youtube Music", value = "ytmsearch:")]
     YoutubeMusic,
-    #[option(name = "SoundCloud", value = "sc")]
+    #[option(name = "SoundCloud", value = "scsearch:")]
     SoundCloud,
-    #[option(name = "Spotify", value = "sp")]
+    #[option(name = "Deezer (Search Query)", value = "dzsearch:")]
+    DeezerQuery,
+    #[option(name = "Deezer (ISRC)", value = "dzisrc:")]
+    DeezerIsrc,
+    #[option(name = "Spotify", value = "spsearch:")]
     Spotify,
 }
 

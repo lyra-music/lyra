@@ -9,15 +9,14 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::bot::{
     command::{
         check,
-        macros::{bad, hid, sus},
+        macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
         AutocompleteCtx, SlashCtx,
     },
     component::queue::Remove,
     core::model::InteractionClient,
-    error::command::{AutocompleteResult, Result as CommandResult},
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    error::{command::AutocompleteResult, CommandResult},
+    lavalink::{ExpectedPlayerDataAware, PlayerDataAware},
 };
 
 enum RemoveRangeAutocompleteOptionsType {
@@ -36,7 +35,7 @@ async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
+    let Some(data) = ctx.get_player_data() else {
         return Vec::new();
     };
     let data_r = data.read().await;
@@ -155,7 +154,7 @@ impl BotSlashCommand for RemoveRange {
         check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let data = ctx.player_data();
         let data_r = data.read().await;
         let queue = data_r.queue();
         let queue_len = queue.len();

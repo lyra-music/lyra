@@ -2,11 +2,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
     command::{
-        macros::{caut, hid, out},
+        macros::{caut, out},
         model::BotSlashCommand,
         SlashCtx,
     },
-    error::command::Result as CommandResult,
+    error::CommandResult,
 };
 
 /// Shows the bot's latency.
