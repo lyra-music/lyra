@@ -4,13 +4,13 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
     command::{
-        check,
         macros::{note, out},
         model::BotSlashCommand,
         SlashCtx,
     },
+    component::tuning::unmuting_player_checks,
     core::model::{BotStateAware, HttpAware},
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{DelegateMethods, LavalinkAware},
 };
@@ -26,8 +26,7 @@ pub struct Up {
 
 impl BotSlashCommand for Up {
     async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        check::user_is_dj(&ctx)?;
-        check::in_voice(&ctx)?;
+        unmuting_player_checks(&ctx)?;
 
         let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();

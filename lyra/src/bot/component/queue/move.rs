@@ -11,9 +11,8 @@ use crate::bot::{
         AutocompleteCtx, SlashCtx,
     },
     component::queue::normalize_queue_position,
-    error::command::{AutocompleteResult, Result as CommandResult},
-    gateway::ExpectedGuildIdAware,
-    lavalink::{CorrectTrackInfo, DelegateMethods, LavalinkAware},
+    error::{command::AutocompleteResult, CommandResult},
+    lavalink::{CorrectTrackInfo, ExpectedPlayerDataAware, PlayerDataAware},
 };
 
 enum MoveAutocompleteOptionType {
@@ -32,7 +31,7 @@ async fn generate_move_autocomplete_choices(
     options: &MoveAutocompleteOptions,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
+    let Some(data) = ctx.get_player_data() else {
         return Vec::new();
     };
     let data_r = data.read().await;
@@ -150,7 +149,7 @@ impl BotSlashCommand for Move {
         check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let data = ctx.player_data();
         let mut data_w = data.write().await;
         let queue = data_w.queue_mut();
         let queue_len = queue.len();

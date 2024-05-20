@@ -40,9 +40,6 @@ jobs:
 
       - name: Codespell
         uses: codespell-project/actions-codespell@v1
-        with:
-          path: lyra
-          ignore_words_list: crate,ans,cant
 
       - name: Setup Mold
         uses: rui314/setup-mold@v1
@@ -51,7 +48,7 @@ jobs:
         uses: Swatinem/rust-cache@v2.5.0
 
       - name: Setup Database
-        working-directory: db
+        working-directory: database
         run: |
           cargo install sqlx-cli --no-default-features --features native-tls,postgres
           cargo sqlx database setup
@@ -60,7 +57,6 @@ jobs:
         run: touch .env
 
       - name: Build And Test
-        working-directory: lyra
         run: |
           cargo build --verbose --release
           cargo test --verbose --release

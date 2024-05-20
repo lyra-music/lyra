@@ -11,7 +11,7 @@ use crate::bot::{
     },
     component::config::access::AccessCategoryFlags,
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
-    error::command::Result as CommandResult,
+    error::CommandResult,
     ext::util::FlagsPrettify,
     gateway::ExpectedGuildIdAware,
 };

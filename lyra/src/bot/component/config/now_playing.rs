@@ -2,7 +2,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
     command::{macros::out, model::BotSlashCommand, SlashCtx},
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
 };
 use lyra_proc::BotCommandGroup;

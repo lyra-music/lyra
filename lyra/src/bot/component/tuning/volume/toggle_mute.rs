@@ -1,9 +1,10 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{check, macros::out, model::BotSlashCommand, SlashCtx},
+    command::{macros::out, model::BotSlashCommand, SlashCtx},
+    component::tuning::unmuting_checks,
     core::model::{BotStateAware, HttpAware},
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::LavalinkAware,
 };
@@ -15,8 +16,7 @@ pub struct ToggleMute;
 
 impl BotSlashCommand for ToggleMute {
     async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        check::user_is_dj(&ctx)?;
-        check::in_voice(&ctx)?;
+        unmuting_checks(&ctx)?;
 
         let guild_id = ctx.guild_id();
         let mut connection = ctx.lavalink().connection_mut(guild_id);

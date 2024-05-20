@@ -1,11 +1,16 @@
 .env
-.vscode
-.tmp
-config.yml
 
-lyra/target
+target
 
-lavalink/java
 lavalink/plugins
 lavalink/Lavalink.jar
-lavalink/..application.yml
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml

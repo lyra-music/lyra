@@ -6,12 +6,12 @@ use syn::{
     Ident, Result, Token,
 };
 
-pub(super) struct Args(pub(super) Vec<Ident>);
+pub struct Args(pub(super) Vec<Ident>);
 
 impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self> {
         let vars = Punctuated::<Ident, Token![,]>::parse_terminated(input)?;
-        Ok(Args(vars.into_iter().collect()))
+        Ok(Self(vars.into_iter().collect()))
     }
 }
 

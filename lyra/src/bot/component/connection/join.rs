@@ -30,13 +30,12 @@ use crate::bot::{
     },
     error::{
         self,
-        command::Result as CommandResult,
         component::connection::join::{
             AutoJoinError, ConnectToError, ConnectToNewError, DeleteEmptyVoiceNoticeError,
             Error as JoinError, GetUsersVoiceChannelError, HandleResponseError, ImplAutoJoinError,
             ImplConnectToError, ImplJoinError, Pfe,
         },
-        Cache as CacheError, UserNotInVoice as UserNotInVoiceError,
+        Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
     lavalink::LavalinkAware,
@@ -300,7 +299,7 @@ async fn delete_empty_voice_notice(
 #[inline]
 fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
     if stage {
-        return Cow::Owned("🌠".to_owned() + txt);
+        return Cow::Owned(String::from("🌠") + txt);
     }
     Cow::Borrowed(txt)
 }

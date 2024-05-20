@@ -3,9 +3,10 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{check, macros::out, model::BotSlashCommand, SlashCtx},
+    command::{macros::out, model::BotSlashCommand, SlashCtx},
+    component::tuning::common_checks,
     core::model::{BotStateAware, HttpAware},
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{DelegateMethods, LavalinkAware},
 };
@@ -21,9 +22,7 @@ pub struct Down {
 
 impl BotSlashCommand for Down {
     async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        check::user_is_dj(&ctx)?;
-        check::in_voice(&ctx)?;
-        check::not_suppressed(&ctx)?;
+        common_checks(&ctx)?;
 
         let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
@@ -58,7 +57,7 @@ impl BotSlashCommand for Down {
         };
 
         out!(
-            format!("{emoji}**`ー`** ~~`{old_percent}%`~~ ➜ **{new_percent_str}**{warning}"),
+            format!("{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}"),
             ctx
         );
     }

@@ -27,9 +27,9 @@ use crate::bot::{
     },
     core::r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
     error::{
-        command::{AutocompleteResult, Result as CommandResult},
+        command::AutocompleteResult,
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
-        LoadFailed as LoadFailedError,
+        CommandResult, LoadFailed as LoadFailedError,
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
     gateway::ExpectedGuildIdAware,

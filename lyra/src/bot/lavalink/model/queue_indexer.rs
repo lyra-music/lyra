@@ -64,7 +64,7 @@ impl FairIndexer {
     ) -> Self {
         let inner = items
             .skip(starting_index)
-            .group_by(|c| c.requester)
+            .chunk_by(|c| c.requester)
             .into_iter()
             .map(|(r, g)| (r, g.count()))
             .collect();

@@ -16,8 +16,8 @@ use crate::bot::{
         SlashCtx,
     },
     error::{
-        command::Result as CommandResult,
         component::connection::leave::{self, PreDisconnectCleanupError},
+        CommandResult,
     },
     gateway::{ExpectedGuildIdAware, SenderAware},
     lavalink::{self, LavalinkAware},

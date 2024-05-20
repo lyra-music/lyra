@@ -96,7 +96,7 @@ impl Context {
 
         let result = match data.kind {
             CommandType::ChatInput => {
-                <SlashCtx>::from_partial_data(
+                SlashCtx::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -108,7 +108,7 @@ impl Context {
             }
             CommandType::User => todo!(),
             CommandType::Message => {
-                <MessageCtx>::from_partial_data(
+                MessageCtx::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -255,6 +255,10 @@ async fn match_error(
             );
         }
         Fe::Confirmation(e) => Ok(match_confirmation(e, i).await?),
+        Fe::NoPlayer(_) => {
+            let play = InteractionClient::mention_command::<Play>();
+            caut!(format!("Not yet played anything. Use {} first.", play), i);
+        }
         _ => {
             err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?i);
             Err(ProcessError::CommandExecute {

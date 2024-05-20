@@ -29,6 +29,7 @@ use crate::bot::{
         command::check::{
             self, AlternateVoteResponse, SendSupersededWinNoticeError, UserOnlyInError,
         },
+        lavalink::NoPlayerError,
         Cache as CacheError, InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError, NotInVoice as NotInVoiceError,
         NotPlaying as NotPlayingError, NotUsersTrack as NotUsersTrackError,
@@ -37,7 +38,9 @@ use crate::bot::{
         UserNotStageManager as UserNotStageManagerError,
     },
     gateway::{ExpectedGuildIdAware, GuildIdAware},
-    lavalink::{self, CorrectTrackInfo, DelegateMethods, Event, LavalinkAware, QueueItem},
+    lavalink::{
+        self, CorrectTrackInfo, DelegateMethods, Event, LavalinkAware, PlayerAware, QueueItem,
+    },
 };
 
 use super::{
@@ -328,7 +331,8 @@ pub async fn queue_not_empty(ctx: &Ctx<impl CtxKind>) -> Result<(), error::Queue
 
 async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, NotPlayingError> {
     let guild_id = ctx.guild_id();
-    let data = ctx.lavalink().player_data(guild_id);
+    let lavalink = ctx.lavalink();
+    let data = lavalink.player_data(guild_id);
     let data_r = data.read().await;
     let queue = data_r.queue();
     let (current, index) = queue.current_and_index().ok_or(NotPlayingError)?;
@@ -336,7 +340,7 @@ async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, 
     let requester = current.requester();
     let position = NonZeroUsize::new(index + 1).expect("index + 1 is non-zero");
     let title = current.track().info.corrected_title().into();
-    let channel_id = ctx.lavalink().connection(guild_id).channel_id;
+    let channel_id = lavalink.connection(guild_id).channel_id;
 
     Ok(CurrentlyPlaying {
         requester,
@@ -474,6 +478,11 @@ pub fn all_users_track<T: CtxKind>(
         return Err(impl_users_track(position, track, e));
     }
 
+    Ok(())
+}
+
+pub fn player_exist(ctx: &impl PlayerAware) -> Result<(), NoPlayerError> {
+    ctx.get_player().ok_or(NoPlayerError)?;
     Ok(())
 }
 

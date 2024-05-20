@@ -3,8 +3,9 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{check, macros::out, model::BotSlashCommand, SlashCtx},
-    error::command::Result as CommandResult,
+    command::{macros::out, model::BotSlashCommand, SlashCtx},
+    component::tuning::common_checks,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{DelegateMethods, LavalinkAware},
 };
@@ -20,9 +21,7 @@ pub struct Set {
 
 impl BotSlashCommand for Set {
     async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        check::user_is_dj(&ctx)?;
-        check::in_voice(&ctx)?;
-        check::not_suppressed(&ctx)?;
+        common_checks(&ctx)?;
 
         let percent = NonZeroU16::new(self.percent as u16).expect("self.percent is non-zero");
         let lavalink = ctx.lavalink();

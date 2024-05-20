@@ -7,7 +7,7 @@ use crate::bot::{
         model::BotSlashCommand,
         SlashCtx,
     },
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{DelegateMethods, IndexerType, LavalinkAware},
 };

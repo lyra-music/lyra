@@ -13,7 +13,7 @@ use twilight_model::{
     },
 };
 
-use crate::bot::error::command::{AutocompleteResult, Result as CommandResult};
+use crate::bot::error::{command::AutocompleteResult, CommandResult};
 
 pub use self::ctx::{
     AutocompleteCtx, CommandDataAware, Ctx, CtxKind, MessageCtx, ModalCtx, RespondViaMessage,

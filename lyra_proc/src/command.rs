@@ -36,16 +36,18 @@ fn process(
             let command_info_aware_path =
                 syn::parse_str::<Path>("crate::bot::command::model::CommandInfoAware")
                     .expect("path is valid");
-            let impl_for_inner = match sub_cmd_inner {
-                Some(inner) => quote! {
-                    impl #command_info_aware_path for #inner {
-                        fn name() -> &'static str {
-                            #name::name()
+            let impl_for_inner = sub_cmd_inner.map_or_else(
+                || quote!(),
+                |inner| {
+                    quote! {
+                        impl #command_info_aware_path for #inner {
+                            fn name() -> &'static str {
+                                #name::name()
+                            }
                         }
                     }
                 },
-                None => quote! {},
-            };
+            );
 
             (
                 quote! {
@@ -67,7 +69,7 @@ fn process(
     }
 }
 
-pub(super) fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
+pub fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
     let data = &input.data;
 

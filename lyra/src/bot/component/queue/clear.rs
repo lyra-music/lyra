@@ -8,7 +8,7 @@ use crate::bot::{
         macros::out,
         model::{BotSlashCommand, SlashCtx},
     },
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{DelegateMethods, Event, LavalinkAware},
 };

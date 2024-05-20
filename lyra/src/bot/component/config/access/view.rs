@@ -12,7 +12,7 @@ use crate::bot::{
     command::{model::BotSlashCommand, SlashCtx},
     component::config::access::mode::AccessModePrettify,
     core::r#const::{colours::EMBED_DEFAULT, text::EMPTY_EMBED_FIELD},
-    error::command::Result as CommandResult,
+    error::CommandResult,
     ext::util::OptionMap,
     gateway::ExpectedGuildIdAware,
 };

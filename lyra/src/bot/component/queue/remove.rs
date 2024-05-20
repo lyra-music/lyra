@@ -13,9 +13,8 @@ use crate::bot::{
         model::{BotAutocomplete, BotSlashCommand},
         AutocompleteCtx, SlashCtx,
     },
-    error::command::{AutocompleteResult, Result as CommandResult},
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    error::{command::AutocompleteResult, CommandResult},
+    lavalink::{ExpectedPlayerDataAware, PlayerDataAware},
 };
 
 async fn generate_remove_choices(
@@ -23,7 +22,7 @@ async fn generate_remove_choices(
     finished: Vec<i64>,
     ctx: &AutocompleteCtx,
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.lavalink().get_player_data(ctx.guild_id()) else {
+    let Some(data) = ctx.get_player_data() else {
         return Vec::new();
     };
     let data_r = data.read().await;
@@ -126,7 +125,7 @@ impl BotSlashCommand for Remove {
         check::queue_not_empty(&ctx).await?;
         check::not_suppressed(&ctx)?;
 
-        let data = ctx.lavalink().player_data(ctx.guild_id());
+        let data = ctx.player_data();
         let data_r = data.read().await;
         let queue = data_r.queue();
         let queue_len = queue.len();

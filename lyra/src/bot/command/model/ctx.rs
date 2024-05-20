@@ -30,7 +30,10 @@ use crate::bot::{
     },
     error::{command::RespondError, core::DeserializeBodyFromHttpError},
     gateway::{ExpectedGuildIdAware, GuildIdAware, SenderAware},
-    lavalink::{Lavalink, LavalinkAware},
+    lavalink::{
+        ExpectedPlayerAware, ExpectedPlayerDataAware, Lavalink, LavalinkAware, PlayerAware,
+        PlayerDataAware,
+    },
 };
 
 use super::PartialInteractionData;
@@ -241,6 +244,11 @@ impl<T: CtxKind> LavalinkAware for Ctx<T> {
         self.bot.lavalink()
     }
 }
+
+impl<T: CtxKind> PlayerDataAware for Ctx<T> {}
+impl<T: CtxKind> ExpectedPlayerDataAware for Ctx<T> {}
+impl<T: CtxKind> PlayerAware for Ctx<T> {}
+impl<T: CtxKind> ExpectedPlayerAware for Ctx<T> {}
 
 impl<T: CtxKind> GuildIdAware for Ctx<T> {
     fn get_guild_id(&self) -> Option<Id<GuildMarker>> {

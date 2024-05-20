@@ -4,7 +4,7 @@ use crate::bot::{
     command::{
         check::CheckerBuilder, macros::out_or_upd, model::BotSlashCommand, poll::Topic, SlashCtx,
     },
-    error::command::Result as CommandResult,
+    error::CommandResult,
     gateway::ExpectedGuildIdAware,
     lavalink::{self, DelegateMethods, LavalinkAware},
 };

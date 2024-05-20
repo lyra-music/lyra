@@ -8,8 +8,6 @@ use std::num::NonZeroU16;
 use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use self::{down::Down, set::Set, toggle_mute::ToggleMute, up::Up};
-
 pub(super) const fn volume_emoji(percent: Option<NonZeroU16>) -> &'static str {
     let Some(percent) = percent else {
         return "🔇";
@@ -30,14 +28,14 @@ pub fn clipping_warning(percent: NonZeroU16) -> &'static str {
 }
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "volume", desc = ".")]
+#[command(name = "volume", desc = ".", dm_permission = false)]
 pub enum Volume {
     #[command(name = "toggle-mute")]
-    ToggleMute(ToggleMute),
+    ToggleMute(toggle_mute::ToggleMute),
     #[command(name = "set")]
-    Set(Set),
+    Set(set::Set),
     #[command(name = "up")]
-    Up(Up),
+    Up(up::Up),
     #[command(name = "down")]
-    Down(Down),
+    Down(down::Down),
 }
