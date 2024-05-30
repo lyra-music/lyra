@@ -177,14 +177,6 @@ pub trait FlagsPrettify: Flags {
 #[derive(PartialEq, Eq, Debug)]
 pub struct PrettifiedTimestamp(Duration);
 
-impl std::ops::Deref for PrettifiedTimestamp {
-    type Target = Duration;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl FromStr for PrettifiedTimestamp {
     type Err = PrettifiedTimestampParseError;
 

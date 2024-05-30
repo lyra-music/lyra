@@ -90,20 +90,6 @@ pub struct Queue {
     current_track_started: u64,
 }
 
-impl std::ops::Deref for Queue {
-    type Target = VecDeque<Item>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl std::ops::DerefMut for Queue {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 impl Queue {
     pub(super) const fn new() -> Self {
         Self {
@@ -279,5 +265,38 @@ impl Queue {
         player.stop_now().await?;
         f(player).await?;
         Ok(())
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline]
+    pub fn remove(&mut self, index: usize) -> Option<Item> {
+        self.inner.remove(index)
+    }
+
+    #[inline]
+    pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Item> {
+        self.inner.iter()
+    }
+
+    #[inline]
+    pub fn insert(&mut self, index: usize, value: Item) {
+        self.inner.insert(index, value);
+    }
+}
+
+impl std::ops::Index<usize> for Queue {
+    type Output = Item;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
     }
 }

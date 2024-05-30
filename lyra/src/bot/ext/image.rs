@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use image::{self, imageops::FilterType, DynamicImage, GenericImageView};
 use kmeans_colors::Sort;
 use palette::{cast::from_component_slice, FromColor, IntoColor, Lab, Srgb, Srgba};
@@ -60,14 +58,6 @@ pub struct LimitImageFileSizeResponse {
 impl LimitImageFileSizeResponse {
     const fn new(image: DynamicImage, kind: LimitImageFileSizeResponseKind) -> Self {
         Self { image, kind }
-    }
-}
-
-impl Deref for LimitImageFileSizeResponse {
-    type Target = DynamicImage;
-
-    fn deref(&self) -> &Self::Target {
-        &self.image
     }
 }
 
