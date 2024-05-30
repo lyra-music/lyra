@@ -58,6 +58,10 @@
     mold.enable = true;
   };
 
+  # Enable Codespaces Integration
+  # https://devenv.sh/integrations/codespaces-devcontainer/
+  devcontainer.enable = true;
+
   # https://devenv.sh/pre-commit-hooks/
   # pre-commit.hooks.shellcheck.enable = true;
 
