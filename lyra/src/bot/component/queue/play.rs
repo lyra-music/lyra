@@ -1,3 +1,5 @@
+use std::hint::unreachable_unchecked;
+
 use chrono::Duration;
 use futures::future;
 use itertools::{Either, Itertools};
@@ -22,18 +24,24 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::bot::{
     command::{
         macros::{bad, crit, out_or_fol, what},
-        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, Ctx, RespondViaMessage},
-        util, AutocompleteCtx, MessageCtx, SlashCtx,
+        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
+        require, util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
-    core::r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
+    core::{
+        model::AuthorIdAware,
+        r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
+    },
     error::{
         command::AutocompleteResult,
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
         CommandResult, LoadFailed as LoadFailedError,
     },
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator, ViaGrapheme},
-    gateway::ExpectedGuildIdAware,
-    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, DelegateMethods, LavalinkAware},
+    gateway::GuildIdAware,
+    lavalink::{
+        CorrectPlaylistInfo, CorrectTrackInfo, LavalinkAware, UnwrappedPlayerData,
+        UnwrappedPlayerInfoUri,
+    },
 };
 
 struct LoadTrackContext {
@@ -42,7 +50,7 @@ struct LoadTrackContext {
 }
 
 impl LoadTrackContext {
-    fn new_via(ctx: &(impl ExpectedGuildIdAware + LavalinkAware)) -> Self {
+    fn new_via(ctx: &(impl GuildIdAware + LavalinkAware)) -> Self {
         Self {
             guild_id: ctx.guild_id(),
             lavalink: ctx.lavalink().clone_inner(),
@@ -64,7 +72,9 @@ impl LoadTrackContext {
             match loaded.load_type {
                 TrackLoadType::Track => {
                     let Some(TrackLoadData::Track(t)) = loaded.data else {
-                        unreachable!()
+                        // SAFETY: `loaded.load_type` is `Track`,
+                        //         so `loaded.data` must be `TrackLoadData::Track(_)`
+                        unsafe { unreachable_unchecked() }
                     };
                     Ok(LoadTrackResult::Track(t))
                 }
@@ -99,7 +109,9 @@ impl Playlist {
         match loaded.load_type {
             TrackLoadType::Playlist => {
                 let Some(TrackLoadData::Playlist(data)) = loaded.data else {
-                    unreachable!()
+                    // SAFETY: `loaded.load_type` is `Playlist`,
+                    //         so `loaded.data` must be `TrackLoadData::Playlist(_)`
+                    unsafe { unreachable_unchecked() }
                 };
 
                 Self {
@@ -163,6 +175,10 @@ trait AutocompleteResultPrettify {
     fn prettify(&mut self) -> String;
 }
 
+trait UnsafeAutocompleteResultPrettify {
+    unsafe fn prettify(&mut self) -> String;
+}
+
 impl AutocompleteResultPrettify for TrackData {
     fn prettify(&mut self) -> String {
         let track_info = &mut self.info;
@@ -181,10 +197,12 @@ impl AutocompleteResultPrettify for TrackData {
     }
 }
 
-impl AutocompleteResultPrettify for LoadedTracks {
-    fn prettify(&mut self) -> String {
+impl UnsafeAutocompleteResultPrettify for LoadedTracks {
+    unsafe fn prettify(&mut self) -> String {
         let Some(TrackLoadData::Playlist(ref mut data)) = self.data else {
-            unreachable!()
+            // SAFETY: `loaded.load_type` is `Search`,
+            //         so `loaded.data` must be `TrackLoadData::Search(_)`
+            unsafe { unreachable_unchecked() }
         };
 
         let name = data.info.take_and_correct_name();
@@ -203,26 +221,30 @@ impl AutocompleteResultPrettify for LoadedTracks {
 }
 
 impl BotAutocomplete for Autocomplete {
-    async fn execute(self, mut ctx: AutocompleteCtx) -> AutocompleteResult {
-        let query = [
-            self.query,
-            self.query_2,
-            self.query_3,
-            self.query_4,
-            self.query_5,
-        ]
-        .into_iter()
-        .find_map(|q| match q {
-            AutocompleteValue::Focused(q) => Some(q),
-            _ => None,
-        })
-        .map(|q| {
-            let source = self.source.unwrap_or_default();
-            (!regex::URL.is_match(&q))
-                .then(|| format!("{}{}", source.value(), q).into_boxed_str())
-                .unwrap_or_else(|| q.into_boxed_str())
-        })
-        .expect("exactly one option is focused");
+    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
+        let mut ctx = require::guild(ctx)?;
+        // SAFETY: exactly one autocomplete option is focused, so finding will always be successful
+        let query = unsafe {
+            [
+                self.query,
+                self.query_2,
+                self.query_3,
+                self.query_4,
+                self.query_5,
+            ]
+            .into_iter()
+            .find_map(|q| match q {
+                AutocompleteValue::Focused(q) => Some(q),
+                _ => None,
+            })
+            .map(|q| {
+                let source = self.source.unwrap_or_default();
+                (!regex::url().is_match(&q))
+                    .then(|| format!("{}{}", source.value(), q).into_boxed_str())
+                    .unwrap_or_else(|| q.into_boxed_str())
+            })
+            .unwrap_unchecked()
+        };
 
         let guild_id = ctx.guild_id();
         let load_ctx = LoadTrackContext {
@@ -234,7 +256,9 @@ impl BotAutocomplete for Autocomplete {
         let choices = match loaded.load_type {
             TrackLoadType::Search => {
                 let Some(TrackLoadData::Search(tracks)) = loaded.data else {
-                    unreachable!()
+                    // SAFETY: `loaded.load_type` is `Search`,
+                    //         so `loaded.data` must be `TrackLoadData::Search(_)`
+                    unsafe { unreachable_unchecked() }
                 };
 
                 tracks
@@ -242,29 +266,28 @@ impl BotAutocomplete for Autocomplete {
                     .map(|mut t| CommandOptionChoice {
                         name: t.prettify(),
                         name_localizations: None,
-                        value: CommandOptionChoiceValue::String(
-                            t.info.uri.expect("track is nonlocal"),
-                        ),
+                        value: CommandOptionChoiceValue::String(t.info.into_uri_unwrapped()),
                     })
                     .take(COMMAND_CHOICES_LIMIT)
                     .collect()
             }
             TrackLoadType::Track => {
                 let Some(TrackLoadData::Track(mut track)) = loaded.data else {
-                    unreachable!()
+                    // SAFETY: `loaded.load_type` is `Track`,
+                    //         so `loaded.data` must be `TrackLoadData::Track(_)`
+                    unsafe { unreachable_unchecked() }
                 };
 
                 vec![CommandOptionChoice {
                     name: track.prettify(),
                     name_localizations: None,
-                    value: CommandOptionChoiceValue::String(
-                        track.info.uri.expect("track is nonlocal"),
-                    ),
+                    value: CommandOptionChoiceValue::String(track.info.into_uri_unwrapped()),
                 }]
             }
             TrackLoadType::Playlist => {
                 let mut choices = vec![CommandOptionChoice {
-                    name: loaded.prettify(),
+                    // SAFETY: `loaded.load_type` is `Playlist`, so this is safe
+                    name: unsafe { loaded.prettify() },
                     name_localizations: None,
                     value: CommandOptionChoiceValue::String(
                         query.grapheme_truncate(100).to_string(),
@@ -285,9 +308,7 @@ impl BotAutocomplete for Autocomplete {
                     choices.push(CommandOptionChoice {
                         name: track.prettify(),
                         name_localizations: None,
-                        value: CommandOptionChoiceValue::String(
-                            track.info.uri.expect("track is nonlocal"),
-                        ),
+                        value: CommandOptionChoiceValue::String(track.info.into_uri_unwrapped()),
                     });
                 }
 
@@ -302,11 +323,9 @@ impl BotAutocomplete for Autocomplete {
 }
 
 async fn play(
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
-    let guild_id = ctx.guild_id();
-
     let load_ctx = LoadTrackContext::new_via(ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
@@ -321,7 +340,7 @@ async fn play(
                         format!(
                             "[`{}`](<{}>)",
                             t.info.corrected_title(),
-                            t.info.uri.as_ref().expect("track is nonlocal")
+                            t.info.uri_unwrapped()
                         )
                     })
                     .collect::<Vec<_>>()
@@ -357,7 +376,9 @@ async fn play(
                 .collect::<Vec<_>>()
                 .pretty_join_with_and();
             let plus = match tracks_len + playlists_len {
-                0 => unreachable!(),
+                // SAFETY: at least one tracks or playlists must be loaded,
+                //         so this should never happen
+                0 => unsafe { std::hint::unreachable_unchecked() },
                 1 => "**`＋`**",
                 _ => "**`≡+`**",
             };
@@ -365,18 +386,19 @@ async fn play(
             util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
 
             let total_tracks = Vec::from(results);
-            let first_track = total_tracks.first().expect("results is non-empty").clone();
+            // SAFETY: at least one tracks must be loaded, so this unwrap is safe
+            let first_track = unsafe { total_tracks.first().cloned().unwrap_unchecked() };
 
-            util::auto_new_player_data(ctx).await?;
+            let player = util::auto_new_player(ctx).await?;
 
-            ctx.lavalink()
-                .player_data(guild_id)
+            player
+                .data_unwrapped()
                 .write()
                 .await
                 .queue_mut()
                 .enqueue(total_tracks, ctx.author_id());
 
-            ctx.lavalink().player(guild_id).play(&first_track).await?;
+            player.play(&first_track).await?;
 
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }
@@ -445,7 +467,8 @@ pub struct Play {
 }
 
 impl BotSlashCommand for Play {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let queries = [
             Some(self.query),
             self.query_2,
@@ -478,7 +501,8 @@ pub struct File {
 }
 
 impl BotSlashCommand for File {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let files = [
             Some(self.track),
             self.track_2,
@@ -527,12 +551,13 @@ pub struct AddToQueue;
 
 impl AddToQueue {
     pub fn create_command() -> Command {
-        CommandBuilder::new("➕ Add to queue", "", CommandType::Message).build()
+        CommandBuilder::new("➕ Add to queue", String::new(), CommandType::Message).build()
     }
 }
 
 impl BotMessageCommand for AddToQueue {
-    async fn run(mut ctx: MessageCtx) -> CommandResult {
+    async fn run(ctx: MessageCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let message = ctx.target_message();
 
         let queries = extract_queries(message);

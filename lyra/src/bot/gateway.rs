@@ -6,6 +6,6 @@ mod shard;
 pub mod voice;
 
 pub use self::{
-    model::{ExpectedGuildIdAware, GuildIdAware, LastCachedStates, Process, SenderAware},
+    model::{GuildIdAware, LastCachedStates, OptionallyGuildIdAware, Process, SenderAware},
     process::process,
 };

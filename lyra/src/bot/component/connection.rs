@@ -33,7 +33,7 @@ use crate::bot::{
             HandleVoiceStateUpdateError, MatchStateChannelIdError, StartInactivityTimeoutError,
         },
     },
-    gateway::{voice, ExpectedGuildIdAware, SenderAware},
+    gateway::{voice, GuildIdAware, SenderAware},
     lavalink::{self, LavalinkAware},
 };
 
@@ -56,7 +56,7 @@ struct InactivityTimeoutContext {
 }
 
 impl InactivityTimeoutContext {
-    fn new_via(ctx: &(impl OwnedBotStateAware + SenderAware + ExpectedGuildIdAware)) -> Self {
+    fn new_via(ctx: &(impl OwnedBotStateAware + SenderAware + GuildIdAware)) -> Self {
         Self {
             inner: ctx.bot_owned(),
             sender: ctx.sender().clone(),
@@ -89,7 +89,7 @@ impl HttpAware for InactivityTimeoutContext {
     }
 }
 
-impl ExpectedGuildIdAware for InactivityTimeoutContext {
+impl GuildIdAware for InactivityTimeoutContext {
     fn guild_id(&self) -> Id<GuildMarker> {
         self.guild_id
     }
@@ -108,13 +108,16 @@ async fn start_inactivity_timeout(
     );
 
     for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(*const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
+        tokio::time::sleep(*const_connection::inactivity_timeout_poll_interval()).await;
         if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
             return Ok(());
         }
     }
 
-    ctx.lavalink().notify_connection_change(guild_id);
+    let Some(connection) = ctx.lavalink().get_connection(guild_id) else {
+        return Ok(());
+    };
+    connection.notify_change();
     pre_disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 

@@ -102,6 +102,10 @@ impl BotInfo {
 pub type BotStateRef<'a> = &'a BotState;
 pub type OwnedBotState = Arc<BotState>;
 
+pub trait AuthorIdAware {
+    fn author_id(&self) -> Id<UserMarker>;
+}
+
 pub trait AuthorPermissionsAware {
     fn author_permissions(&self) -> Permissions;
 }
@@ -173,7 +177,7 @@ impl BotState {
     pub fn user(&self) -> CurrentUser {
         self.cache
             .current_user()
-            .expect("current user should be in cache")
+            .unwrap_or_else(|| panic!("current user isn't in cache"))
     }
 
     #[inline]

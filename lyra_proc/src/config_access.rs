@@ -6,7 +6,7 @@ use syn::Ident;
 
 use crate::model::Args;
 
-pub fn impl_view_access_ids(categories: &Args) -> TokenStream {
+pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
     let column_names = categories
         .iter()
         .map(|c| match c.to_string().as_str() {

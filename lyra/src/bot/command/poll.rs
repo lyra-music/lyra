@@ -29,7 +29,7 @@ use twilight_util::builder::embed::{
 use crate::bot::{
     command::macros::{caut, hid, nope},
     core::{
-        model::{BotStateAware, CacheAware, HttpAware},
+        model::{AuthorIdAware, BotStateAware, CacheAware, HttpAware},
         r#const::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
@@ -40,12 +40,13 @@ use crate::bot::{
         Cache as CacheError,
     },
     ext::util::hex_to_rgb,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
     lavalink::{Event, EventRecvResult, LavalinkAware},
 };
 
 use super::{
-    model::{Ctx, RespondViaMessage},
+    model::{GuildCtx, GuildInteraction, NonPingInteraction, RespondViaMessage},
+    require::CachelessInVoice,
     util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware, MessageLinkAware},
 };
 
@@ -73,7 +74,7 @@ impl std::fmt::Display for Topic {
                 }
             },
         };
-        write!(f, "{message}")
+        f.write_str(message)
     }
 }
 
@@ -135,7 +136,7 @@ impl Vote {
 impl std::fmt::Display for Vote {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = if self.0 { "Agree" } else { "Disagree" };
-        write!(f, "{s}")
+        f.write_str(s)
     }
 }
 
@@ -196,18 +197,17 @@ struct WaitForPollActionsContext<'a> {
 }
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
-    let user_id = inter.author_id().expect("interaction from a guild");
+    // SAFETY: interaction is not of type `Ping`, so author exists
+    let user_id = unsafe { inter.author_id_unchecked() };
 
     let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
-        unreachable!()
+        // SAFETY: interaction is of type `MessageComponent`,
+        //         so interaction data must also be of type `MessageComponent`
+        unsafe { std::hint::unreachable_unchecked() }
     };
 
-    let voter_permissions = inter
-        .member
-        .as_ref()
-        .expect("interaction from a guild")
-        .permissions
-        .expect("member from an interaction");
+    // SAFETY: interaction invoked in a guild, so author permissions exists
+    let voter_permissions = unsafe { inter.author_permissions_unchecked() };
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),
@@ -223,7 +223,10 @@ fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAct
     }
 }
 
-fn get_author_info(guild_id: Id<GuildMarker>, ctx: &Ctx<impl RespondViaMessage>) -> (&str, String) {
+fn get_author_info(
+    guild_id: Id<GuildMarker>,
+    ctx: &GuildCtx<impl RespondViaMessage>,
+) -> (&str, String) {
     let author_name = ctx
         .member()
         .nick
@@ -314,13 +317,13 @@ fn generate_latent_embed_colours() -> LatentEmbedColours {
 }
 
 fn get_users_in_voice(
-    ctx: &Ctx<impl RespondViaMessage>,
-    guild_id: Id<GuildMarker>,
+    ctx: &GuildCtx<impl RespondViaMessage>,
+    in_voice: &CachelessInVoice,
 ) -> Result<HashSet<Id<UserMarker>>, CacheError> {
     let users_in_voice = ctx
         .cache()
-        .voice_channel_states(ctx.lavalink().connection(guild_id).channel_id)
-        .expect("bot is in voice")
+        .voice_channel_states(ctx.lavalink().connection_from(in_voice).channel_id)
+        .ok_or(CacheError)?
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
         .collect::<Result<HashSet<_>, _>>()?;
@@ -435,7 +438,8 @@ async fn update_embed(
 
 pub async fn start(
     topic: &Topic,
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    in_voice: &CachelessInVoice,
 ) -> Result<Resolution, StartPollError> {
     let guild_id = ctx.guild_id();
 
@@ -443,7 +447,7 @@ pub async fn start(
     let embed_latent = generate_latent_embed_colours();
     let (upvote_button_id, row) = generate_upvote_button_id_and_row();
 
-    let users_in_voice = get_users_in_voice(ctx, guild_id)?;
+    let users_in_voice = get_users_in_voice(ctx, in_voice)?;
     let votes = HashMap::from([(ctx.author_id(), Vote(true))]);
     let threshold = ((users_in_voice.len() + 1) as f64 / 2.).round() as usize;
 
@@ -465,7 +469,7 @@ pub async fn start(
     let message_id = message.id();
     {
         ctx.lavalink()
-            .connection_mut(guild_id)
+            .connection_mut_from(in_voice)
             .set_poll(Poll::new(topic, message.clone()));
     }
     let components = &mut ctx
@@ -492,7 +496,7 @@ pub async fn start(
         votes,
         threshold,
         embed_ctx,
-        guild_id,
+        in_voice,
     ))
     .await?)
 }
@@ -531,14 +535,14 @@ fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: u
 
 async fn wait_for_votes(
     mut poll_ctx: WaitForPollActionsContext<'_>,
-    ctx: &Ctx<impl RespondViaMessage>,
+    ctx: &GuildCtx<impl RespondViaMessage>,
     users_in_voice: HashSet<Id<UserMarker>>,
     mut votes: HashMap<Id<UserMarker>, Vote>,
     threshold: usize,
     embed_ctx: UpdatePollEmbedContext,
-    guild_id: Id<GuildMarker>,
+    in_voice: &CachelessInVoice,
 ) -> Result<Resolution, WaitForVotesError> {
-    let mut rx = ctx.lavalink().connection(guild_id).subscribe();
+    let mut rx = ctx.lavalink().connection_from(in_voice).subscribe();
     loop {
         let poll_stream = wait_for_poll_actions(&mut rx, &mut poll_ctx);
         match tokio::time::timeout(Duration::from_secs(30), poll_stream).await {
@@ -582,7 +586,8 @@ async fn wait_for_votes(
                 PollAction::AlternateCast(user_id) => {
                     if !users_in_voice.contains(&user_id) {
                         ctx.lavalink()
-                            .dispatch(guild_id, Event::AlternateVoteCastDenied);
+                            .connection_from(in_voice)
+                            .dispatch(Event::AlternateVoteCastDenied);
                         continue;
                     }
                     match votes.entry(user_id) {
@@ -591,7 +596,8 @@ async fn wait_for_votes(
                         }
                         Entry::Occupied(e) => {
                             ctx.lavalink()
-                                .dispatch(guild_id, Event::AlternateVoteCastedAlready(*e.get()));
+                                .connection_from(in_voice)
+                                .dispatch(Event::AlternateVoteCastedAlready(*e.get()));
                             continue;
                         }
                     }

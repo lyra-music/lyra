@@ -12,15 +12,15 @@ use crate::bot::{
     command::{
         check,
         macros::{caut, out},
-        model::{BotSlashCommand, Ctx, CtxKind},
-        SlashCtx,
+        model::{BotSlashCommand, CtxKind, GuildCtx},
+        require, SlashCtx,
     },
     error::{
         component::connection::leave::{self, PreDisconnectCleanupError},
         CommandResult,
     },
-    gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::{self, LavalinkAware},
+    gateway::{GuildIdAware, SenderAware},
+    lavalink::{self, Event, LavalinkAware},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -31,9 +31,7 @@ impl Display for LeaveResponse {
     }
 }
 
-pub(super) fn disconnect(
-    ctx: &(impl SenderAware + ExpectedGuildIdAware),
-) -> Result<(), ChannelError> {
+pub(super) fn disconnect(ctx: &(impl SenderAware + GuildIdAware)) -> Result<(), ChannelError> {
     ctx.sender()
         .command(&UpdateVoiceState::new(ctx.guild_id(), None, false, false))?;
 
@@ -41,26 +39,29 @@ pub(super) fn disconnect(
 }
 
 pub(super) async fn pre_disconnect_cleanup(
-    ctx: &(impl ExpectedGuildIdAware + lavalink::LavalinkAware + Sync),
+    ctx: &(impl GuildIdAware + lavalink::LavalinkAware + Sync),
 ) -> Result<(), PreDisconnectCleanupError> {
     let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
-    lavalink.dispatch_queue_clear(guild_id);
+    if let Some(connection) = lavalink.get_connection(guild_id) {
+        connection.dispatch(Event::QueueClear);
+    };
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;
 
     Ok(())
 }
 
-async fn leave(ctx: &Ctx<impl CtxKind>) -> Result<LeaveResponse, leave::Error> {
+async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Error> {
     let guild_id = ctx.guild_id();
 
-    let in_voice = check::in_voice(ctx)?;
+    let in_voice = require::in_voice(ctx)?;
+    let connection = ctx.lavalink().connection_from(&in_voice);
     let channel_id = in_voice.channel_id();
-    in_voice.with_user()?.only()?;
+    check::in_voice_with_user(in_voice)?.only()?;
 
-    ctx.lavalink().notify_connection_change(guild_id);
+    connection.notify_change();
     pre_disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 
@@ -75,7 +76,8 @@ async fn leave(ctx: &Ctx<impl CtxKind>) -> Result<LeaveResponse, leave::Error> {
 pub struct Leave;
 
 impl BotSlashCommand for Leave {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
                 out!(format!("📎 ~~{}~~", voice.mention()), ctx);

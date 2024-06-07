@@ -41,18 +41,17 @@ impl Process for ReadyContext<'_> {
 
         self.inner.guilds.iter().for_each(|g| {
             let db = self.bot.db().clone();
-            let g = g.id.get() as i64;
+            let guild_id = g.id.get() as i64;
             set.spawn(async move {
                 sqlx::query!(
-                    r"--sql
-                    INSERT INTO guild_configs
+                    "INSERT INTO guild_configs
                         (id)
                     SELECT $1
                     WHERE
                         NOT EXISTS (
                             SELECT 1 FROM guild_configs WHERE id = $1
                         );",
-                    g
+                    guild_id
                 )
                 .execute(&db)
                 .await?;

@@ -47,6 +47,10 @@ pub enum Error {
     TwilightHttp(#[from] twilight_http::Error),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
     NoPlayer(#[from] super::lavalink::NoPlayerError),
+    NotInGuild(#[from] super::NotInGuild),
+    CheckUserOnlyIn(#[from] check::UserOnlyInError),
+    Cache(#[from] super::Cache),
+    HandlePoll(#[from] check::HandlePollError),
 }
 
 pub enum FlattenedError<'a> {
@@ -84,6 +88,7 @@ pub enum FlattenedError<'a> {
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
     Lavalink(&'a lavalink_rs::error::LavalinkError),
     NoPlayer(&'a super::lavalink::NoPlayerError),
+    NotInGuild(&'a super::NotInGuild),
 }
 
 pub use FlattenedError as Fe;
@@ -216,9 +221,7 @@ impl<'a> Fe<'a> {
             check::HandleInVoiceWithSomeoneElseError::PollResolvable(e) => {
                 Self::from_vote_resolvable(e)
             }
-            check::HandleInVoiceWithSomeoneElseError::HandlePollError(e) => {
-                Self::from_handle_poll(e)
-            }
+            check::HandleInVoiceWithSomeoneElseError::HandlePoll(e) => Self::from_handle_poll(e),
         }
     }
 
@@ -531,6 +534,8 @@ impl Error {
             Self::TwilightHttp(e) => Fe::TwilightHttp(e),
             Self::Lavalink(e) => Fe::Lavalink(e),
             Self::NoPlayer(e) => Fe::NoPlayer(e),
+            Self::NotInGuild(e) => Fe::NotInGuild(e),
+            Self::Cache(e) => Fe::Cache(e),
             Self::CheckNotSuppressed(e) => Fe::from_check_not_suppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
             Self::InVoiceWithSomeoneElse(e) => Fe::from_in_voice_with_someone_else_error(e),
@@ -544,6 +549,8 @@ impl Error {
             Self::Play(e) => Fe::from_play(e),
             Self::DeserializeBodyFromHttp(e) => Fe::from_deserialize_body_from_http_error(e),
             Self::RemoveTracks(e) => Fe::from_remove_tracks(e),
+            Self::CheckUserOnlyIn(e) => Fe::from_check_user_only_in(e),
+            Self::HandlePoll(e) => Fe::from_handle_poll(e),
         }
     }
 }
@@ -556,6 +563,7 @@ pub enum AutocompleteError {
     LoadFailed(#[from] super::LoadFailed),
     Respond(#[from] RespondError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    NotInGuild(#[from] super::NotInGuild),
 }
 
 pub type AutocompleteResult = core::result::Result<(), AutocompleteError>;

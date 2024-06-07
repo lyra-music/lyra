@@ -11,20 +11,22 @@ use crate::bot::{
     command::{
         check,
         model::{BotAutocomplete, BotSlashCommand},
-        AutocompleteCtx, SlashCtx,
+        require, AutocompleteCtx, SlashCtx,
     },
+    core::model::CacheAware,
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::{ExpectedPlayerDataAware, PlayerDataAware},
+    lavalink::PlayerAware,
 };
 
 async fn generate_remove_choices(
     focused: &str,
     finished: Vec<i64>,
-    ctx: &AutocompleteCtx,
+    ctx: &(impl CacheAware + PlayerAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.get_player_data() else {
+    let Ok(player) = require::player(ctx) else {
         return Vec::new();
     };
+    let data = player.data();
     let data_r = data.read().await;
     let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
@@ -68,7 +70,8 @@ pub struct Autocomplete {
 }
 
 impl BotAutocomplete for Autocomplete {
-    async fn execute(self, mut ctx: AutocompleteCtx) -> AutocompleteResult {
+    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
+        let mut ctx = require::guild(ctx)?;
         let tracks = [
             self.track,
             self.track_2,
@@ -85,13 +88,16 @@ impl BotAutocomplete for Autocomplete {
             })
             .copied()
             .collect::<Vec<_>>();
-        let focused = tracks
-            .into_iter()
-            .find_map(|a| match a {
-                AutocompleteValue::Focused(i) => Some(i),
-                _ => None,
-            })
-            .expect("exactly one option is focused");
+        // SAFETY: exactly one autocomplete option is focused, so finding will always be successful
+        let focused = unsafe {
+            tracks
+                .into_iter()
+                .find_map(|a| match a {
+                    AutocompleteValue::Focused(i) => Some(i),
+                    _ => None,
+                })
+                .unwrap_unchecked()
+        };
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)
@@ -120,12 +126,13 @@ pub struct Remove {
 }
 
 impl BotSlashCommand for Remove {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx).await?;
-        check::not_suppressed(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let in_voice_with_user =
+            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let data = ctx.player_data();
+        let data = player.data();
         let data_r = data.read().await;
         let queue = data_r.queue();
         let queue_len = queue.len();
@@ -154,6 +161,6 @@ impl BotSlashCommand for Remove {
         positions.sort_unstable();
 
         drop(data_r);
-        Ok(super::remove(positions.into(), &mut ctx).await?)
+        Ok(super::remove(positions.into(), &mut ctx, &player).await?)
     }
 }

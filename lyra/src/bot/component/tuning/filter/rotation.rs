@@ -6,9 +6,9 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, set_filter},
+    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
 };
 
@@ -26,8 +26,8 @@ impl SetRotation {
     }
 }
 
-impl super::UpdateFilter for Option<SetRotation> {
-    fn apply(self, filter: Filters) -> Filters {
+impl super::ApplyFilter for Option<SetRotation> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             rotation: self.map(|r| r.0),
             ..filter
@@ -53,15 +53,16 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetRotation::new(self.frequency) else {
             bad!("Frequency must not be zero.", ctx);
         };
         let frequency = update.frequency();
 
-        set_filter(&ctx, Some(update)).await?;
+        player.update_filter(Some(update)).await?;
         out!(
             format!("🍳🟢 Enabled rotation (Frequency: `{frequency} Hz.`)"),
             ctx
@@ -75,10 +76,11 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        set_filter(&ctx, None::<SetRotation>).await?;
+        player.update_filter(None::<SetRotation>).await?;
         out!("🍳🔴 Disabled rotation", ctx);
     }
 }

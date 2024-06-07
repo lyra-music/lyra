@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{hint::unreachable_unchecked, sync::Arc};
 
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
@@ -14,6 +14,7 @@ use super::model::Process;
 use crate::bot::{
     command::{
         macros::{bad, cant, caut, crit, err, hid, nope, note, out_upd, sus, sus_fol},
+        model::NonPingInteraction,
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },
@@ -67,32 +68,35 @@ impl BotState {
 impl Process for Context {
     async fn process(self) -> ProcessResult {
         match self.inner.kind {
-            InteractionType::ApplicationCommand => self.process_as_app_command().await,
-            InteractionType::ApplicationCommandAutocomplete => self.process_as_autocomplete().await,
-            InteractionType::MessageComponent => self.process_as_component().await,
-            InteractionType::ModalSubmit | InteractionType::Ping => Ok(()),
+            // SAFETY: `self.inner.kind` is `ApplicationCommand`, so this is safe
+            InteractionType::ApplicationCommand => unsafe { self.process_as_app_command() }.await,
+            InteractionType::ApplicationCommandAutocomplete => {
+                // SAFETY: `self.inner.kind` is `ApplicationCommandAutocomplete`, so this is safe
+                unsafe { self.process_as_autocomplete() }.await
+            }
+            // SAFETY: `self.inner.kind` is `MessageComponent`, so this is safe
+            InteractionType::MessageComponent => unsafe { self.process_as_component() }.await,
+            InteractionType::ModalSubmit | InteractionType::Ping => Ok(()), // ignored
             _ => unimplemented!(),
         }
     }
 }
 
 impl Context {
-    async fn process_as_app_command(mut self) -> ProcessResult {
+    async unsafe fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
         let i = bot.interaction().await?.interfaces(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            unreachable!()
+            // SAFETY: interaction is of type `ApplicationCommand`,
+            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
+            unsafe { std::hint::unreachable_unchecked() }
         };
 
         let name = data.name.clone().into();
         let inner_guild_id = self.inner.guild_id;
-        let channel_id = self
-            .inner
-            .channel
-            .as_ref()
-            .map(|c| c.id)
-            .expect("interaction type is not ping");
+        // SAFETY: interaction type is not `Ping`, so `channel` is present
+        let channel_id = unsafe { self.inner.channel_id_unchecked() };
 
         let result = match data.kind {
             CommandType::ChatInput => {
@@ -122,13 +126,10 @@ impl Context {
         };
 
         if let Some(guild_id) = inner_guild_id {
-            let lavalink = bot.lavalink();
-
-            if lavalink
-                .get_connection(guild_id)
-                .is_some_and(|c| c.text_channel_id != channel_id)
-            {
-                lavalink.connection_mut(guild_id).text_channel_id = channel_id;
+            if let Some(mut connection) = bot.lavalink().get_connection_mut(guild_id) {
+                if connection.text_channel_id != channel_id {
+                    connection.text_channel_id = channel_id;
+                }
             }
         }
 
@@ -142,7 +143,9 @@ impl Context {
             }
             Fuunacee::Command(_) => {
                 let CommandExecuteError::Command(error) = source else {
-                    unreachable!()
+                    // SAFETY: `source.flatten_until_user_not_allowed_as()` is `Fuunacee::Command(_)`,
+                    //         so the unflattened source error must be `CommandExecuteError::Command(_)`
+                    unsafe { unreachable_unchecked() }
                 };
                 match_error(error, name, i).await
             }
@@ -155,9 +158,10 @@ impl Context {
         }
     }
 
-    async fn process_as_autocomplete(mut self) -> ProcessResult {
+    async unsafe fn process_as_autocomplete(mut self) -> ProcessResult {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            unreachable!()
+            // SAFETY:
+            unsafe { unreachable_unchecked() }
         };
 
         let name = data.name.clone().into();
@@ -178,7 +182,7 @@ impl Context {
     }
 
     #[allow(clippy::unused_async)]
-    async fn process_as_component(self) -> ProcessResult {
+    async unsafe fn process_as_component(self) -> ProcessResult {
         // TODO: implement controller
         Ok(())
     }

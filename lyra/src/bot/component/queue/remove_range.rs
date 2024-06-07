@@ -11,12 +11,12 @@ use crate::bot::{
         check,
         macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        AutocompleteCtx, SlashCtx,
+        require, AutocompleteCtx, SlashCtx,
     },
     component::queue::Remove,
-    core::model::InteractionClient,
+    core::model::{CacheAware, InteractionClient},
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::{ExpectedPlayerDataAware, PlayerDataAware},
+    lavalink::PlayerAware,
 };
 
 enum RemoveRangeAutocompleteOptionsType {
@@ -33,11 +33,12 @@ struct RemoveRangeAutocompleteOptions {
 
 async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
-    ctx: &AutocompleteCtx,
+    ctx: &(impl CacheAware + PlayerAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.get_player_data() else {
+    let Ok(player) = require::player(ctx) else {
         return Vec::new();
     };
+    let data = player.data();
     let data_r = data.read().await;
     let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
@@ -108,7 +109,8 @@ pub struct Autocomplete {
 }
 
 impl BotAutocomplete for Autocomplete {
-    async fn execute(self, mut ctx: AutocompleteCtx) -> AutocompleteResult {
+    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
+        let mut ctx = require::guild(ctx)?;
         let (focused, kind) = match (self.start, self.end) {
             (AutocompleteValue::Focused(focused), AutocompleteValue::None) => {
                 (focused, RemoveRangeAutocompleteOptionsType::StartFocused)
@@ -124,7 +126,9 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 RemoveRangeAutocompleteOptionsType::EndFocusedStartCompleted(i),
             ),
-            _ => unreachable!(),
+            // SAFETY: only one autocomplete options can be focused at a time,
+            //         so this branch is unreachable
+            _ => unsafe { std::hint::unreachable_unchecked() },
         };
 
         let options = RemoveRangeAutocompleteOptions {
@@ -149,12 +153,13 @@ pub struct RemoveRange {
 }
 
 impl BotSlashCommand for RemoveRange {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx).await?;
-        check::not_suppressed(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let in_voice_with_user =
+            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let data = ctx.player_data();
+        let data = player.data();
         let data_r = data.read().await;
         let queue = data_r.queue();
         let queue_len = queue.len();
@@ -162,7 +167,6 @@ impl BotSlashCommand for RemoveRange {
         if queue_len == 1 {
             let remove = InteractionClient::mention_command::<Remove>();
 
-            drop(in_voice_with_user);
             sus!(
                 format!("The queue only has one track; Use {remove} instead."),
                 ctx
@@ -187,7 +191,6 @@ impl BotSlashCommand for RemoveRange {
                 )
             };
 
-            drop(in_voice_with_user);
             bad!(message, ctx);
         }
 
@@ -195,6 +198,6 @@ impl BotSlashCommand for RemoveRange {
         check::all_users_track(positions, in_voice_with_user, queue, &ctx)?;
 
         drop(data_r);
-        Ok(super::remove_range(self.start, self.end, &mut ctx).await?)
+        Ok(super::remove_range(self.start, self.end, &mut ctx, &player).await?)
     }
 }

@@ -2,10 +2,15 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 
 use crate::bot::{
     command::{
-        check::CheckerBuilder, macros::out_or_upd, model::BotSlashCommand, poll::Topic, SlashCtx,
+        check,
+        macros::out_or_upd,
+        model::BotSlashCommand,
+        poll::Topic,
+        require::{self, CachelessInVoice},
+        SlashCtx,
     },
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
     lavalink::{self, DelegateMethods, LavalinkAware},
 };
 
@@ -38,7 +43,8 @@ pub struct Repeat {
 }
 
 impl BotSlashCommand for Repeat {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let guild_id = ctx.guild_id();
         let mode = {
             if let Some(mode) = self.mode {
@@ -52,17 +58,19 @@ impl BotSlashCommand for Repeat {
             }
         };
 
-        CheckerBuilder::new()
-            .in_voice_with_user_only_with_poll(Topic::Repeat(mode))
-            .queue_not_empty()
-            .build()
-            .run(&mut ctx)
+        let in_voice = require::in_voice(&ctx)?;
+        let in_voice_cacheless = CachelessInVoice::from(&in_voice);
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
+        check::in_voice_with_user(in_voice)?
+            .only_else_poll(Topic::Repeat(mode))?
+            .start(&mut ctx)
             .await?;
 
-        let lavalink = ctx.lavalink();
-        lavalink.dispatch(guild_id, lavalink::Event::QueueRepeat);
-        lavalink
-            .player_data(guild_id)
+        ctx.lavalink()
+            .connection_from(&in_voice_cacheless)
+            .dispatch(lavalink::Event::QueueRepeat);
+        player
+            .data()
             .write()
             .await
             .queue_mut()

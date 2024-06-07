@@ -11,10 +11,7 @@ use lavalink_rs::{
 use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::bot::{
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware, Pitch as PitchModel},
-};
+use crate::bot::{command::require::Player, lavalink::Pitch as PitchModel};
 
 enum Tier {
     Default,
@@ -43,16 +40,13 @@ impl PitchModel {
 }
 
 async fn shift_pitch(
-    ctx: &(impl LavalinkAware + ExpectedGuildIdAware + Sync),
+    player: &Player,
     half_tones: NonZeroI64,
 ) -> LavalinkResult<(PitchModel, PitchModel)> {
-    let guild_id = ctx.guild_id();
-    let lavalink = ctx.lavalink();
-    let player = lavalink.player(guild_id);
-    let old_filter = player.get_player().await?.filters.unwrap_or_default();
+    let old_filter = player.info().await?.filters.unwrap_or_default();
 
-    let (old_pitch, new_pitch) = lavalink
-        .player_data(guild_id)
+    let (old_pitch, new_pitch) = player
+        .data()
         .write()
         .await
         .pitch_mut()
@@ -65,6 +59,7 @@ async fn shift_pitch(
     });
 
     player
+        .context
         .set_filters(Filters {
             timescale,
             ..old_filter

@@ -21,7 +21,7 @@ pub(super) type ConnectionRefMut<'a> =
     dashmap::mapref::one::RefMut<'a, Id<GuildMarker>, Connection>;
 
 impl Connection {
-    pub(super) fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+    pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
         Self {
             channel_id,
             text_channel_id,
@@ -34,7 +34,7 @@ impl Connection {
 
     pub async fn changed(&self) -> bool {
         tokio::time::timeout(
-            *r#const::connection::CONNECTION_CHANGED_TIMEOUT,
+            *r#const::connection::connection_changed_timeout(),
             self.change.notified(),
         )
         .await
@@ -57,7 +57,7 @@ impl Connection {
         let _ = self.event_sender.send(event);
     }
 
-    pub(super) fn notify_change(&self) {
+    pub fn notify_change(&self) {
         tracing::trace!("notified connection change");
         self.change.notify_one();
     }
@@ -99,7 +99,7 @@ pub async fn wait_for_with(
     rx: &mut broadcast::Receiver<Event>,
     predicate: impl Fn(&Event) -> bool + Send + Sync,
 ) -> EventRecvResult<Option<Event>> {
-    let event = tokio::time::timeout(*r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, async {
+    let event = tokio::time::timeout(*r#const::misc::wait_for_bot_events_timeout(), async {
         loop {
             let event = rx.recv().await?;
             if predicate(&event) {
@@ -107,5 +107,6 @@ pub async fn wait_for_with(
             }
         }
     });
+
     Ok(event.await.transpose()?.ok())
 }

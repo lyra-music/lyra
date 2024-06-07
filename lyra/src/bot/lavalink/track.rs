@@ -6,7 +6,7 @@ use lavalink_rs::{
 
 use crate::bot::{
     error::lavalink::ProcessResult,
-    lavalink::{model::CorrectTrackInfo, DelegateMethods},
+    lavalink::{model::CorrectTrackInfo, UnwrappedPlayerData},
 };
 
 // FIXME: don't debug `LavalinkClient` until `lavalink_rs` stops stack overflowing
@@ -31,11 +31,12 @@ async fn impl_end(lavalink: LavalinkClient, event: &TrackEnd) -> ProcessResult {
         event.track.info.checked_title()
     );
 
-    let Some(data) = lavalink.get_player_data(guild_id) else {
+    let Some(player) = lavalink.get_player_context(guild_id) else {
         tracing::trace!(?guild_id, "track ended via forced disconnection");
 
         return Ok(());
     };
+    let data = player.data_unwrapped();
     let data_r = data.read().await;
     let queue = data_r.queue();
 
@@ -44,13 +45,12 @@ async fn impl_end(lavalink: LavalinkClient, event: &TrackEnd) -> ProcessResult {
         queue.advance_unlock();
     } else {
         drop(data_r);
-        let data = lavalink.player_data(guild_id);
         let mut data_w = data.write().await;
         let queue = data_w.queue_mut();
 
         queue.advance();
         if let Some(item) = queue.current() {
-            lavalink.player(guild_id).play_now(item.track()).await?;
+            player.play_now(item.track()).await?;
         }
     }
 

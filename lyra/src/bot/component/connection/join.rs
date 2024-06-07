@@ -19,12 +19,15 @@ use crate::bot::{
     command::{
         check,
         macros::{bad, cant, nope, note, note_fol, out, sus_fol},
-        model::{BotSlashCommand, Ctx, CtxKind, RespondViaMessage},
+        model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
+        require::{self, InVoiceCachedVoiceState},
         SlashCtx,
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
+        model::{
+            AuthorIdAware, BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware,
+        },
         r#const::connection::INACTIVITY_TIMEOUT_SECS,
         traced,
     },
@@ -37,8 +40,8 @@ use crate::bot::{
         },
         Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
     },
-    gateway::{ExpectedGuildIdAware, SenderAware},
-    lavalink::LavalinkAware,
+    gateway::{GuildIdAware, SenderAware},
+    lavalink::{Connection, LavalinkAware},
 };
 
 pub(super) enum Response {
@@ -79,7 +82,7 @@ impl JoinedChannel {
         let kind = match kind {
             ChannelType::GuildVoice => JoinedChannelType::Voice,
             ChannelType::GuildStageVoice => JoinedChannelType::Stage,
-            _ => unreachable!(),
+            _ => panic!("unknown channel type: {kind:?}"),
         };
         Self { id, kind }
     }
@@ -97,7 +100,7 @@ impl Display for JoinedChannel {
 type GetUsersVoiceChannelResult =
     Result<(Id<ChannelMarker>, ChannelType, Option<Id<ChannelMarker>>), GetUsersVoiceChannelError>;
 
-fn get_users_voice_channel(ctx: &Ctx<impl CtxKind>) -> GetUsersVoiceChannelResult {
+fn get_users_voice_channel(ctx: &GuildCtx<impl CtxKind>) -> GetUsersVoiceChannelResult {
     let voice_state = ctx
         .cache()
         .voice_state(ctx.author_id(), ctx.guild_id())
@@ -112,7 +115,7 @@ fn get_users_voice_channel(ctx: &Ctx<impl CtxKind>) -> GetUsersVoiceChannelResul
 }
 
 async fn impl_join(
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &GuildCtx<impl CtxKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<Response, ImplJoinError> {
     let (channel_id, channel_type, channel_parent_id) = match channel {
@@ -123,7 +126,7 @@ async fn impl_join(
     Ok(connect_to(channel_id, channel_type, channel_parent_id, ctx).await?)
 }
 
-async fn impl_auto_join(ctx: &Ctx<impl CtxKind>) -> Result<Response, ImplAutoJoinError> {
+async fn impl_auto_join(ctx: &GuildCtx<impl CtxKind>) -> Result<Response, ImplAutoJoinError> {
     let (channel_id, channel_type, channel_parent_id) = get_users_voice_channel(ctx)?;
 
     Ok(connect_to_new(channel_id, channel_type, channel_parent_id, ctx).await?)
@@ -131,7 +134,7 @@ async fn impl_auto_join(ctx: &Ctx<impl CtxKind>) -> Result<Response, ImplAutoJoi
 
 fn check_user_is_stage_manager(
     channel_type: ChannelType,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<(), error::UserNotStageManager> {
     if channel_type == ChannelType::GuildStageVoice {
         check::user_is_stage_manager(ctx)?;
@@ -143,7 +146,7 @@ async fn connect_to_new(
     channel_id: Id<ChannelMarker>,
     channel_type: ChannelType,
     channel_parent_id: Option<Id<ChannelMarker>>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToNewError> {
     check_user_is_stage_manager(channel_type, ctx)?;
 
@@ -162,7 +165,7 @@ async fn connect_to(
     channel_id: Id<ChannelMarker>,
     channel_type: ChannelType,
     channel_parent_id: Option<Id<ChannelMarker>>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToError> {
     check_user_is_stage_manager(channel_type, ctx)?;
 
@@ -197,10 +200,10 @@ async fn impl_connect_to(
     channel_type: ChannelType,
     old_channel_id: Option<Id<ChannelMarker>>,
     guild_id: Id<GuildMarker>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ImplConnectToError> {
     if !ctx
-        .bot_permissions_for(channel_id)
+        .bot_permissions_for(channel_id)?
         .contains(Permissions::CONNECT)
     {
         Err(error::ConnectionForbidden(channel_id))?;
@@ -214,15 +217,25 @@ async fn impl_connect_to(
 
     let response = old_channel_id.map_or_else(
         || {
-            ctx.lavalink()
-                .new_connection(guild_id, channel_id, ctx.channel_id());
+            let connection = Connection::new(channel_id, ctx.channel_id());
+            connection.notify_change();
+            ctx.lavalink().new_connection_with(guild_id, connection);
             Response::Joined {
                 voice: joined,
                 empty: voice_is_empty,
             }
         },
         |from| {
-            ctx.lavalink().connection_mut(guild_id).channel_id = channel_id;
+            let mut connection =
+            // SAFETY: `old_channel_id` is of variant `Some`, meaning another connection exists,
+            //         so `ctx.lavalink().get_connection_mut(guild_id).unwrap_unchecked()` is safe
+            unsafe {
+                ctx.lavalink()
+                    .get_connection_mut(guild_id)
+                    .unwrap_unchecked()
+            };
+            connection.channel_id = channel_id;
+            connection.notify_change();
             Response::Moved {
                 from,
                 to: joined,
@@ -231,7 +244,6 @@ async fn impl_connect_to(
         },
     );
 
-    ctx.lavalink().notify_connection_change(guild_id);
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;
 
@@ -258,7 +270,7 @@ struct DeleteEmptyVoiceNotice {
 
 impl DeleteEmptyVoiceNotice {
     fn new(
-        ctx: &Ctx<impl CtxKind>,
+        ctx: &GuildCtx<impl CtxKind>,
         message_id: Id<MessageMarker>,
         channel_id: Id<ChannelMarker>,
     ) -> Self {
@@ -306,8 +318,8 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 
 async fn handle_response(
     response: Response,
-    ctx: &mut Ctx<impl RespondViaMessage>,
-) -> Result<(), HandleResponseError> {
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
@@ -349,24 +361,27 @@ async fn handle_response(
         )));
     }
 
-    let muted = ctx.current_voice_state().ok_or(CacheError)?.mute();
+    let state = ctx.current_voice_state().ok_or(CacheError)?;
+    let muted = state.mute();
     if muted {
         sus_fol!(
             "Currently server muted; Some features will be limited.",
             ?ctx
         );
     }
-    Ok(())
+    Ok(state.into())
 }
 
-pub async fn auto(ctx: &mut Ctx<impl RespondViaMessage>) -> Result<(), AutoJoinError> {
+pub async fn auto(
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
     Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
 }
 
 pub async fn join(
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
     channel: Option<InteractionChannel>,
-) -> Result<(), JoinError> {
+) -> Result<InVoiceCachedVoiceState, JoinError> {
     Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
 }
 
@@ -380,7 +395,8 @@ pub struct Join {
 }
 
 impl BotSlashCommand for Join {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let Err(e) = join(&mut ctx, self.channel).await else {
             return Ok(());
         };

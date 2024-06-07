@@ -1,6 +1,7 @@
 use std::{
     borrow::{Borrow, Cow},
     fmt::{Debug, Display},
+    ops::Add,
     str::FromStr,
 };
 
@@ -134,27 +135,26 @@ pub trait ViaGrapheme: UnicodeSegmentation {
 
 impl ViaGrapheme for str {}
 
-pub trait PrettyTruncator: ViaGrapheme {
+pub trait PrettyTruncator: ViaGrapheme + ToOwned + 'static
+where
+    for<'a> Cow<'a, Self>: Add<&'a Self, Output = Cow<'a, Self>>,
+{
     fn trail() -> &'static Self;
     fn pretty_truncate(&self, new_len: usize) -> Cow<Self>
     where
-        Self: ToOwned;
-}
-
-impl PrettyTruncator for str {
-    fn trail() -> &'static Self {
-        "…"
-    }
-
-    fn pretty_truncate(&self, new_len: usize) -> Cow<Self>
-    where
-        Self: ToOwned,
+        for<'a> <Self as ToOwned>::Owned: FromIterator<&'a str>,
     {
         let trail = Self::trail();
 
         (self.grapheme_len() <= new_len)
             .then_some(Cow::Borrowed(self))
             .unwrap_or_else(|| self.grapheme_truncate(new_len - trail.grapheme_len()) + trail)
+    }
+}
+
+impl PrettyTruncator for str {
+    fn trail() -> &'static Self {
+        "…"
     }
 }
 
@@ -177,21 +177,13 @@ pub trait FlagsPrettify: Flags {
 #[derive(PartialEq, Eq, Debug)]
 pub struct PrettifiedTimestamp(Duration);
 
-impl std::ops::Deref for PrettifiedTimestamp {
-    type Target = Duration;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl FromStr for PrettifiedTimestamp {
     type Err = PrettifiedTimestampParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let captures = if let Some(captures) = const_regex::TIMESTAMP.captures(value) {
+        let captures = if let Some(captures) = const_regex::timestamp().captures(value) {
             captures
-        } else if let Some(captures) = const_regex::TIMESTAMP_2.captures(value) {
+        } else if let Some(captures) = const_regex::timestamp_2().captures(value) {
             captures
         } else {
             return Err(PrettifiedTimestampParseError);

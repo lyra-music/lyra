@@ -6,9 +6,9 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, set_filter},
+    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
 };
 
@@ -43,8 +43,8 @@ impl SetDistortion {
     }
 }
 
-impl crate::bot::component::tuning::UpdateFilter for Option<SetDistortion> {
-    fn apply(self, filter: Filters) -> Filters {
+impl crate::bot::component::tuning::ApplyFilter for Option<SetDistortion> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             distortion: self.map(|d| d.0),
             ..filter
@@ -84,8 +84,9 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let distortion = LavalinkDistortion {
             sin_offset: self.sin_offset,
@@ -108,7 +109,7 @@ impl BotSlashCommand for On {
             );
         };
 
-        set_filter(&ctx, Some(update)).await?;
+        player.update_filter(Some(update)).await?;
         out!(format!("🍭🟢 Enabled distortion"), ctx);
     }
 }
@@ -119,10 +120,11 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        set_filter(&ctx, None::<SetDistortion>).await?;
+        player.update_filter(None::<SetDistortion>).await?;
         out!("🍭🔴 Disabled distortion", ctx);
     }
 }

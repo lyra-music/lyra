@@ -15,7 +15,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::{
     command::{
-        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
+        declare::{message_commands, slash_commands, POPULATED_COMMANDS_MAP},
         model::CommandInfoAware,
     },
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
@@ -44,6 +44,7 @@ impl Interface<'_> {
     ) -> MessageRespondResult {
         let interaction_token = self.interaction_token();
         self.inner
+            .0
             .create_response(
                 self.interaction_id,
                 interaction_token,
@@ -54,7 +55,7 @@ impl Interface<'_> {
             )
             .await?;
 
-        self.inner.response(interaction_token).await
+        self.inner.0.response(interaction_token).await
     }
 
     pub async fn update_message_with(
@@ -63,6 +64,7 @@ impl Interface<'_> {
     ) -> MessageRespondResult {
         let interaction_token = self.interaction_token();
         self.inner
+            .0
             .create_response(
                 self.interaction_id,
                 interaction_token,
@@ -73,11 +75,11 @@ impl Interface<'_> {
             )
             .await?;
 
-        self.inner.response(interaction_token).await
+        self.inner.0.response(interaction_token).await
     }
 
     fn update(&self) -> UpdateResponse<'_> {
-        self.inner.update_response(self.interaction_token())
+        self.inner.0.update_response(self.interaction_token())
     }
 
     pub async fn update_no_components_embeds(&self, content: &str) -> MessageFollowupResult {
@@ -108,6 +110,7 @@ impl Interface<'_> {
     pub async fn followup(&self, content: &str) -> MessageFollowupResult {
         Ok(self
             .inner
+            .0
             .create_followup(self.interaction_token())
             .content(content)
             .await?)
@@ -116,6 +119,7 @@ impl Interface<'_> {
     pub async fn followup_ephem(&self, content: &str) -> MessageFollowupResult {
         Ok(self
             .inner
+            .0
             .create_followup(self.interaction_token())
             .flags(MessageFlags::EPHEMERAL)
             .content(content)
@@ -142,6 +146,7 @@ impl Interface<'_> {
             .into();
 
         self.inner
+            .0
             .create_response(
                 self.interaction_id,
                 self.interaction_token(),
@@ -164,6 +169,7 @@ impl Interface<'_> {
             .into();
 
         self.inner
+            .0
             .create_response(
                 self.interaction_id,
                 self.interaction_token(),
@@ -182,6 +188,7 @@ impl Interface<'_> {
         content: &str,
     ) -> UnitFollowupResult {
         self.inner
+            .0
             .update_followup(self.interaction_token(), message_id)
             .content(Some(content))
             .await?;
@@ -190,6 +197,7 @@ impl Interface<'_> {
 
     pub async fn delete_followup(&self, message_id: Id<MessageMarker>) -> UnitRespondResult {
         self.inner
+            .0
             .delete_followup(self.interaction_token(), message_id)
             .await?;
         Ok(())
@@ -211,7 +219,10 @@ impl<'a> Client<'a> {
 
     pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
         let commands = self
-            .set_global_commands(&[SLASH_COMMANDS.as_ref(), MESSAGE_COMMANDS.as_ref()].concat())
+            .0
+            .set_global_commands(
+                &[slash_commands().as_slice(), message_commands().as_slice()].concat(),
+            )
             .await?
             .models()
             .await?;
@@ -230,7 +241,7 @@ impl<'a> Client<'a> {
     ) -> &'static twilight_model::application::command::Command {
         POPULATED_COMMANDS_MAP
             .get()
-            .expect("POPULATED_COMMANDS_MAP is populated")
+            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
             .get(T::name())
             .unwrap_or_else(|| panic!("command not found: {}", T::name()))
     }
@@ -239,16 +250,27 @@ impl<'a> Client<'a> {
         let cmd = Self::populated_command::<T>();
 
         let name = &cmd.name;
-        let id = cmd.id.expect("id exists");
+        let id = cmd
+            .id
+            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"));
         format!("</{name}:{id}>").into_boxed_str()
     }
-}
 
-impl<'a> std::ops::Deref for Client<'a> {
-    type Target = twilight_http::client::InteractionClient<'a>;
+    #[inline]
+    pub const fn create_followup(
+        &'a self,
+        interaction_token: &'a str,
+    ) -> twilight_http::request::application::interaction::CreateFollowup<'a> {
+        self.0.create_followup(interaction_token)
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    #[inline]
+    pub const fn delete_followup(
+        &'a self,
+        interaction_token: &'a str,
+        message_id: Id<MessageMarker>,
+    ) -> twilight_http::request::application::interaction::DeleteFollowup<'a> {
+        self.0.delete_followup(interaction_token, message_id)
     }
 }
 

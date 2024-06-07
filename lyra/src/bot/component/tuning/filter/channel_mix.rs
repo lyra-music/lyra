@@ -6,9 +6,9 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, set_filter},
+    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
 };
 
@@ -46,8 +46,8 @@ impl SetChannelMix {
     }
 }
 
-impl crate::bot::component::tuning::UpdateFilter for Option<SetChannelMix> {
-    fn apply(self, filter: Filters) -> Filters {
+impl crate::bot::component::tuning::ApplyFilter for Option<SetChannelMix> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             channel_mix: self.map(|c| c.0),
             ..filter
@@ -83,8 +83,9 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetChannelMix::new(
             self.left_to_left,
@@ -102,7 +103,7 @@ impl BotSlashCommand for On {
             );
         };
 
-        set_filter(&ctx, Some(update)).await?;
+        player.update_filter(Some(update)).await?;
         out!("⚗️🟢 Enabled channel mix)", ctx);
     }
 }
@@ -113,10 +114,11 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        set_filter(&ctx, None::<SetChannelMix>).await?;
+        player.update_filter(None::<SetChannelMix>).await?;
         out!("⚗️🔴 Disabled channel mix", ctx);
     }
 }

@@ -5,13 +5,13 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::common_checks,
+    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
 };
 
-use super::UpdateFilter;
+use super::ApplyFilter;
 enum Tier {
     Default,
     Fast,
@@ -78,8 +78,8 @@ impl SpeedFilter {
     }
 }
 
-impl UpdateFilter for SpeedFilter {
-    fn apply(self, filter: Filters) -> Filters {
+impl ApplyFilter for SpeedFilter {
+    fn apply_to(self, filter: Filters) -> Filters {
         let timescale = Some(self.into_timescale_via(&filter.timescale.unwrap_or_default()));
 
         Filters {
@@ -101,17 +101,18 @@ pub struct Speed {
 }
 
 impl BotSlashCommand for Speed {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        let Some(filter) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
+        let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
         else {
             bad!("Multiplier must not be 0", ctx);
         };
 
-        let multiplier = filter.multiplier();
-        let emoji = filter.tier().emoji();
-        super::set_filter(&ctx, filter).await?;
+        let multiplier = update.multiplier();
+        let emoji = update.tier().emoji();
+        player.update_filter(update).await?;
 
         out!(
             format!("{emoji} Set the playback speed to `{multiplier}`×."),

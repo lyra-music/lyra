@@ -13,11 +13,11 @@ pub trait SenderAware {
     fn sender(&self) -> &MessageSender;
 }
 
-pub trait GuildIdAware {
+pub trait OptionallyGuildIdAware {
     fn get_guild_id(&self) -> Option<Id<GuildMarker>>;
 }
 
-pub trait ExpectedGuildIdAware {
+pub trait GuildIdAware {
     fn guild_id(&self) -> Id<GuildMarker>;
 }
 
@@ -32,7 +32,10 @@ impl LastCachedStates {
             Event::VoiceStateUpdate(event) => cache
                 .voice_state(
                     event.user_id,
-                    event.guild_id.expect("event received in a guild"),
+                    // SAFETY: this bot cannot join DM voice calls,
+                    //         meaning all voice states will be from a guild voice channel,
+                    //         so `e.guild_id` is present
+                    unsafe { event.guild_id.unwrap_unchecked() },
                 )
                 .as_deref()
                 .cloned(),

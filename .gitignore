@@ -6,8 +6,7 @@ lavalink/plugins
 lavalink/Lavalink.jar
 
 # Devenv
-.devenv*
-devenv.local.nix
+.devenv
 
 # direnv
 .direnv

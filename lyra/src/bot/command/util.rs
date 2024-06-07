@@ -1,5 +1,5 @@
 use chrono::Utc;
-use lavalink_rs::error::LavalinkResult;
+use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_gateway::Event;
 use twilight_model::{
@@ -20,13 +20,15 @@ use twilight_model::{
 use super::{
     check,
     macros::note_fol,
-    model::{CommandDataAware, Ctx, CtxKind, RespondViaMessage, RespondViaModal},
-    ModalCtx,
+    model::{
+        CommandDataAware, CtxKind, GuildCtx, GuildModalCtx, RespondViaMessage, RespondViaModal,
+    },
+    require::{self, InVoice},
 };
 use crate::bot::{
     component::connection::auto_join,
     core::{
-        model::{BotStateAware, CacheAware, OwnedBotStateAware},
+        model::{AuthorIdAware, BotStateAware, CacheAware, OwnedBotStateAware},
         r#const::{
             self,
             discord::{BASE_URL, CDN_URL},
@@ -42,7 +44,7 @@ use crate::bot::{
         },
         Suppressed as SuppressedError,
     },
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
     lavalink::{DelegateMethods, LavalinkAware},
 };
 
@@ -53,7 +55,7 @@ pub trait MessageLinkAware {
     fn link(&self) -> String {
         let guild_id_str = self
             .guild_id()
-            .map_or_else(|| String::from("@me"), |g| g.to_string());
+            .map_or_else(|| String::from("@me"), |i| i.to_string());
         format!(
             "{}/channels/{}/{}/{}",
             BASE_URL,
@@ -164,7 +166,10 @@ pub trait GuildAvatarUrlAware {
 
 impl GuildAvatarUrlAware for PartialMember {
     fn id(&self) -> Id<UserMarker> {
-        self.user.as_ref().expect("member is not partial").id
+        self.user
+            .as_ref()
+            .unwrap_or_else(|| panic!("user field is missing"))
+            .id
     }
     fn avatar(&self) -> Option<ImageHash> {
         self.avatar
@@ -198,28 +203,34 @@ impl DefaultAvatarUrlAware for User {
 }
 
 pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
 ) -> Result<(), AutoJoinOrCheckInVoiceWithUserError> {
-    if let Some(voice_state) = ctx.current_voice_state() {
-        check::user_in(voice_state.channel_id(), ctx)?;
-        check::not_suppressed(ctx)?;
+    if let Ok(in_voice) = require::in_voice(ctx) {
+        let in_voice = in_voice.and_unsuppressed()?;
+        check::in_voice_with_user(in_voice)?;
         return Ok(());
     }
 
-    let Err(e) = auto_join(ctx).await else {
-        let Err(NotSuppressedError::Suppressed(suppressed)) = check::not_suppressed(ctx) else {
-            return Ok(());
-        };
-        handle_suppressed_auto_join(suppressed, ctx).await?;
-        return Ok(());
-    };
-
-    Err(e.unflatten_into_auto_join_attempt())?
+    match auto_join(ctx).await {
+        Err(e) => Err(e.unflatten_into_auto_join_attempt())?,
+        Ok(state) => {
+            let Err(NotSuppressedError::Suppressed(suppressed)) = {
+                // SAFETY: as `auto_join` was called and ran successfully,
+                //         there must now be an active voice connection.
+                unsafe { InVoice::new(state, ctx) }
+            }
+            .and_unsuppressed() else {
+                return Ok(());
+            };
+            handle_suppressed_auto_join(suppressed, ctx).await?;
+            Ok(())
+        }
+    }
 }
 
 async fn handle_suppressed_auto_join(
     error: SuppressedError,
-    ctx: &Ctx<impl RespondViaMessage>,
+    ctx: &GuildCtx<impl RespondViaMessage>,
 ) -> Result<(), HandleSuppressedAutoJoinError> {
     let bot_user_id = ctx.bot().user_id();
     match error {
@@ -252,7 +263,7 @@ async fn handle_suppressed_auto_join(
             );
             let requested_to_speak_message = requested_to_speak.model().await?;
             let wait_for_speaker = tokio::time::timeout(
-                *r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT,
+                *r#const::misc::wait_for_bot_events_timeout(),
                 wait_for_speaker,
             );
 
@@ -267,15 +278,15 @@ async fn handle_suppressed_auto_join(
 }
 
 pub async fn prompt_for_confirmation(
-    mut ctx: Ctx<impl CommandDataAware + RespondViaModal>,
-) -> Result<ModalCtx, PromptForConfirmationError> {
+    mut ctx: GuildCtx<impl CommandDataAware + RespondViaModal>,
+) -> Result<GuildModalCtx, PromptForConfirmationError> {
     let text_input = TextInput {
         custom_id: String::new(),
-        label: "This is a destructive command. Are you sure?".into(),
+        label: String::from("This is a destructive command. Are you sure?"),
         max_length: None,
         min_length: None,
-        required: true.into(),
-        placeholder: Some(r#"Type "YES" (All Caps) to confirm..."#.into()),
+        required: Some(true),
+        placeholder: Some(String::from(r#"Type "YES" (All Caps) to confirm..."#)),
         style: TextInputStyle::Short,
         value: None,
     };
@@ -309,7 +320,7 @@ pub async fn prompt_for_confirmation(
         });
 
     let wait_for_modal_submit = tokio::time::timeout(
-        *r#const::misc::DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT,
+        *r#const::misc::destructive_command_confirmation_timeout(),
         wait_for_modal_submit,
     )
     .await;
@@ -326,7 +337,9 @@ pub async fn prompt_for_confirmation(
             }
             ctx
         }
-        Ok(Ok(_)) => unreachable!(),
+        // SAFETY: the future has been filtered to only match modal submit interaction
+        //         so this branch is unreachable
+        Ok(Ok(_)) => unsafe { std::hint::unreachable_unchecked() },
         Ok(Err(e)) => Err(e)?,
         Err(_) => Err(ConfirmationError::TimedOut)?,
     };
@@ -334,12 +347,14 @@ pub async fn prompt_for_confirmation(
     Ok(modal_ctx)
 }
 
-pub async fn auto_new_player_data(ctx: &Ctx<impl CtxKind>) -> LavalinkResult<()> {
+pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<PlayerContext> {
     let guild_id = ctx.guild_id();
     let lavalink = ctx.lavalink();
 
-    if lavalink.get_player_data(guild_id).is_none() {
-        lavalink.new_player_data(guild_id).await?;
-    }
-    Ok(())
+    let player = match lavalink.get_player_context(guild_id) {
+        Some(player) => player,
+        None => lavalink.new_player(guild_id).await?,
+    };
+
+    Ok(player)
 }

@@ -7,13 +7,13 @@ use crate::bot::{
         check,
         macros::{out, sus},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
     component::config::access::AccessCategoryFlags,
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
     error::CommandResult,
     ext::util::FlagsPrettify,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
 };
 
 pub(super) trait AccessModePrettify {
@@ -71,7 +71,8 @@ pub struct Mode {
 }
 
 impl BotSlashCommand for Mode {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 
         let access_mode = <Option<bool>>::from(self.mode);
@@ -79,11 +80,11 @@ impl BotSlashCommand for Mode {
 
         let category_flags = AccessCategoryFlags::from(self.category);
         let set_statements = category_flags
-            .iter_names_as_column()
+            .iter_as_columns()
             .map(|c| format!("{c} = $2"))
             .join(",");
         let where_clause = category_flags
-            .iter_names_as_column()
+            .iter_as_columns()
             .map(|c| format!("{c} IS NOT {sql_access_mode}"))
             .join(" OR ");
 

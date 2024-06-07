@@ -13,7 +13,7 @@ use lavalink_rs::model::player::{Filters, TremoloVibrato};
 use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use super::UpdateFilter;
+use super::ApplyFilter;
 
 trait TremoloVibratoMarker {}
 struct TremoloMarker;
@@ -75,25 +75,22 @@ enum TremoloVibratoSettings {
 
 impl std::fmt::Display for TremoloVibratoSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let settings = match self {
-            Self::Default => String::from("**`Default Settings`**"),
-            Self::Depth(d) => format!("Depth: `{d}`"),
-            Self::Frequency(f) => format!("Frequency: `{f} Hz.`"),
-            Self::Custom {
-                frequency: f,
-                depth: d,
-            } => format!("Frequency: `{f} Hz.`, Depth: `{d}`"),
-        };
-
-        write!(f, "{settings}")
+        match self {
+            Self::Default => f.write_str("**`Default Settings`**"),
+            Self::Depth(d) => write!(f, "Depth: `{d}`"),
+            Self::Frequency(frequency) => write!(f, "Frequency: `{frequency} Hz.`"),
+            Self::Custom { frequency, depth } => {
+                write!(f, "Frequency: `{frequency} Hz.`, Depth: `{depth}`")
+            }
+        }
     }
 }
 
 type SetTremolo = SetTremoloVibrato<TremoloMarker>;
 type SetVibrato = SetTremoloVibrato<VibratoMarker>;
 
-impl UpdateFilter for Option<SetTremoloVibrato<TremoloMarker>> {
-    fn apply(self, filter: Filters) -> Filters {
+impl ApplyFilter for Option<SetTremoloVibrato<TremoloMarker>> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             tremolo: self.map(|f| f.inner),
             ..filter
@@ -101,8 +98,8 @@ impl UpdateFilter for Option<SetTremoloVibrato<TremoloMarker>> {
     }
 }
 
-impl UpdateFilter for Option<SetTremoloVibrato<VibratoMarker>> {
-    fn apply(self, filter: Filters) -> Filters {
+impl ApplyFilter for Option<SetTremoloVibrato<VibratoMarker>> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             vibrato: self.map(|f| f.inner),
             ..filter

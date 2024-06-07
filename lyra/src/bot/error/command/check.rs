@@ -173,7 +173,7 @@ pub enum PollLossErrorKind {
 #[error(transparent)]
 pub enum HandleInVoiceWithSomeoneElseError {
     PollResolvable(#[from] PollResolvableError),
-    HandlePollError(#[from] HandlePollError),
+    HandlePoll(#[from] HandlePollError),
 }
 
 #[derive(Error, Debug)]
@@ -188,4 +188,11 @@ pub enum RunError {
     Cache(#[from] CacheError),
     Paused(#[from] error::Paused),
     Stopped(#[from] error::Stopped),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum OnlyElsePoll {
+    Cache(#[from] CacheError),
+    HandlePoll(#[from] HandlePollError),
 }

@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
@@ -10,23 +10,26 @@ authors = ["fdnt7"]
 build = "build.rs"
 
 [build-dependencies]
-vergen = { version = "8.3.1", features = [
+anyhow = "*"
+vergen-git2 = { version = "1.0.0-beta.2", features = [
     "build",
     "cargo",
-    "git",
-    "gitoxide",
     "rustc",
     "si",
 ] }
 
 [lints.rust]
-unsafe_code = "forbid"
+# dead_code = "allow"
+unsafe_op_in_unsafe_fn = "forbid"
+# unsafe_code = "forbid"
 
 [lints.clippy]
-enum_glob_use = "deny"
+multiple_unsafe_ops_per_block = "forbid"
+undocumented_unsafe_blocks = "forbid"
+enum_glob_use = "forbid"
+unwrap_used = "forbid"
 pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
-unwrap_used = "deny"
 
 cast_possible_truncation = "allow"
 cast_possible_wrap = "allow"
@@ -38,6 +41,7 @@ module_name_repetitions = "allow"
 [dependencies]
 lyra_proc = { path = "../lyra_proc" }
 
+paste = "1.0.15"
 const-str = "0.5.7"
 const_panic = { version = "0.2.8", features = ["derive"] }
 heck = "0.5.0"
@@ -46,17 +50,17 @@ unicode-segmentation = "1.11.0"
 dashmap = "5.5.3"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
-thiserror = "1.0.60"
+thiserror = "1.0.61"
 color-eyre = "0.6.3"
-rstest = "0.19.0"
+rstest = "0.21.0"
 futures = "0.3.30"
-tokio = { version = "1.37.0", features = [
+tokio = { version = "1.38.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
     "macros",
 ] }
-serde = "1.0.202"
+serde = "1.0.203"
 serde_json = "1.0.117"
 regex = "1.10.4"
 linkify = "0.10.0"
@@ -67,7 +71,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 rayon = "1.10.0"
-lazy_static = "1.4.0"
 chrono = "0.4.38"
 sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"

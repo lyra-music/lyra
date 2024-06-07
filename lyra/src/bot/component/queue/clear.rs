@@ -7,10 +7,10 @@ use crate::bot::{
         check,
         macros::out,
         model::{BotSlashCommand, SlashCtx},
+        require,
     },
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, Event, LavalinkAware},
+    lavalink::{Event, LavalinkAware},
 };
 
 /// Clears the queue
@@ -19,15 +19,14 @@ use crate::bot::{
 pub struct Clear;
 
 impl BotSlashCommand for Clear {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx).await?;
-        check::not_suppressed(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let in_voice = require::in_voice(&ctx)?.and_unsuppressed()?;
+        let connection = ctx.lavalink().connection_from(&in_voice);
+        let in_voice_with_user = check::in_voice_with_user(in_voice)?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let guild_id = ctx.guild_id();
-        let lavalink = ctx.lavalink();
-
-        let data = lavalink.player_data(guild_id);
+        let data = player.data();
         {
             let data_r = data.read().await;
             let queue = data_r.queue();
@@ -35,8 +34,9 @@ impl BotSlashCommand for Clear {
             let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
             check::all_users_track(positions, in_voice_with_user, queue, &ctx)?;
 
-            queue.stop_with_advance_lock(guild_id, lavalink).await?;
-            lavalink.dispatch(guild_id, Event::QueueClear);
+            queue.stop_with_advance_lock(&player.context).await?;
+            connection.dispatch(Event::QueueClear);
+            drop(connection);
         }
 
         {

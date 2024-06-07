@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use itertools::Itertools;
 use sqlx::{postgres::PgQueryResult, Pool, Postgres};
 use tokio::task::JoinSet;
@@ -13,17 +15,17 @@ use twilight_model::{
     },
 };
 
-use super::AccessCategoryFlags;
+use super::AccessCategoryFlag;
 use crate::bot::{
     command::{
         check,
         macros::{out, sus},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
 };
 
 type SqlxResultJoinSet = JoinSet<Result<PgQueryResult, sqlx::Error>>;
@@ -34,16 +36,16 @@ impl AccessCategoryMarker for GenericMarker {}
 impl AccessCategoryMarker for ChannelMarker {}
 
 fn add_access<T: AccessCategoryMarker>(
-    set: &mut SqlxResultJoinSet,
-    db: Pool<Postgres>,
-    cat: &AccessCategoryFlags,
-    g: i64,
+    join_set: &mut SqlxResultJoinSet,
+    database: Pool<Postgres>,
+    category: &AccessCategoryFlag,
+    guild_id: i64,
     ids: impl IntoIterator<Item = Id<T>>,
 ) {
-    let column = cat.iter_names_as_column().next().expect("cat is non-empty");
+    let column = category.ident();
     let values_clause = ids.into_iter().map(|id| format!("($1,{id})")).join(",");
 
-    set.spawn(async move {
+    join_set.spawn(async move {
         sqlx::query(&format!(
             "--sql
             INSERT INTO {column}
@@ -56,31 +58,31 @@ fn add_access<T: AccessCategoryMarker>(
                 );
             "
         ))
-        .bind(g)
-        .execute(&db)
+        .bind(guild_id)
+        .execute(&database)
         .await
     });
 }
 
 fn remove_access<T: AccessCategoryMarker>(
-    set: &mut SqlxResultJoinSet,
-    db: Pool<Postgres>,
-    cat: &AccessCategoryFlags,
-    g: i64,
+    join_set: &mut SqlxResultJoinSet,
+    database: Pool<Postgres>,
+    category: &AccessCategoryFlag,
+    guild_id: i64,
     ids: impl IntoIterator<Item = Id<T>>,
 ) {
-    let column = cat.iter_names_as_column().next().expect("cat is non-empty");
+    let column = category.ident();
     let where_clause = ids.into_iter().map(|c| format!("id = {c}")).join(" OR ");
 
-    set.spawn(async move {
+    join_set.spawn(async move {
         sqlx::query(&format!(
             "--sql
             DELETE FROM {column}
             WHERE guild = $1 AND ({where_clause});
             ",
         ))
-        .bind(g)
-        .execute(&db)
+        .bind(guild_id)
+        .execute(&database)
         .await
     });
 }
@@ -152,10 +154,11 @@ pub struct MemberRole {
 }
 
 impl BotSlashCommand for MemberRole {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 
-        let inputted_mentionables = [
+        let input_mentionables: HashMap<_, HashSet<_>> = [
             Some(self.member_or_role),
             self.member_or_role_2,
             self.member_or_role_3,
@@ -164,41 +167,46 @@ impl BotSlashCommand for MemberRole {
         ]
         .into_iter()
         .flatten()
-        .unique_by(twilight_interactions::command::ResolvedMentionable::id)
-        .collect::<Vec<_>>();
+        .map(|v| {
+            let flag = match v {
+                ResolvedMentionable::User(_) => AccessCategoryFlag::Users,
+                ResolvedMentionable::Role(_) => AccessCategoryFlag::Roles,
+            };
+            (flag, v.id())
+        })
+        .fold(HashMap::new(), |mut acc, (k, v)| {
+            acc.entry(k).or_default().insert(v);
+            acc
+        });
 
-        let members = (
-            AccessCategoryFlags::USERS,
-            inputted_mentionables
-                .iter()
-                .filter(|m| matches!(m, ResolvedMentionable::User(_)))
-                .map(ResolvedMentionable::id)
-                .collect::<Vec<_>>(),
-        );
-        let roles = (
-            AccessCategoryFlags::ROLES,
-            inputted_mentionables
-                .iter()
-                .filter(|m| matches!(m, ResolvedMentionable::Role(_)))
-                .map(ResolvedMentionable::id)
-                .collect::<Vec<_>>(),
-        );
+        let input_mentionables_len = input_mentionables.values().fold(0, |acc, v| acc + v.len());
 
+        let database = ctx.db();
+        let guild_id = ctx.guild_id().get() as i64;
         let mut set = JoinSet::new();
-
-        let categorized_mentionables = [members, roles]
-            .into_iter()
-            .filter(|(_, mentionables)| !mentionables.is_empty());
-
-        let db = ctx.db();
-        let g = ctx.guild_id().get() as i64;
         match self.action {
-            EditAction::Add => categorized_mentionables.for_each(|(cat, mentionables)| {
-                add_access(&mut set, db.clone(), &cat, g, mentionables);
-            }),
-            EditAction::Remove => categorized_mentionables.for_each(|(cat, mentionables)| {
-                remove_access(&mut set, db.clone(), &cat, g, mentionables);
-            }),
+            EditAction::Add => {
+                for (category, mentionables) in input_mentionables {
+                    add_access(
+                        &mut set,
+                        database.clone(),
+                        &category,
+                        guild_id,
+                        mentionables,
+                    );
+                }
+            }
+            EditAction::Remove => {
+                for (category, mentionables) in input_mentionables {
+                    remove_access(
+                        &mut set,
+                        database.clone(),
+                        &category,
+                        guild_id,
+                        mentionables,
+                    );
+                }
+            }
         }
 
         let mut rows_affected = 0;
@@ -211,7 +219,7 @@ impl BotSlashCommand for MemberRole {
             sus!(NO_ROWS_AFFECTED_MESSAGE, ctx);
         }
 
-        let ignored_changes = inputted_mentionables.len() as u64 - rows_affected;
+        let ignored_changes = input_mentionables_len as u64 - rows_affected;
         let ignored_changes_notice = match ignored_changes {
             1.. => {
                 format!(
@@ -255,11 +263,13 @@ pub struct Channel {
     target_5: Option<InteractionChannel>,
 }
 
+#[allow(clippy::too_many_lines)]
 impl BotSlashCommand for Channel {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 
-        let inputted_channels = [
+        let input_channels: HashMap<_, HashSet<_>> = [
             Some(self.target),
             self.target_2,
             self.target_3,
@@ -268,67 +278,40 @@ impl BotSlashCommand for Channel {
         ]
         .into_iter()
         .flatten()
-        .unique_by(|c| c.id)
-        .collect::<Vec<_>>();
+        .map(|v| {
+            let flag = match v.kind {
+                ChannelType::PublicThread
+                | ChannelType::PrivateThread
+                | ChannelType::AnnouncementThread => AccessCategoryFlag::Threads,
+                ChannelType::GuildVoice | ChannelType::GuildStageVoice => {
+                    AccessCategoryFlag::VoiceChannels
+                }
+                ChannelType::GuildCategory => AccessCategoryFlag::CategoryChannels,
+                _ => AccessCategoryFlag::TextChannels,
+            };
+            (flag, v.id)
+        })
+        .fold(HashMap::new(), |mut acc, (k, v)| {
+            acc.entry(k).or_default().insert(v);
+            acc
+        });
 
-        let threads = (
-            AccessCategoryFlags::THREADS,
-            inputted_channels
-                .iter()
-                .filter(|&c| {
-                    matches!(
-                        c.kind,
-                        ChannelType::PublicThread
-                            | ChannelType::PrivateThread
-                            | ChannelType::AnnouncementThread
-                    )
-                })
-                .map(|c| c.id)
-                .collect::<Vec<_>>(),
-        );
-        let text_channels = (
-            AccessCategoryFlags::TEXT_CHANNELS,
-            inputted_channels
-                .iter()
-                .filter(|c| matches!(c.kind, ChannelType::GuildText))
-                .map(|c| c.id)
-                .collect::<Vec<_>>(),
-        );
-        let voice_channels = (
-            AccessCategoryFlags::VOICE_CHANNELS,
-            inputted_channels
-                .iter()
-                .filter(|c| {
-                    matches!(
-                        c.kind,
-                        ChannelType::GuildVoice | ChannelType::GuildStageVoice
-                    )
-                })
-                .map(|c| c.id)
-                .collect::<Vec<_>>(),
-        );
-        let category_channels = (
-            AccessCategoryFlags::CATEGORY_CHANNELS,
-            inputted_channels
-                .iter()
-                .filter(|c| matches!(c.kind, ChannelType::GuildCategory))
-                .map(|c| c.id)
-                .collect::<Vec<_>>(),
-        );
+        let input_channels_len = input_channels.values().fold(0, |acc, v| acc + v.len());
 
+        let database = ctx.db();
+        let guild_id = ctx.guild_id().get() as i64;
         let mut set = JoinSet::new();
-
-        let categorized_channels = [threads, text_channels, voice_channels, category_channels]
-            .into_iter()
-            .filter(|(_, channels)| !channels.is_empty());
-
-        let db = ctx.db();
-        let g = ctx.guild_id().get() as i64;
         match self.action {
-            EditAction::Add => categorized_channels
-                .for_each(|(cat, channels)| add_access(&mut set, db.clone(), &cat, g, channels)),
-            EditAction::Remove => categorized_channels
-                .for_each(|(cat, channels)| remove_access(&mut set, db.clone(), &cat, g, channels)),
+            EditAction::Add => {
+                for (category, channels) in input_channels {
+                    add_access(&mut set, database.clone(), &category, guild_id, channels);
+                }
+            }
+            EditAction::Remove => {
+                for (category, channels) in input_channels {
+                    remove_access(&mut set, database.clone(), &category, guild_id, channels);
+                }
+            }
         }
 
         let mut rows_affected = 0;
@@ -341,7 +324,7 @@ impl BotSlashCommand for Channel {
             sus!(NO_ROWS_AFFECTED_MESSAGE, ctx);
         }
 
-        let ignored_changes = inputted_channels.len() as u64 - rows_affected;
+        let ignored_changes = input_channels_len as u64 - rows_affected;
         let ignored_changes_notice = match ignored_changes {
             1.. => {
                 format!(

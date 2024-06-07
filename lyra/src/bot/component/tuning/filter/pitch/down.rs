@@ -3,8 +3,10 @@ use std::num::NonZeroI64;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{macros::out, model::BotSlashCommand, SlashCtx},
-    component::tuning::{common_checks, filter::pitch::shift_pitch},
+    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    component::tuning::{
+        check_user_is_dj_and_require_unsuppressed_player, filter::pitch::shift_pitch,
+    },
     error::CommandResult,
 };
 
@@ -18,12 +20,13 @@ pub struct Down {
 }
 
 impl BotSlashCommand for Down {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        let half_tones =
-            NonZeroI64::new(self.half_tones.unwrap_or(2)).expect("self.half_tones is non-zero");
-        let (old, new) = shift_pitch(&ctx, -half_tones).await?;
+        // SAFETY: `self.half_tones.unwrap_or(2)` is non-empty
+        let half_tones = unsafe { NonZeroI64::new_unchecked(self.half_tones.unwrap_or(2)) };
+        let (old, new) = shift_pitch(&player, -half_tones).await?;
 
         let emoji = new.tier().emoji();
         out!(format!("{emoji}**`ー`** ~~`{old}`~~ ➜ **`{new}`**"), ctx);

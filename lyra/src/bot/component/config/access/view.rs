@@ -9,12 +9,12 @@ use twilight_model::id::{
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 
 use crate::bot::{
-    command::{model::BotSlashCommand, SlashCtx},
+    command::{model::BotSlashCommand, require, SlashCtx},
     component::config::access::mode::AccessModePrettify,
     core::r#const::{colours::EMBED_DEFAULT, text::EMPTY_EMBED_FIELD},
     error::CommandResult,
     ext::util::OptionMap,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
 };
 
 /// Views the currently configured access controls for channels, roles and members
@@ -23,7 +23,8 @@ use crate::bot::{
 pub struct View;
 
 impl BotSlashCommand for View {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         let guild_id = ctx.guild_id().get() as i64;
         let db = ctx.db();
 
