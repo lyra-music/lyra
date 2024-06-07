@@ -8,7 +8,7 @@
     };
     fenix = {
       url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs"; 
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -89,18 +89,22 @@
                 mold.enable = true;
               };
 
+              # Enable Codespaces Integration
+              # https://devenv.sh/integrations/codespaces-devcontainer/
+              devcontainer.enable = true;
+
               # https://devenv.sh/pre-commit-hooks/
               # pre-commit.hooks.shellcheck.enable = true;
 
               # https://devenv.sh/processes/
               processes.lavalink.exec = "scripts/lavalink";
 
-	      processes.database-setup.exec = ''
-		while ! "./scripts/database"
-		do
-		  :
-		done
-	      '';
+              processes.database-setup.exec = ''
+                while ! "./scripts/database"
+                do
+                  :
+                done
+              '';
 
               # See full reference at https://devenv.sh/reference/options/
               # dotenv.enable = true;
