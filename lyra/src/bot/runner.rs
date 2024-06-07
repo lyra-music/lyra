@@ -29,7 +29,7 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::bot::core::r#const::metadata::BANNER;
+use crate::bot::core::r#const::metadata::banner;
 
 use super::{
     core::{
@@ -62,17 +62,20 @@ fn build_http_client() -> Client {
 fn build_shard_config() -> ShardConfig {
     ConfigBuilder::new(CONFIG.token.to_owned(), INTENTS)
         .presence(
-            UpdatePresencePayload::new(
-                [Activity::from(MinimalActivity {
-                    kind: ActivityType::Listening,
-                    name: "/play".into(),
-                    url: None,
-                })],
-                false,
-                None,
-                Status::Online,
-            )
-            .expect("activities is non-empty"),
+            // SAFETY: provided non-empty set of activities
+            unsafe {
+                UpdatePresencePayload::new(
+                    [Activity::from(MinimalActivity {
+                        kind: ActivityType::Listening,
+                        name: "/play".into(),
+                        url: None,
+                    })],
+                    false,
+                    None,
+                    Status::Online,
+                )
+                .unwrap_unchecked()
+            },
         )
         .build()
 }
@@ -104,7 +107,7 @@ pub(super) async fn start() -> Result<(), StartError> {
         tasks.push(tokio::spawn(handle_gateway_events(shard, bot.clone())));
     }
 
-    println!("{}", *BANNER);
+    println!("{}", banner());
     Ok(wait_until_shutdown(senders, tasks).await?)
 }
 

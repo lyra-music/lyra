@@ -1,7 +1,10 @@
 use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::bot::{command::macros::out, lavalink::ExpectedPlayerDataAware};
+use crate::bot::{
+    command::{macros::out, require},
+    component::tuning::UpdateFilter,
+};
 
 struct ResetAllExceptSpeed;
 
@@ -14,8 +17,8 @@ impl ResetAllExceptSpeed {
     }
 }
 
-impl super::UpdateFilter for ResetAllExceptSpeed {
-    fn apply(self, filter: Filters) -> Filters {
+impl super::ApplyFilter for ResetAllExceptSpeed {
+    fn apply_to(self, filter: Filters) -> Filters {
         let timescale = Some(Self::into_timescale_via(
             &filter.timescale.unwrap_or_default(),
         ));
@@ -33,14 +36,12 @@ impl super::UpdateFilter for ResetAllExceptSpeed {
 pub struct AllOff;
 
 impl crate::bot::command::model::BotSlashCommand for AllOff {
-    async fn run(
-        self,
-        mut ctx: crate::bot::command::SlashCtx,
-    ) -> crate::bot::error::command::Result {
-        super::super::common_checks(&ctx)?;
+    async fn run(self, ctx: crate::bot::command::SlashCtx) -> crate::bot::error::command::Result {
+        let mut ctx = require::guild(ctx)?;
+        let player = require::player(&ctx)?;
 
-        super::super::set_filter(&ctx, ResetAllExceptSpeed).await?;
-        ctx.player_data().write().await.pitch_mut().reset();
+        player.update_filter(ResetAllExceptSpeed).await?;
+        player.data().write().await.pitch_mut().reset();
 
         out!("🪄🔴 Disabled all filters", ctx);
     }

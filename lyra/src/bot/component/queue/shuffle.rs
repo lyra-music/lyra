@@ -2,14 +2,13 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
     command::{
-        check::CheckerBuilder,
+        check,
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, IndexerType, LavalinkAware},
+    lavalink::IndexerType,
 };
 
 /// Toggles queue shuffling
@@ -18,16 +17,12 @@ use crate::bot::{
 pub struct Shuffle;
 
 impl BotSlashCommand for Shuffle {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        CheckerBuilder::new()
-            .in_voice_with_user_only()
-            .queue_not_empty()
-            .build()
-            .run(&mut ctx)
-            .await?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        check::in_voice_with_user(require::in_voice(&ctx)?)?.only()?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let guild_id = ctx.guild_id();
-        let data = ctx.lavalink().player_data(guild_id);
+        let data = player.data();
         let data_r = data.read().await;
         let indexer_type = data_r.queue().indexer_type();
 

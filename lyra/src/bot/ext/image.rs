@@ -26,19 +26,23 @@ impl DominantPalette for DynamicImage {
             .map(|x| x.into_format::<_, f32>().into_color())
             .collect::<Vec<Lab>>();
 
-        let result = (0..RUNS)
-            .map(|i| {
-                kmeans_colors::get_kmeans_hamerly(
-                    palette_size,
-                    MAX_ITERATIONS,
-                    COVERAGE,
-                    false,
-                    &lab,
-                    RANDOM_SEED + u64::from(i),
-                )
-            })
-            .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
-            .expect("RUNS is non-zero");
+        // SAFETY: `0..RUNS` is a non-empty iterator,
+        //         so unwrapping `.max_by(...)` is safe
+        let result = unsafe {
+            (0..RUNS)
+                .map(|i| {
+                    kmeans_colors::get_kmeans_hamerly(
+                        palette_size,
+                        MAX_ITERATIONS,
+                        COVERAGE,
+                        false,
+                        &lab,
+                        RANDOM_SEED + u64::from(i),
+                    )
+                })
+                .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
+                .unwrap_unchecked()
+        };
 
         let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
         res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));

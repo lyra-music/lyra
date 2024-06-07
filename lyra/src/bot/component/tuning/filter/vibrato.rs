@@ -5,9 +5,11 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, filter::SetVibrato, set_filter},
+    component::tuning::{
+        check_user_is_dj_and_require_unsuppressed_player, filter::SetVibrato, UpdateFilter,
+    },
     error::CommandResult,
 };
 
@@ -33,15 +35,16 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetVibrato::new(self.frequency, self.depth) else {
             bad!("Both frequency and depth must not be zero.", ctx);
         };
         let settings = update.settings();
 
-        set_filter(&ctx, Some(update)).await?;
+        player.update_filter(Some(update)).await?;
         out!(format!("🎻🟢 Enabled vibrato ({settings})"), ctx);
     }
 }
@@ -52,10 +55,11 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        set_filter(&ctx, None::<SetVibrato>).await?;
+        player.update_filter(None::<SetVibrato>).await?;
         out!("🎻🔴 Disabled vibrato", ctx);
     }
 }

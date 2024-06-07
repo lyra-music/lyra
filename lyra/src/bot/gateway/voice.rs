@@ -12,7 +12,7 @@ use crate::bot::component::{connection, tuning};
 use crate::bot::core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware};
 use crate::bot::error::gateway::ProcessResult;
 use crate::bot::{
-    gateway::{ExpectedGuildIdAware, SenderAware},
+    gateway::{GuildIdAware, SenderAware},
     lavalink::{Lavalink, LavalinkAware},
 };
 
@@ -83,9 +83,12 @@ impl SenderAware for Context {
     }
 }
 
-impl ExpectedGuildIdAware for Context {
+impl GuildIdAware for Context {
     fn guild_id(&self) -> Id<GuildMarker> {
-        self.inner.guild_id.expect("event received in a guild")
+        // SAFETY: this bot cannot join DM voice calls,
+        //         meaning all voice states will be from a guild voice channel,
+        //         so `e.guild_id` is present
+        unsafe { self.inner.guild_id.unwrap_unchecked() }
     }
 }
 

@@ -5,11 +5,12 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, set_filter},
+    component::tuning::{
+        check_user_is_dj_and_require_unsuppressed_player, ApplyFilter, UpdateFilter,
+    },
     error::CommandResult,
-    lavalink::ExpectedPlayerDataAware,
 };
 
 use super::Tier;
@@ -48,8 +49,8 @@ impl SetPitch {
     }
 }
 
-impl super::super::UpdateFilter for SetPitch {
-    fn apply(self, filter: Filters) -> Filters {
+impl ApplyFilter for SetPitch {
+    fn apply_to(self, filter: Filters) -> Filters {
         let timescale = Some(self.into_timescale_via(&filter.timescale.unwrap_or_default()));
 
         Filters {
@@ -69,8 +70,9 @@ pub struct Set {
 }
 
 impl BotSlashCommand for Set {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetPitch::new(self.multiplier) else {
             bad!("Multiplier must not be 0", ctx);
@@ -78,8 +80,8 @@ impl BotSlashCommand for Set {
 
         let multiplier = update.multiplier();
         let emoji = update.tier().emoji();
-        set_filter(&ctx, update).await?;
-        ctx.player_data().write().await.pitch_mut().set(multiplier);
+        player.update_filter(update).await?;
+        player.data().write().await.pitch_mut().set(multiplier);
 
         out!(
             format!("{emoji} Set the playback pitch to `{multiplier}`×."),

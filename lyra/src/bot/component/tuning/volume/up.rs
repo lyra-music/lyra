@@ -6,13 +6,13 @@ use crate::bot::{
     command::{
         macros::{note, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::unmuting_player_checks,
+    component::tuning::check_user_is_dj_and_require_player,
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    gateway::GuildIdAware,
+    lavalink::LavalinkAware,
 };
 
 /// Increase the playback volume
@@ -25,17 +25,19 @@ pub struct Up {
 }
 
 impl BotSlashCommand for Up {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        unmuting_player_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (in_voice, player) = check_user_is_dj_and_require_player(&ctx)?;
 
         let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
-        let data = &lavalink.player_data(guild_id);
+        let data = player.data();
         let percent_u16 = self.percent.unwrap_or(10) as u16;
 
-        let max_percent = NonZeroU16::new(1_000).expect("1_000 is non-zero");
-        let (old_percent_str, new_percent) = if lavalink.connection(guild_id).mute {
-            lavalink.connection_mut(guild_id).mute = false;
+        // SAFETY: `1_000` is non-zero
+        let max_percent = unsafe { NonZeroU16::new_unchecked(1_000) };
+        let (old_percent_str, new_percent) = if lavalink.connection_from(&in_voice).mute {
+            lavalink.connection_mut_from(&in_voice).mute = false;
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(false)
@@ -43,7 +45,8 @@ impl BotSlashCommand for Up {
 
             (
                 String::from("Muted"),
-                NonZeroU16::new(percent_u16).expect("self.percent is non-zero"),
+                // SAFETY: `percent_u16` is in range [1, 1_000], so it is non-zero
+                unsafe { NonZeroU16::new_unchecked(percent_u16) },
             )
         } else {
             let old_percent = data.read().await.volume();
@@ -65,10 +68,7 @@ impl BotSlashCommand for Up {
             .then_some(" (`Max`)")
             .unwrap_or_default();
 
-        lavalink
-            .player(guild_id)
-            .set_volume(new_percent.get())
-            .await?;
+        player.context.set_volume(new_percent.get()).await?;
         data.write().await.set_volume(new_percent);
 
         out!(

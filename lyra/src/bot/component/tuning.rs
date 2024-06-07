@@ -14,54 +14,62 @@ pub use volume::Volume;
 use crate::bot::{
     command::{
         check,
-        model::{Ctx, CtxKind},
+        model::{CtxKind, GuildCtx},
+        require::{self, InVoice, Player},
     },
     core::model::{BotStateAware, HttpAware},
-    error::CommandResult,
-    gateway::{voice, ExpectedGuildIdAware},
-    lavalink::{DelegateMethods, ExpectedPlayerAware, LavalinkAware},
+    error::CommandError,
+    gateway::{voice, GuildIdAware},
+    lavalink::{DelegateMethods, LavalinkAware},
 };
 
 #[inline]
-fn common_checks(ctx: &Ctx<impl CtxKind>) -> CommandResult {
+fn check_user_is_dj_and_require_unsuppressed_player(
+    ctx: &GuildCtx<impl CtxKind>,
+) -> Result<(InVoice, Player), CommandError> {
     check::user_is_dj(ctx)?;
-    check::in_voice(ctx)?;
-    check::not_suppressed(ctx)?;
-    check::player_exist(ctx)?;
+    let in_voice = require::in_voice(ctx)?.and_unsuppressed()?;
+    let player = require::player(ctx)?;
 
-    Ok(())
+    Ok((in_voice, player))
 }
 
 #[inline]
-fn unmuting_checks(ctx: &Ctx<impl CtxKind>) -> CommandResult {
+fn unmuting_checks(ctx: &GuildCtx<impl CtxKind>) -> Result<InVoice, CommandError> {
     check::user_is_dj(ctx)?;
-    check::in_voice(ctx)?;
+    let in_voice = require::in_voice(ctx)?;
 
-    Ok(())
+    Ok(in_voice)
 }
 
 #[inline]
-fn unmuting_player_checks(ctx: &Ctx<impl CtxKind>) -> CommandResult {
+fn check_user_is_dj_and_require_player(
+    ctx: &GuildCtx<impl CtxKind>,
+) -> Result<(InVoice, Player), CommandError> {
     check::user_is_dj(ctx)?;
-    check::in_voice(ctx)?;
-    check::player_exist(ctx)?;
+    let in_voice = require::in_voice(ctx)?;
+    let player = require::player(ctx)?;
 
-    Ok(())
+    Ok((in_voice, player))
+}
+
+trait ApplyFilter {
+    fn apply_to(self, filter: Filters) -> Filters;
 }
 
 trait UpdateFilter {
-    fn apply(self, filter: Filters) -> Filters;
+    async fn update_filter(&self, update: impl ApplyFilter + Send + Sync) -> LavalinkResult<()>;
 }
 
-async fn set_filter(
-    ctx: &(impl ExpectedPlayerAware + Sync),
-    update: impl UpdateFilter + Send + Sync,
-) -> LavalinkResult<()> {
-    let player = ctx.player();
-    let old_filter = player.get_player().await?.filters.unwrap_or_default();
+impl UpdateFilter for Player {
+    async fn update_filter(&self, update: impl ApplyFilter + Send + Sync) -> LavalinkResult<()> {
+        let old_filter = self.info().await?.filters.unwrap_or_default();
 
-    player.set_filters(update.apply(old_filter)).await?;
-    Ok(())
+        self.context
+            .set_filters(update.apply_to(old_filter))
+            .await?;
+        Ok(())
+    }
 }
 
 #[tracing::instrument(skip_all, name = "voice_state_update")]
@@ -82,7 +90,8 @@ pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twili
         } else if let Some(d) = lavalink.get_player_data(guild_id) {
             Some(d.read().await.volume())
         } else {
-            Some(NonZeroU16::new(100).expect("volume is non-zero"))
+            // SAFETY: `100` is non-zero
+            Some(unsafe { NonZeroU16::new_unchecked(100) })
         });
         let describe = if state_mute { "muted" } else { "unmuted" };
 

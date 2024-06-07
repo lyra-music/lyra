@@ -26,24 +26,24 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 use crate::bot::{
     command::{
         macros::{note_fol, out},
-        model::{Ctx, CtxKind, RespondViaMessage},
+        model::{GuildCtx, RespondViaMessage},
+        require::Player,
     },
     core::{
         model::{CacheAware, InteractionClient},
         r#const::{
-            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
+            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::fuzzy_matcher,
         },
     },
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
     ext::util::{PrettifiedTimestamp, PrettyJoiner, PrettyTruncator},
-    gateway::ExpectedGuildIdAware,
-    lavalink::{CorrectTrackInfo, ExpectedPlayerDataAware, LavalinkAware, QueueItem},
+    lavalink::{CorrectTrackInfo, QueueItem},
 };
 
 fn generate_position_choice(
     position: NonZeroUsize,
     track: &QueueItem,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> CommandOptionChoice {
     let track_info = &track.track().info;
     let track_length = PrettifiedTimestamp::from(Duration::milliseconds(track_info.length as i64));
@@ -76,7 +76,7 @@ fn generate_position_choices<'a>(
     queue_len: NonZeroUsize,
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     impl_generate_position_choices(
         queue_iter
@@ -93,7 +93,7 @@ fn generate_position_choices_reversed<'a>(
     queue_len: NonZeroUsize,
     queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     impl_generate_position_choices(
         queue_iter
@@ -109,7 +109,7 @@ fn generate_position_choices_reversed<'a>(
 fn impl_generate_position_choices<'a>(
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     queue_iter
         .filter(|(p, _)| !excluded.contains(p))
@@ -123,7 +123,7 @@ fn generate_position_choices_from_input<'a>(
     queue_len: NonZeroUsize,
     queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     normalize_queue_position(input, queue_len)
         .filter(|p| !excluded.contains(p))
@@ -139,7 +139,7 @@ fn generate_position_choices_from_fuzzy_match<'a>(
     focused: &str,
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &Ctx<impl CtxKind>,
+    ctx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     let queue_iter = queue_iter
         .filter_map(|(p, t)| {
@@ -150,7 +150,7 @@ fn generate_position_choices_from_fuzzy_match<'a>(
             Some((
                 p,
                 t,
-                FUZZY_MATCHER.fuzzy_match(&format!("{requester} {author} {title}",), focused)?,
+                fuzzy_matcher().fuzzy_match(&format!("{requester} {author} {title}",), focused)?,
             ))
         })
         .sorted_by_key(|(_, _, s)| -s)
@@ -192,9 +192,10 @@ fn validate_input_positions(
 async fn remove_range(
     start: i64,
     end: i64,
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    player: &Player,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.player_data();
+    let data = player.data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
@@ -213,14 +214,15 @@ async fn remove_range(
         .collect();
 
     drop(data_w);
-    impl_remove(positions, removed, queue_cleared, ctx).await
+    impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
 async fn remove(
     positions: Box<[NonZeroUsize]>,
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    player: &Player,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.player_data();
+    let data = player.data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
@@ -234,16 +236,17 @@ async fn remove(
     };
 
     drop(data_w);
-    impl_remove(positions, removed, queue_cleared, ctx).await
+    impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
 async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
     queue_cleared: bool,
-    ctx: &mut Ctx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    player: &Player,
 ) -> Result<(), RemoveTracksError> {
-    let data = ctx.player_data();
+    let data = player.data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
@@ -258,7 +261,9 @@ async fn impl_remove(
         _ => format!("`{removed_len} tracks`"),
     };
     let minus = match removed_len {
-        0 => unreachable!(),
+        // SAFETY: `/remove` always remove at least one track after input positions have been validated,
+        //         so this branch is unreachable
+        0 => unsafe { std::hint::unreachable_unchecked() },
         1 => "**`ー`**",
         _ => "**`≡-`**",
     };
@@ -270,12 +275,11 @@ async fn impl_remove(
     if positions.binary_search(&current).is_ok() {
         queue.adjust_repeat_mode();
         let next = queue.current().map(|t| t.track().clone());
-        let guild_id = ctx.guild_id();
 
         queue
-            .with_advance_lock_and_stopped(guild_id, ctx.lavalink(), |player| async move {
+            .with_advance_lock_and_stopped(&player.context, |p| async move {
                 if let Some(ref next) = next {
-                    player.play(next).await?;
+                    p.play(next).await?;
                 }
                 Ok(())
             })

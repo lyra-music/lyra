@@ -1,8 +1,13 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::macros::{bad, out},
-    component::tuning::{common_checks, equaliser::SetEqualiser, set_filter},
+    command::{
+        macros::{bad, out},
+        require,
+    },
+    component::tuning::{
+        check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser, UpdateFilter,
+    },
 };
 
 /// Enable the player equaliser with custom settings.
@@ -58,8 +63,9 @@ pub struct Custom {
 }
 
 impl crate::bot::command::model::BotSlashCommand for Custom {
-    async fn run(self, mut ctx: crate::bot::command::SlashCtx) -> crate::bot::error::CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: crate::bot::command::SlashCtx) -> crate::bot::error::CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let equaliser = [
             self.band_1,
@@ -89,7 +95,7 @@ impl crate::bot::command::model::BotSlashCommand for Custom {
             );
         };
 
-        set_filter(&ctx, Some(filter)).await?;
+        player.update_filter(Some(filter)).await?;
         out!("🎛️🟢 Enabled player equaliser (**`Custom Settings`**)", ctx);
     }
 }

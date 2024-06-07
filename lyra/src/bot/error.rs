@@ -5,6 +5,7 @@ pub mod gateway;
 pub mod lavalink;
 pub mod runner;
 
+pub use command::Error as CommandError;
 pub use command::Result as CommandResult;
 
 use thiserror::Error;
@@ -21,6 +22,8 @@ pub trait EPrint: std::error::Error + std::fmt::Debug {
 #[derive(Error, Debug)]
 #[error("missing from cache")]
 pub struct Cache;
+
+pub type CacheResult<T> = Result<T, Cache>;
 
 #[derive(Debug, Error)]
 #[error("user is not a DJ")]
@@ -166,3 +169,7 @@ pub enum RunError {
     Dotenvy(#[from] dotenvy::Error),
     StartError(#[from] runner::StartError),
 }
+
+#[derive(Error, Debug)]
+#[error("not in a guild")]
+pub struct NotInGuild;

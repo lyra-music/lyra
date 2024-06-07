@@ -3,12 +3,12 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{macros::out, model::BotSlashCommand, SlashCtx},
-    component::tuning::common_checks,
+    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    gateway::GuildIdAware,
+    lavalink::LavalinkAware,
 };
 
 /// Decrease the playback volume
@@ -21,12 +21,12 @@ pub struct Down {
 }
 
 impl BotSlashCommand for Down {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (in_voice, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
-        let data = lavalink.player_data(guild_id);
+        let data = player.data();
         let old_percent = data.read().await.volume();
 
         let maybe_new_percent = old_percent
@@ -36,10 +36,7 @@ impl BotSlashCommand for Down {
 
         let emoji = super::volume_emoji(maybe_new_percent);
         let (new_percent_str, warning) = if let Some(new_percent) = maybe_new_percent {
-            lavalink
-                .player(guild_id)
-                .set_volume(new_percent.get())
-                .await?;
+            player.context.set_volume(new_percent.get()).await?;
             data.write().await.set_volume(new_percent);
 
             (
@@ -47,7 +44,7 @@ impl BotSlashCommand for Down {
                 super::clipping_warning(new_percent),
             )
         } else {
-            lavalink.connection_mut(guild_id).mute = true;
+            ctx.lavalink().connection_mut_from(&in_voice).mute = true;
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(true)

@@ -3,11 +3,9 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::bot::{
-    command::{macros::out, model::BotSlashCommand, SlashCtx},
-    component::tuning::common_checks,
+    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
 };
 
 /// Set the playback volume
@@ -20,18 +18,14 @@ pub struct Set {
 }
 
 impl BotSlashCommand for Set {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        let percent = NonZeroU16::new(self.percent as u16).expect("self.percent is non-zero");
-        let lavalink = ctx.lavalink();
-        let guild_id = ctx.guild_id();
-        lavalink.player(guild_id).set_volume(percent.get()).await?;
-        lavalink
-            .player_data(guild_id)
-            .write()
-            .await
-            .set_volume(percent);
+        // SAFETY: `self.percent as u16` is in range [1, 1_000], so it is non-zero
+        let percent = unsafe { NonZeroU16::new_unchecked(self.percent as u16) };
+        player.context.set_volume(percent.get()).await?;
+        player.data().write().await.set_volume(percent);
 
         let emoji = super::volume_emoji(Some(percent));
         let warning = super::clipping_warning(percent);

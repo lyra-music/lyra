@@ -20,13 +20,17 @@ vergen = { version = "8.3.1", features = [
 ] }
 
 [lints.rust]
-unsafe_code = "forbid"
+# dead_code = "allow"
+unsafe_op_in_unsafe_fn = "forbid"
+# unsafe_code = "forbid"
 
 [lints.clippy]
-enum_glob_use = "deny"
+multiple_unsafe_ops_per_block = "forbid"
+undocumented_unsafe_blocks = "forbid"
+enum_glob_use = "forbid"
+unwrap_used = "forbid"
 pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
-unwrap_used = "deny"
 
 cast_possible_truncation = "allow"
 cast_possible_wrap = "allow"
@@ -38,6 +42,7 @@ module_name_repetitions = "allow"
 [dependencies]
 lyra_proc = { path = "../lyra_proc" }
 
+paste = "1.0.15"
 const-str = "0.5.7"
 const_panic = { version = "0.2.8", features = ["derive"] }
 heck = "0.5.0"
@@ -48,9 +53,9 @@ dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "1.0.61"
 color-eyre = "0.6.3"
-rstest = "0.20.0"
+rstest = "0.21.0"
 futures = "0.3.30"
-tokio = { version = "1.37.0", features = [
+tokio = { version = "1.38.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
@@ -67,7 +72,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 rayon = "1.10.0"
-lazy_static = "1.4.0"
 chrono = "0.4.38"
 sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"

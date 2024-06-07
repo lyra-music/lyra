@@ -1,6 +1,11 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::bot::{command::macros::out, component::tuning::equaliser::SetEqualiser};
+use crate::bot::{
+    command::{macros::out, require},
+    component::tuning::{
+        check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser, UpdateFilter,
+    },
+};
 
 lyra_proc::read_equaliser_presets_as!(EqualiserPreset);
 
@@ -25,13 +30,14 @@ pub struct Preset {
 }
 
 impl crate::bot::command::model::BotSlashCommand for Preset {
-    async fn run(self, mut ctx: crate::bot::command::SlashCtx) -> crate::bot::error::CommandResult {
-        super::super::common_checks(&ctx)?;
+    async fn run(self, ctx: crate::bot::command::SlashCtx) -> crate::bot::error::CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let preset_name = self.preset.value();
         let update = Some(SetEqualiser::from(self.preset));
 
-        super::super::set_filter(&ctx, update).await?;
+        player.update_filter(update).await?;
         out!(
             format!(
                 "🎛️🟢 Enabled player equaliser (Preset: **`{}`**)",

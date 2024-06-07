@@ -15,7 +15,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::bot::{
     command::{
-        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
+        declare::{message_commands, slash_commands, POPULATED_COMMANDS_MAP},
         model::CommandInfoAware,
     },
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
@@ -220,7 +220,9 @@ impl<'a> Client<'a> {
     pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
         let commands = self
             .0
-            .set_global_commands(&[SLASH_COMMANDS.as_ref(), MESSAGE_COMMANDS.as_ref()].concat())
+            .set_global_commands(
+                &[slash_commands().as_slice(), message_commands().as_slice()].concat(),
+            )
             .await?
             .models()
             .await?;
@@ -239,7 +241,7 @@ impl<'a> Client<'a> {
     ) -> &'static twilight_model::application::command::Command {
         POPULATED_COMMANDS_MAP
             .get()
-            .expect("POPULATED_COMMANDS_MAP is populated")
+            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
             .get(T::name())
             .unwrap_or_else(|| panic!("command not found: {}", T::name()))
     }
@@ -248,7 +250,9 @@ impl<'a> Client<'a> {
         let cmd = Self::populated_command::<T>();
 
         let name = &cmd.name;
-        let id = cmd.id.expect("id exists");
+        let id = cmd
+            .id
+            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"));
         format!("</{name}:{id}>").into_boxed_str()
     }
 

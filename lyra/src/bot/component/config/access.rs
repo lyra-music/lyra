@@ -4,6 +4,7 @@ mod mode;
 mod view;
 
 use bitflags::bitflags;
+use const_str::concat as const_str_concat;
 use itertools::Itertools;
 use sqlx::{Pool, Postgres};
 use tokio::task::JoinSet;
@@ -63,25 +64,24 @@ impl CalculatorBuilder {
         }
     }
 
-    fn query(mut self, column: &'static str, id: i64) -> Self {
+    fn query(mut self, category: &AccessCategoryFlag, id: i64) -> Self {
+        let column = category.ident();
         let db = self.db.clone();
         self.set.spawn(async move {
             let in_access_controls = sqlx::query_as::<_, (Option<bool>,)>(&format!(
-                "--sql
-                SELECT EXISTS (SELECT 1 FROM {column} WHERE guild = $1 AND id = $2) 
-                "
+                "SELECT EXISTS (SELECT 1 FROM {column} WHERE guild = $1 AND id = $2)"
             ))
             .bind(self.guild_id)
             .bind(id)
             .fetch_one(&db)
             .await?
-            .0
-            .expect("SELECT EXISTS is non-null");
+            .0;
+
+            // SAFETY: `SELECT EXISTS ...` is always non-null
+            let in_access_controls = unsafe { in_access_controls.unwrap_unchecked() };
 
             let (access_mode,) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
-                "--sql
-                SELECT {column} FROM guild_configs WHERE id = $1
-                "
+                "SELECT {column} FROM guild_configs WHERE id = $1"
             ))
             .bind(self.guild_id)
             .fetch_one(&db)
@@ -95,19 +95,13 @@ impl CalculatorBuilder {
         self
     }
 
-    pub fn user(self, user_id: Id<UserMarker>) -> Self {
-        let id = user_id.get() as i64;
-        self.query("usr_access", id)
-    }
-
     pub fn roles<'a>(mut self, role_ids: impl Iterator<Item = &'a Id<RoleMarker>>) -> Self {
+        let column = AccessCategoryFlag::Roles.ident();
         let db = self.db.clone();
         let where_clause = role_ids.map(|id| format!("id = {id}")).join(" OR ");
         self.set.spawn(async move {
             let (Some(in_access_controls),) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
-                "--sql
-                SELECT EXISTS (SELECT 1 FROM rol_access WHERE guild = $1 AND ({})) 
-                ",
+                "SELECT EXISTS (SELECT 1 FROM {column} WHERE guild = $1 AND ({}))",
                 where_clause.or("true")
             ))
             .bind(self.guild_id)
@@ -118,9 +112,7 @@ impl CalculatorBuilder {
             };
 
             let access_mode = sqlx::query!(
-                r"--sql
-                SELECT rol_access FROM guild_configs WHERE id = $1
-                ",
+                "SELECT rol_access FROM guild_configs WHERE id = $1",
                 self.guild_id
             )
             .fetch_one(&db)
@@ -135,24 +127,29 @@ impl CalculatorBuilder {
         self
     }
 
+    pub fn user(self, user_id: Id<UserMarker>) -> Self {
+        let id = user_id.get() as i64;
+        self.query(&AccessCategoryFlag::Users, id)
+    }
+
     pub fn thread(self, thread_id: Id<ChannelMarker>) -> Self {
         let id = thread_id.get() as i64;
-        self.query("xch_access", id)
+        self.query(&AccessCategoryFlag::Threads, id)
     }
 
     pub fn text_channel(self, text_channel_id: Id<ChannelMarker>) -> Self {
         let id = text_channel_id.get() as i64;
-        self.query("tch_access", id)
+        self.query(&AccessCategoryFlag::TextChannels, id)
     }
 
     pub fn voice_channel(self, voice_channel_id: Id<ChannelMarker>) -> Self {
         let id = voice_channel_id.get() as i64;
-        self.query("vch_access", id)
+        self.query(&AccessCategoryFlag::VoiceChannels, id)
     }
 
     pub fn category_channel(self, category_channel_id: Id<ChannelMarker>) -> Self {
         let id = category_channel_id.get() as i64;
-        self.query("cch_access", id)
+        self.query(&AccessCategoryFlag::CategoryChannels, id)
     }
 
     pub async fn build(mut self) -> Result<Calculator, AccessCalculatorBuildError> {
@@ -162,6 +159,57 @@ impl CalculatorBuilder {
         }
 
         Ok(Calculator { pairs })
+    }
+}
+
+#[repr(u8)]
+#[derive(PartialEq, Eq, Hash)]
+enum AccessCategoryFlag {
+    Users = 0b0000_0001,
+    Roles = 0b0000_0010,
+    Threads = 0b0000_0100,
+    TextChannels = 0b0000_1000,
+    VoiceChannels = 0b0001_0000,
+    CategoryChannels = 0b0010_0000,
+}
+
+impl From<AccessCategoryFlag> for AccessCategoryFlags {
+    fn from(value: AccessCategoryFlag) -> Self {
+        Self::from_bits_retain(value as u8)
+    }
+}
+
+impl TryFrom<AccessCategoryFlags> for AccessCategoryFlag {
+    type Error = AccessCategoryFlags;
+
+    fn try_from(value: AccessCategoryFlags) -> Result<Self, Self::Error> {
+        if value.iter().count() != 1 {
+            return Err(value);
+        }
+
+        // SAFETY: `value` is guruanteed to only have one flag,
+        //         so this transmute is safe
+        Ok(unsafe { std::mem::transmute(value.bits()) })
+    }
+}
+
+impl AccessCategoryFlag {
+    const fn ident(&self) -> &'static str {
+        const POSTFIX: &str = "_access";
+        macro_rules! concat_postfix {
+            ($postfix: expr) => {
+                const_str_concat!($postfix, POSTFIX)
+            };
+        }
+
+        match self {
+            Self::Users => concat_postfix!("usr"),
+            Self::Roles => concat_postfix!("rol"),
+            Self::Threads => concat_postfix!("xch"),
+            Self::TextChannels => concat_postfix!("tch"),
+            Self::VoiceChannels => concat_postfix!("vch"),
+            Self::CategoryChannels => concat_postfix!("cch"),
+        }
     }
 }
 
@@ -189,23 +237,17 @@ impl FlagsPrettify for AccessCategoryFlags {}
 
 impl From<AccessCategory> for AccessCategoryFlags {
     fn from(category: AccessCategory) -> Self {
-        Self::from_bits_truncate(category.value() as u8)
+        Self::from_bits_retain(category.value() as u8)
     }
 }
 
 impl AccessCategoryFlags {
-    pub fn iter_names_as_column(&self) -> impl Iterator<Item = String> {
-        self.iter_names()
-            .map(|(n, _)| match n {
-                "USERS" => "usr",
-                "ROLES" => "rol",
-                "THREADS" => "xch",
-                "TEXT_CHANNELS" => "tch",
-                "VOICE_CHANNELS" => "vch",
-                "CATEGORY_CHANNELS" => "cch",
-                _ => unreachable!(),
-            })
-            .map(|n| format!("{n}_access"))
+    pub fn iter_each(&self) -> impl Iterator<Item = AccessCategoryFlag> {
+        self.iter().flat_map(Self::try_into)
+    }
+
+    pub fn iter_as_columns(&self) -> impl Iterator<Item = &'static str> {
+        self.iter_each().map(|f| f.ident())
     }
 }
 

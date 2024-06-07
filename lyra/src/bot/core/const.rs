@@ -1,4 +1,6 @@
 pub mod metadata {
+    use std::sync::OnceLock;
+
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
     const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
@@ -52,48 +54,69 @@ pub mod metadata {
         "%cargo_opt_level",
     ];
 
-    lazy_static::lazy_static! {
-        pub static ref BANNER: Box<str> = {
+    pub fn banner() -> &'static str {
+        static BANNER: OnceLock<&'static str> = OnceLock::new();
+        BANNER.get_or_init(|| {
             use aho_corasick::AhoCorasick;
 
             let rdr = include_str!("../../../../assets/lyra2-ascii.ans");
             let mut wtr = Vec::new();
 
             let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
-            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS).expect("searching is infallible");
-            String::from_utf8(wtr).expect("slice is UTF-8").into()
-        };
+            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
+                .expect("searching is infallible");
+            // SAFETY: since `rdr` is utf-8, `wtr` must also be utf-8
+            unsafe { String::from_utf8_unchecked(wtr).leak() }
+        })
     }
 }
 
 pub mod connection {
-    use std::time::Duration;
+    use std::{sync::OnceLock, time::Duration};
 
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
-    lazy_static::lazy_static! {
-        pub static ref CONNECTION_CHANGED_TIMEOUT: Duration = Duration::from_millis(500);
-        pub static ref GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
-        pub static ref INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
-            Duration::from_secs(u64::from(INACTIVITY_TIMEOUT_SECS) / u64::from(INACTIVITY_TIMEOUT_POLL_N));
+    pub fn connection_changed_timeout() -> &'static Duration {
+        static CONNECTION_CHANGED_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        CONNECTION_CHANGED_TIMEOUT.get_or_init(|| Duration::from_millis(500))
+    }
+
+    pub fn get_lavalink_connection_info_timeout() -> &'static Duration {
+        static GET_LAVALINK_CONNECTION_INFO_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        GET_LAVALINK_CONNECTION_INFO_TIMEOUT.get_or_init(|| Duration::from_millis(2_000))
+    }
+
+    pub fn inactivity_timeout_poll_interval() -> &'static Duration {
+        static INACTIVITY_TIMEOUT_POLL_INTERVAL: OnceLock<Duration> = OnceLock::new();
+        INACTIVITY_TIMEOUT_POLL_INTERVAL.get_or_init(|| {
+            Duration::from_secs(
+                u64::from(INACTIVITY_TIMEOUT_SECS) / u64::from(INACTIVITY_TIMEOUT_POLL_N),
+            )
+        })
     }
 }
 
 pub mod misc {
-    use std::time::Duration;
+    use std::{sync::OnceLock, time::Duration};
 
     pub const ADD_TRACKS_WRAP_LIMIT: usize = 3;
     pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS: u8 = 30;
 
-    lazy_static::lazy_static! {
-        pub static ref WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
-        pub static ref WAIT_FOR_NOT_SUPPRESSED_TIMEOUT: Duration = Duration::from_secs(WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS.into());
-        pub static ref DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
+    pub fn wait_for_bot_events_timeout() -> &'static Duration {
+        static WAIT_FOR_BOT_EVENTS_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        WAIT_FOR_BOT_EVENTS_TIMEOUT.get_or_init(|| Duration::from_millis(1_000))
+    }
+
+    pub fn destructive_command_confirmation_timeout() -> &'static Duration {
+        static DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT.get_or_init(|| Duration::from_secs(60))
     }
 }
 
 pub mod text {
+    use std::sync::OnceLock;
+
     use fuzzy_matcher::skim::SkimMatcherV2;
 
     pub const UNTITLED_TRACK: &str = "(Untitled Track)";
@@ -102,24 +125,45 @@ pub mod text {
     pub const EMPTY_EMBED_FIELD: &str = "`-Empty-`";
     pub const NO_ROWS_AFFECTED_MESSAGE: &str = "🔐 No changes were made.";
 
-    lazy_static::lazy_static! {
-        pub static ref FUZZY_MATCHER: SkimMatcherV2 = SkimMatcherV2::default();
+    pub fn fuzzy_matcher() -> &'static SkimMatcherV2 {
+        static FUZZY_MATCHER: OnceLock<SkimMatcherV2> = OnceLock::new();
+        FUZZY_MATCHER.get_or_init(SkimMatcherV2::default)
     }
 }
 
 pub mod regex {
+    use std::sync::OnceLock;
+
     use regex::Regex;
 
-    lazy_static::lazy_static! {
-        pub static ref URL: Regex =
-            Regex::new(r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?")
-                .expect("regex is valid");
-        pub static ref TIMESTAMP: Regex =
-            Regex::new(r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$")
-                .expect("regex is valild");
-        pub static ref TIMESTAMP_2: Regex =
-            Regex::new(r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$")
-                .expect("regex is valid");
+    pub fn url() -> &'static Regex {
+        static URL: OnceLock<Regex> = OnceLock::new();
+        URL.get_or_init(|| {
+            Regex::new(
+                r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?"
+            )
+            .expect("regex is valid")
+        })
+    }
+
+    pub fn timestamp() -> &'static Regex {
+        static TIMESTAMP: OnceLock<Regex> = OnceLock::new();
+        TIMESTAMP.get_or_init(|| {
+            Regex::new(
+                r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$",
+            )
+            .expect("regex is valid")
+        })
+    }
+
+    pub fn timestamp_2() -> &'static Regex {
+        static TIMESTAMP_2: OnceLock<Regex> = OnceLock::new();
+        TIMESTAMP_2.get_or_init(|| {
+            Regex::new(
+                r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$"
+            )
+            .expect("regex is valid")
+        })
     }
 }
 

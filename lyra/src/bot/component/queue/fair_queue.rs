@@ -5,11 +5,10 @@ use crate::bot::{
         check,
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
     error::CommandResult,
-    gateway::ExpectedGuildIdAware,
-    lavalink::{DelegateMethods, IndexerType, LavalinkAware},
+    lavalink::IndexerType,
 };
 
 /// Toggles fair queuing
@@ -18,13 +17,13 @@ use crate::bot::{
 pub struct FairQueue;
 
 impl BotSlashCommand for FairQueue {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
         check::user_is_dj(&ctx)?;
-        check::in_voice(&ctx)?.with_someone_else()?;
-        check::queue_not_empty(&ctx).await?;
+        let _ = require::in_voice(&ctx)?.and_with_someone_else()?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let guild_id = ctx.guild_id();
-        let data = ctx.lavalink().player_data(guild_id);
+        let data = player.data();
         let indexer_type = data.read().await.queue().indexer_type();
 
         match indexer_type {

@@ -6,9 +6,9 @@ use crate::bot::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        SlashCtx,
+        require, SlashCtx,
     },
-    component::tuning::{common_checks, set_filter},
+    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
 };
 
@@ -41,17 +41,15 @@ enum LowPassSettings {
 
 impl std::fmt::Display for LowPassSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let settings = match self {
-            Self::Default => String::from("**`Default Settings`**"),
-            Self::Custom(s) => format!("Smoothing: `{s:.1}`"),
-        };
-
-        write!(f, "{settings}")
+        match self {
+            Self::Default => f.write_str("**`Default Settings`**"),
+            Self::Custom(s) => write!(f, "Smoothing: `{s:.1}`"),
+        }
     }
 }
 
-impl crate::bot::component::tuning::UpdateFilter for Option<SetLowPass> {
-    fn apply(self, filter: Filters) -> Filters {
+impl crate::bot::component::tuning::ApplyFilter for Option<SetLowPass> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             low_pass: self.map(|l| l.0),
             ..filter
@@ -78,8 +76,9 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetLowPass::new(self.smoothing) else {
             bad!(
@@ -89,7 +88,7 @@ impl BotSlashCommand for On {
         };
         let settings = update.settings();
 
-        set_filter(&ctx, Some(update)).await?;
+        player.update_filter(Some(update)).await?;
         out!(format!("😶‍🌫️🟢 Enabled low pass ({settings})"), ctx);
     }
 }
@@ -100,10 +99,11 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        common_checks(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        set_filter(&ctx, None::<SetLowPass>).await?;
+        player.update_filter(None::<SetLowPass>).await?;
         out!("😶‍🌫️🔴 Disabled low pass", ctx);
     }
 }

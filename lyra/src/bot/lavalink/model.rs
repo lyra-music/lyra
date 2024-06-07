@@ -7,7 +7,9 @@ mod queue_indexer;
 use std::{num::NonZeroU16, sync::Arc};
 
 use lavalink_rs::{
-    client::LavalinkClient, error::LavalinkResult, model::player::ConnectionInfo,
+    client::LavalinkClient,
+    error::LavalinkResult,
+    model::{player::ConnectionInfo, track::TrackInfo},
     player_context::PlayerContext,
 };
 use tokio::sync::RwLock;
@@ -17,46 +19,30 @@ use twilight_model::id::{
 };
 
 use crate::bot::{
+    command::require::{CachelessInVoice, InVoice},
     core::r#const,
-    gateway::{ExpectedGuildIdAware, GuildIdAware},
+    gateway::GuildIdAware,
 };
 
-use self::connection::{Connection, ConnectionRef, ConnectionRefMut};
+use self::connection::{ConnectionRef, ConnectionRefMut};
 
 pub use self::{
-    connection::{wait_for_with, Event, EventRecvResult},
+    connection::{wait_for_with, Connection, Event, EventRecvResult},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
     pitch::Pitch,
     queue::{Item as QueueItem, Queue, RepeatMode},
     queue_indexer::IndexerType,
 };
 
-type PlayerDataRwLockArc = Arc<RwLock<PlayerData>>;
+pub type PlayerDataRwLockArc = Arc<RwLock<PlayerData>>;
 
 pub trait ClientAware {
     fn lavalink(&self) -> &Lavalink;
 }
 
-pub trait PlayerDataAware: ClientAware + GuildIdAware {
-    fn get_player_data(&self) -> Option<PlayerDataRwLockArc> {
-        self.lavalink().get_player_data(self.get_guild_id()?)
-    }
-}
-pub trait ExpectedPlayerDataAware: ClientAware + ExpectedGuildIdAware {
-    fn player_data(&self) -> PlayerDataRwLockArc {
-        self.lavalink().player_data(self.guild_id())
-    }
-}
-
 pub trait PlayerAware: ClientAware + GuildIdAware {
     fn get_player(&self) -> Option<PlayerContext> {
-        self.lavalink().get_player_context(self.get_guild_id()?)
-    }
-}
-
-pub trait ExpectedPlayerAware: ClientAware + ExpectedGuildIdAware {
-    fn player(&self) -> PlayerContext {
-        self.lavalink().player(self.guild_id())
+        self.lavalink().get_player_context(self.guild_id())
     }
 }
 
@@ -68,9 +54,10 @@ pub struct PlayerData {
 }
 
 impl PlayerData {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            volume: NonZeroU16::new(100).expect("volume is non-zero"),
+            // SAFETY: `100` is non-zero
+            volume: unsafe { NonZeroU16::new_unchecked(100) },
             pitch: Pitch::new(),
             queue: Queue::new(),
             now_playing_message_id: None,
@@ -200,7 +187,10 @@ pub trait DelegateMethods {
             }
             twilight_gateway::Event::VoiceStateUpdate(e) => {
                 self.handle_voice_state_update(
-                    e.guild_id.expect("event received in a guild"),
+                    // SAFETY: this bot cannot join DM voice calls,
+                    //         meaning all voice states will be from a guild voice channel,
+                    //         so `e.guild_id` is present
+                    unsafe { e.guild_id.unwrap_unchecked() },
                     e.channel_id,
                     e.user_id,
                     e.session_id.clone(),
@@ -222,24 +212,25 @@ pub trait DelegateMethods {
         connection_info: impl Into<ConnectionInfo> + Send,
         user_data: Arc<Data>,
     ) -> LavalinkResult<PlayerContext>;
-    async fn new_player_data(
+    async fn new_player(
         &self,
         guild_id: impl Into<LavalinkGuildId> + Send + Copy,
-    ) -> LavalinkResult<()> {
+    ) -> LavalinkResult<PlayerContext> {
         let now = tokio::time::Instant::now();
         let info = self
             .get_connection_info(
                 guild_id,
-                *r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+                *r#const::connection::get_lavalink_connection_info_timeout(),
             )
             .await?;
         tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
 
         let data = Arc::new(RwLock::new(PlayerData::new()));
-        self.create_player_context_with_data(guild_id, info, data)
+        let player = self
+            .create_player_context_with_data(guild_id, info, data)
             .await?;
 
-        Ok(())
+        Ok(player)
     }
 
     fn get_player_context(&self, guild_id: impl Into<LavalinkGuildId>) -> Option<PlayerContext>;
@@ -248,14 +239,7 @@ pub trait DelegateMethods {
         guild_id: impl Into<LavalinkGuildId> + Send,
     ) -> Option<PlayerDataRwLockArc> {
         self.get_player_context(guild_id)
-            .map(|c| c.data().expect("data type is valid"))
-    }
-    fn player(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> PlayerContext {
-        self.get_player_context(guild_id)
-            .expect("player context exists")
-    }
-    fn player_data(&self, guild_id: impl Into<LavalinkGuildId> + Send) -> PlayerDataRwLockArc {
-        self.player(guild_id).data().expect("data type is valid")
+            .map(|c| c.data_unwrapped())
     }
 }
 
@@ -264,14 +248,18 @@ impl Lavalink {
         self.inner.clone()
     }
 
+    pub fn new_connection_with(&self, guild_id: Id<GuildMarker>, connection: Connection) {
+        self.connections.insert(guild_id, connection);
+    }
+
     pub fn new_connection(
         &self,
         guild_id: Id<GuildMarker>,
         channel_id: Id<ChannelMarker>,
         text_channel_id: Id<ChannelMarker>,
     ) {
-        self.connections
-            .insert(guild_id, Connection::new(channel_id, text_channel_id));
+        let connection = Connection::new(channel_id, text_channel_id);
+        self.new_connection_with(guild_id, connection);
     }
 
     pub fn drop_connection(&self, guild_id: Id<GuildMarker>) {
@@ -282,31 +270,24 @@ impl Lavalink {
         self.connections.get(&guild_id)
     }
 
+    pub fn connection_from(&self, from: &impl GetConnection) -> ConnectionRef {
+        // SAFETY: because the caller has an instance of `InVoice`,
+        //         this proves that there is a voice connection currently.
+        unsafe { self.connections.get(&from.guild_id()).unwrap_unchecked() }
+    }
+
+    pub fn connection_mut_from(&self, from: &impl GetConnection) -> ConnectionRefMut {
+        // SAFETY: because the caller has an instance of `InVoice`,
+        //         this proves that there is a voice connection currently.
+        unsafe {
+            self.connections
+                .get_mut(&from.guild_id())
+                .unwrap_unchecked()
+        }
+    }
+
     pub fn get_connection_mut(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRefMut> {
         self.connections.get_mut(&guild_id)
-    }
-
-    pub fn connection(&self, guild_id: Id<GuildMarker>) -> ConnectionRef {
-        self.get_connection(guild_id).expect("connection exists")
-    }
-
-    pub fn connection_mut(&self, guild_id: Id<GuildMarker>) -> ConnectionRefMut {
-        self.get_connection_mut(guild_id)
-            .expect("connection exists")
-    }
-
-    pub fn notify_connection_change(&self, guild_id: Id<GuildMarker>) {
-        self.connection(guild_id).notify_change();
-    }
-
-    #[inline]
-    pub fn dispatch(&self, guild_id: Id<GuildMarker>, event: Event) {
-        self.connection(guild_id).dispatch(event);
-    }
-
-    #[inline]
-    pub fn dispatch_queue_clear(&self, guild_id: Id<GuildMarker>) {
-        self.dispatch(guild_id, Event::QueueClear);
     }
 
     #[inline]
@@ -365,3 +346,37 @@ impl DelegateMethods for LavalinkClient {
         self.get_player_context(guild_id)
     }
 }
+
+pub trait UnwrappedPlayerData {
+    fn data_unwrapped(&self) -> PlayerDataRwLockArc;
+}
+
+impl UnwrappedPlayerData for PlayerContext {
+    fn data_unwrapped(&self) -> PlayerDataRwLockArc {
+        // SAFETY: Player data exists of type `Arc<RwLock<PlayerData>>`
+        unsafe { self.data().unwrap_unchecked() }
+    }
+}
+
+pub trait UnwrappedPlayerInfoUri {
+    fn into_uri_unwrapped(self) -> String;
+    fn uri_unwrapped(&self) -> &str;
+}
+
+impl UnwrappedPlayerInfoUri for TrackInfo {
+    fn uri_unwrapped(&self) -> &str {
+        self.uri
+            .as_ref()
+            .unwrap_or_else(|| panic!("local tracks are unsupported"))
+    }
+
+    fn into_uri_unwrapped(self) -> String {
+        self.uri
+            .unwrap_or_else(|| panic!("local tracks are unsupported"))
+    }
+}
+
+pub trait GetConnection: GuildIdAware {}
+
+impl GetConnection for InVoice<'_> {}
+impl GetConnection for CachelessInVoice {}

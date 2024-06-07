@@ -8,11 +8,12 @@ use crate::bot::{
         check,
         macros::{bad, out, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        AutocompleteCtx, SlashCtx,
+        require, AutocompleteCtx, SlashCtx,
     },
     component::queue::normalize_queue_position,
+    core::model::CacheAware,
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::{CorrectTrackInfo, ExpectedPlayerDataAware, PlayerDataAware},
+    lavalink::{CorrectTrackInfo, PlayerAware},
 };
 
 enum MoveAutocompleteOptionType {
@@ -29,11 +30,12 @@ struct MoveAutocompleteOptions {
 
 async fn generate_move_autocomplete_choices(
     options: &MoveAutocompleteOptions,
-    ctx: &AutocompleteCtx,
+    ctx: &(impl PlayerAware + CacheAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Some(data) = ctx.get_player_data() else {
+    let Ok(player) = require::player(ctx) else {
         return Vec::new();
     };
+    let data = player.data();
     let data_r = data.read().await;
     let (queue, Some(queue_len)) = (data_r.queue(), NonZeroUsize::new(data_r.queue().len())) else {
         return Vec::new();
@@ -103,7 +105,8 @@ pub struct Autocomplete {
 }
 
 impl BotAutocomplete for Autocomplete {
-    async fn execute(self, mut ctx: AutocompleteCtx) -> AutocompleteResult {
+    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
+        let mut ctx = require::guild(ctx)?;
         let (focused, kind) = match (self.track, self.position) {
             (AutocompleteValue::Focused(focused), AutocompleteValue::None) => {
                 (focused, MoveAutocompleteOptionType::TrackFocused)
@@ -119,7 +122,9 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 MoveAutocompleteOptionType::PositionFocusedTrackCompleted(i),
             ),
-            _ => unreachable!(),
+            // SAFETY: only one autocomplete options can be focused at a time,
+            //         so this branch is unreachable
+            _ => unsafe { std::hint::unreachable_unchecked() },
         };
 
         let options = MoveAutocompleteOptions {
@@ -144,18 +149,18 @@ pub struct Move {
 }
 
 impl BotSlashCommand for Move {
-    async fn run(self, mut ctx: SlashCtx) -> CommandResult {
-        let in_voice_with_user = check::in_voice(&ctx)?.with_user()?;
-        check::queue_not_empty(&ctx).await?;
-        check::not_suppressed(&ctx)?;
+    async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let in_voice_with_user =
+            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
+        let player = require::player(&ctx)?.and_queue_not_empty().await?;
 
-        let data = ctx.player_data();
+        let data = player.data();
         let mut data_w = data.write().await;
         let queue = data_w.queue_mut();
         let queue_len = queue.len();
 
         if queue_len == 1 {
-            drop(in_voice_with_user);
             sus!(
                 "Nowhere to move the track as it is the only track in the queue.",
                 ctx
@@ -165,24 +170,22 @@ impl BotSlashCommand for Move {
         super::validate_input_positions(&[self.track, self.position], queue_len)?;
 
         if self.track == self.position {
-            drop(in_voice_with_user);
             bad!(
                 format!("Invalid new position: {}; New position must be different from the old position", self.position),
                 ctx
             );
         }
 
-        let position =
-            NonZeroUsize::new(self.position as usize).expect("self.position is non-zero");
+        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
+        let position = unsafe { NonZeroUsize::new_unchecked(self.position as usize) };
         check::users_track(position, in_voice_with_user, queue, &ctx)?;
 
-        let track_position =
-            NonZeroUsize::new(self.track as usize).expect("self.track is non-zero");
+        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
+        let track_position = unsafe { NonZeroUsize::new_unchecked(self.track as usize) };
         let queue_position = queue.position();
 
-        let track = queue
-            .remove(track_position.get() - 1)
-            .expect("self.track is in bounds");
+        // SAFETY: `track_position.get() - 1` has been validated to be in-bounds, so this unwrap is safe
+        let track = unsafe { queue.remove(track_position.get() - 1).unwrap_unchecked() };
         let track_title = track.track().info.corrected_title();
         let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 

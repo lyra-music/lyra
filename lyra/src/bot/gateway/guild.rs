@@ -23,8 +23,7 @@ impl CreateContext<'_> {
         }
 
         sqlx::query!(
-            r"--sql
-            INSERT INTO guild_configs
+            "INSERT INTO guild_configs
                 (id)
             SELECT $1
             WHERE

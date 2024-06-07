@@ -7,6 +7,7 @@ use crate::bot::{
         check,
         macros::{out, sus},
         model::BotSlashCommand,
+        require,
         util::prompt_for_confirmation,
         SlashCtx,
     },
@@ -14,7 +15,7 @@ use crate::bot::{
     core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
     error::CommandResult,
     ext::util::FlagsPrettify,
-    gateway::ExpectedGuildIdAware,
+    gateway::GuildIdAware,
 };
 
 /// Clears all currently configured access controls for channels, roles or members
@@ -27,12 +28,13 @@ pub struct Clear {
 
 impl BotSlashCommand for Clear {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
+        let ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 
         let category_flags = AccessCategoryFlags::from(self.category);
 
         let mut set = JoinSet::new();
-        category_flags.iter_names_as_column().for_each(|c| {
+        category_flags.iter_as_columns().for_each(|c| {
             let db = ctx.db().clone();
             let g = ctx.guild_id().get() as i64;
 

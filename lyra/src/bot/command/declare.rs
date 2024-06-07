@@ -24,15 +24,40 @@ use crate::bot::{
     error::command::declare::{AutocompleteExecuteError, CommandExecuteError},
 };
 
+macro_rules! count {
+    () => (0usize);
+    ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
+}
+
 macro_rules! declare_slash_commands {
     ($( $raw_cmd: ident ),* $(,)? ) => {
-        lazy_static::lazy_static! {
-            static ref SLASH_COMMANDS_MAP: HashMap<Box<str>, Command> = HashMap::from([
-                $(
-                    (stringify!($raw_cmd).into(), <$raw_cmd>::create_command().into()),
-                )*
-            ]);
-            pub static ref SLASH_COMMANDS: Box<[Command]> = SLASH_COMMANDS_MAP.clone().into_values().collect();
+        ::paste::paste! {
+            struct SlashCommandMap {
+                $([<_ $raw_cmd:snake>]: Command,)*
+            }
+        }
+
+        fn slash_commands_map() -> &'static SlashCommandMap {
+            static SLASH_COMMANDS_MAP: OnceLock<SlashCommandMap> = OnceLock::new();
+            SLASH_COMMANDS_MAP.get_or_init(|| {
+                ::paste::paste! {
+                    SlashCommandMap {
+                        $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
+                    }
+                }
+            })
+        }
+
+        type SlashCommands = [Command; count!($($raw_cmd)*)];
+
+        pub fn slash_commands() -> &'static SlashCommands {
+            static SLASH_COMMANDS: OnceLock<SlashCommands> = OnceLock::new();
+            SLASH_COMMANDS.get_or_init(|| {
+                let map = slash_commands_map();
+                ::paste::paste! {
+                    [$(map.[<_ $raw_cmd:snake>].clone(),)*]
+                }
+            })
         }
 
         pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<Box<str>, Command>> = OnceLock::new();
@@ -40,10 +65,9 @@ macro_rules! declare_slash_commands {
         $(
             impl CommandInfoAware for $raw_cmd {
                 fn name() -> &'static str {
-                    let cmd_name = stringify!($raw_cmd);
-                    &SLASH_COMMANDS_MAP.get(cmd_name)
-                        .unwrap_or_else(|| panic!("command not found: {}", cmd_name))
-                        .name
+                    ::paste::paste! {
+                        &slash_commands_map().[<_ $raw_cmd:snake>].name
+                    }
                 }
             }
         )*
@@ -59,7 +83,7 @@ macro_rules! declare_slash_commands {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.into_partial_command_data();
+                        let cmd_data = self.into_command_data();
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
@@ -70,22 +94,41 @@ macro_rules! declare_slash_commands {
 
 macro_rules! declare_message_commands {
     ($( $raw_cmd: ident ),* $(,)? ) => {
-        lazy_static::lazy_static! {
-            static ref MESSAGE_COMMANDS_MAP: HashMap<Box<str>, Command> = HashMap::from([
-                $(
-                    (stringify!($raw_cmd).into(), <$raw_cmd>::create_command().into()),
-                )*
-            ]);
-            pub static ref MESSAGE_COMMANDS: Box<[Command]> = MESSAGE_COMMANDS_MAP.clone().into_values().collect();
+        ::paste::paste! {
+            struct MessageCommandMap {
+                $([<_ $raw_cmd:snake>]: Command,)*
+            }
+        }
+
+        fn message_commands_map() -> &'static MessageCommandMap {
+            static MESSAGE_COMMANDS_MAP: OnceLock<MessageCommandMap> = OnceLock::new();
+            MESSAGE_COMMANDS_MAP.get_or_init(|| {
+                ::paste::paste! {
+                    MessageCommandMap {
+                        $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
+                    }
+                }
+            })
+        }
+
+        type MessageCommands = [Command; count!($($raw_cmd)*)];
+
+        pub fn message_commands() -> &'static MessageCommands {
+            static MESSAGE_COMMANDS: OnceLock<MessageCommands> = OnceLock::new();
+            MESSAGE_COMMANDS.get_or_init(|| {
+                let map = message_commands_map();
+                ::paste::paste! {
+                    [$(map.[<_ $raw_cmd:snake>].clone(),)*]
+                }
+            })
         }
 
         $(
             impl CommandInfoAware for $raw_cmd {
                 fn name() -> &'static str {
-                    let cmd_name = stringify!($raw_cmd);
-                    &MESSAGE_COMMANDS_MAP.get(cmd_name)
-                        .unwrap_or_else(|| panic!("command not found: {}", cmd_name))
-                        .name
+                    ::paste::paste! {
+                        &message_commands_map().[<_ $raw_cmd:snake>].name
+                    }
                 }
             }
         )*
@@ -101,7 +144,7 @@ macro_rules! declare_message_commands {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.into_partial_command_data();
+                        let cmd_data = self.into_command_data();
                         return Err(CommandExecuteError::UnknownCommand(cmd_data))
                     }
                 }
@@ -121,7 +164,7 @@ macro_rules! declare_autocomplete {
                         }
                     )*
                     _ => {
-                        let cmd_data = self.into_partial_command_data();
+                        let cmd_data = self.into_command_data();
                         return Err(AutocompleteExecuteError::UnknownAutocomplete(cmd_data))
                     }
                 }

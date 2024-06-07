@@ -27,8 +27,8 @@ impl SetEqualiser {
     }
 }
 
-impl super::UpdateFilter for Option<SetEqualiser> {
-    fn apply(self, filter: Filters) -> Filters {
+impl super::ApplyFilter for Option<SetEqualiser> {
+    fn apply_to(self, filter: Filters) -> Filters {
         Filters {
             equalizer: self.map(|f| f.0.into()),
             ..filter
