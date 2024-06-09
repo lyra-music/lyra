@@ -1,6 +1,6 @@
 [package]
 name = "lyra_proc"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -20,7 +20,7 @@ unwrap_used = "deny"
 [dependencies]
 syn = "2"
 quote = "1"
+serde = "1"
 itertools = "*"
 heck = "*"
 toml = "*"
-serde = "1"

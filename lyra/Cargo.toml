@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
@@ -10,7 +10,7 @@ authors = ["fdnt7"]
 build = "build.rs"
 
 [build-dependencies]
-anyhow = "*"
+anyhow = "1"
 vergen-git2 = { version = "1.0.0-beta.2", features = [
     "build",
     "cargo",
@@ -40,19 +40,17 @@ module_name_repetitions = "allow"
 
 [dependencies]
 lyra_proc = { path = "../lyra_proc" }
+lyra_ext = { path = "../lyra_ext" }
 
 paste = "1.0.15"
 const-str = "0.5.7"
 const_panic = { version = "0.2.8", features = ["derive"] }
-heck = "0.5.0"
 bitflags = "2.5.0"
-unicode-segmentation = "1.11.0"
 dashmap = "5.5.3"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "1.0.61"
 color-eyre = "0.6.3"
-rstest = "0.21.0"
 futures = "0.3.30"
 tokio = { version = "1.38.0", features = [
     "sync",
@@ -71,7 +69,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 rayon = "1.10.0"
-chrono = "0.4.38"
 sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
 lavalink-rs = { git = "https://gitlab.com/vicky5124/lavalink-rs", rev = "56fd9191", features = [
@@ -94,18 +91,3 @@ twilight-util = { version = "=0.16.0-rc.1", features = [
     "builder",
 ] }
 twilight-interactions = "0.16.0-rc.1"
-
-[dependencies.kmeans_colors]
-version = "0.6.0"
-features = ["palette_color"]
-default-features = false
-
-[dependencies.image]
-version = "0.25.1"
-features = ["jpeg", "png", "gif", "tiff"]
-default-features = false
-
-[dependencies.palette]
-version = "0.7.6"
-features = ["std"]
-default-features = false

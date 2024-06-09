@@ -52,6 +52,19 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
     let category_names = categories.iter().map(|c| c.to_string().to_title_case());
 
     quote! {
+        use ::itertools::Itertools;
+        use ::twilight_mention::Mention;
+        use ::twilight_model::id::{
+            marker::{ChannelMarker, RoleMarker, UserMarker},
+            Id,
+        };
+        use ::lyra_ext::logical_bind::LogicalBind;
+        use ::twilight_util::builder::embed::EmbedFieldBuilder;
+
+        use crate::component::config::access::mode::AccessModeDisplay;
+        use crate::gateway::GuildIdAware;
+        use crate::core::r#const::text::EMPTY_EMBED_FIELD;
+
         struct __AccessView {
             id: i64,
         }
@@ -61,6 +74,9 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
                 #column_names_ident: Option<bool>,
             )*
         }
+
+        let guild_id = ctx.guild_id().get() as i64;
+        let db = ctx.db();
 
         let __access_modes = sqlx::query_as!(
             __AccessModeView,
@@ -88,7 +104,7 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
                 EmbedFieldBuilder::new(
                     format!(
                         "{} {}", 
-                        __access_modes.#column_names_ident.into_mode_icon(),
+                        __access_modes.#column_names_ident.display_icon(),
                         #category_names
                     ), #categories.or(EMPTY_EMBED_FIELD)
                 ).inline()
