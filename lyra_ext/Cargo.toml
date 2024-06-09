@@ -1,0 +1,45 @@
+[package]
+name = "lyra_ext"
+version = "0.7.1"
+edition = "2021"
+
+[lints.clippy]
+multiple_unsafe_ops_per_block = "forbid"
+undocumented_unsafe_blocks = "forbid"
+enum_glob_use = "forbid"
+unwrap_used = "forbid"
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+
+module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+
+[dependencies]
+rstest = "0.21.0"
+heck = "0.5.0"
+const-str = "0.5.7"
+unicode-segmentation = "1"
+bitflags = "2"
+regex = "1"
+rayon = "1"
+
+[dependencies.kmeans_colors]
+version = "0.6.0"
+features = ["palette_color"]
+default-features = false
+
+[dependencies.image]
+version = "0.25.1"
+features = ["jpeg", "png", "gif", "tiff"]
+default-features = false
+
+[dependencies.palette]
+version = "0.7.6"
+features = ["std"]
+default-features = false
+
+[dependencies.time]
+version = "0.3.36"
+features = ["formatting"]
+default-features = false

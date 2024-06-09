@@ -58,5 +58,5 @@ jobs:
 
       - name: Build And Test
         run: |
-          cargo build --verbose --release
-          cargo test --verbose --release
+          cargo build --verbose
+          cargo test --verbose

@@ -34,7 +34,7 @@ fn process(
             let (sub_cmd_match, impl_resolved_command_data) = c;
             let sub_cmd_inner = unwrap(type_path, "Box");
             let command_info_aware_path =
-                syn::parse_str::<Path>("crate::bot::command::model::CommandInfoAware")
+                syn::parse_str::<Path>("crate::command::model::CommandInfoAware")
                     .expect("path is valid");
             let impl_for_inner = sub_cmd_inner.map_or_else(
                 || quote!(),
@@ -86,12 +86,11 @@ pub fn impl_lyra_command_group(input: &DeriveInput) -> TokenStream {
     };
 
     let bot_slash_command_path =
-        syn::parse_str::<Path>("crate::bot::command::model::BotSlashCommand")
-            .expect("path is valid");
+        syn::parse_str::<Path>("crate::command::model::BotSlashCommand").expect("path is valid");
     let slash_ctx_path =
-        syn::parse_str::<Path>("crate::bot::command::model::SlashCtx").expect("path is valid");
+        syn::parse_str::<Path>("crate::command::model::SlashCtx").expect("path is valid");
     let result_path =
-        syn::parse_str::<Path>("crate::bot::error::command::Result").expect("path is valid");
+        syn::parse_str::<Path>("crate::error::command::Result").expect("path is valid");
     quote! {
         impl #bot_slash_command_path for #name {
             async fn run(self, ctx: #slash_ctx_path) -> #result_path {

@@ -1,0 +1,805 @@
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    // marker::PhantomData,
+    num::NonZeroUsize,
+    sync::Arc,
+    time::Duration,
+};
+
+use twilight_model::{
+    channel::{message::MessageFlags, ChannelType},
+    guild::Permissions,
+    id::{marker::ChannelMarker, Id},
+};
+
+use crate::{
+    command::model::{Ctx, CtxKind},
+    component::config::access::CalculatorBuilder,
+    core::{
+        model::{
+            AuthorIdAware,
+            AuthorPermissionsAware,
+            BotState,
+            // CacheAware,
+            OwnedBotStateAware,
+        },
+        traced,
+    },
+    error::{
+        // self,
+        command::check::{
+            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
+            UserOnlyInError,
+        },
+        CacheResult,
+        InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
+        InVoiceWithoutUser as InVoiceWithoutUserError,
+        NotUsersTrack as NotUsersTrackError,
+        UserNotAccessManager as UserNotAccessManagerError,
+        UserNotAllowed as UserNotAllowedError,
+        UserNotDj as UserNotDjError,
+        UserNotStageManager as UserNotStageManagerError,
+    },
+    gateway::GuildIdAware,
+    lavalink::{
+        self,
+        CorrectTrackInfo,
+        // DelegateMethods,
+        Event,
+        LavalinkAware,
+        // PlayerAware,
+        QueueItem,
+    },
+};
+
+use super::{
+    model::{GuildCtx, RespondViaMessage},
+    poll::{self, Resolution as PollResolution, Topic as PollTopic},
+    require::{self, someone_else_in, InVoice, PartialInVoice},
+};
+
+pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissions::MUTE_MEMBERS);
+pub const ACCESS_MANAGER_PERMISSIONS: Permissions =
+    Permissions::MANAGE_ROLES.union(Permissions::MANAGE_CHANNELS);
+
+pub const STAGE_MANAGER_PERMISSIONS: Permissions = Permissions::MANAGE_CHANNELS
+    .union(Permissions::MUTE_MEMBERS)
+    .union(Permissions::MOVE_MEMBERS);
+
+pub fn does_user_have_permissions(
+    permissions: Permissions,
+    ctx: &impl AuthorPermissionsAware,
+) -> bool {
+    let author_permissions = ctx.author_permissions();
+    author_permissions.contains(permissions)
+        || author_permissions.contains(Permissions::ADMINISTRATOR)
+}
+
+#[inline]
+pub fn is_user_dj(ctx: &impl AuthorPermissionsAware) -> bool {
+    does_user_have_permissions(DJ_PERMISSIONS, ctx)
+}
+
+pub fn user_is_dj(ctx: &impl AuthorPermissionsAware) -> Result<(), UserNotDjError> {
+    if !is_user_dj(ctx) {
+        return Err(UserNotDjError);
+    }
+    Ok(())
+}
+
+pub fn user_is_access_manager(
+    ctx: &impl AuthorPermissionsAware,
+) -> Result<(), UserNotAccessManagerError> {
+    if !does_user_have_permissions(ACCESS_MANAGER_PERMISSIONS, ctx) {
+        return Err(UserNotAccessManagerError);
+    }
+    Ok(())
+}
+
+pub fn user_is_stage_manager(
+    ctx: &impl AuthorPermissionsAware,
+) -> Result<(), UserNotStageManagerError> {
+    if !does_user_have_permissions(STAGE_MANAGER_PERMISSIONS, ctx) {
+        return Err(UserNotStageManagerError);
+    }
+    Ok(())
+}
+
+pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserAllowedError> {
+    let Some(weak) = require::guild_weak(ctx).ok() else {
+        return Ok(());
+    };
+
+    if user_is_access_manager(&weak).is_ok() {
+        return Ok(());
+    }
+
+    let channel = ctx.channel();
+    let mut access_calculator_builder = CalculatorBuilder::new(weak.guild_id(), ctx.db().clone())
+        .user(ctx.author_id())
+        .roles(weak.member().roles.iter());
+    match channel.kind {
+        ChannelType::PublicThread
+        | ChannelType::PrivateThread
+        | ChannelType::AnnouncementThread => {
+            // SAFETY: `channel.kind` is of type threads, so `parent_id` is present
+            let parent_id = unsafe { channel.parent_id.unwrap_unchecked() };
+            access_calculator_builder = access_calculator_builder
+                .thread(channel.id)
+                .text_channel(parent_id);
+        }
+        ChannelType::GuildVoice | ChannelType::GuildStageVoice => {
+            let channel_id = channel.id;
+            access_calculator_builder = access_calculator_builder
+                .text_channel(channel_id)
+                .voice_channel(channel_id);
+        }
+        _ => {
+            access_calculator_builder = access_calculator_builder.text_channel(channel.id);
+            if let Some(category_channel_id) = channel.parent_id {
+                access_calculator_builder =
+                    access_calculator_builder.category_channel(category_channel_id);
+            }
+        }
+    };
+
+    let user_allowed_to_use_commands = access_calculator_builder.build().await?.calculate();
+    if !user_allowed_to_use_commands {
+        Err(UserNotAllowedError)?;
+    }
+    Ok(())
+}
+
+pub async fn user_allowed_to_use(
+    channel_id: Id<ChannelMarker>,
+    channel_parent_id: Option<Id<ChannelMarker>>,
+    ctx: &GuildCtx<impl CtxKind>,
+) -> Result<(), check::UserAllowedError> {
+    if user_is_access_manager(ctx).is_ok() {
+        return Ok(());
+    }
+
+    let guild_id = ctx.guild_id();
+    let mut access_calculator_builder =
+        CalculatorBuilder::new(guild_id, ctx.db().clone()).voice_channel(channel_id);
+
+    if let Some(parent_id) = channel_parent_id {
+        access_calculator_builder = access_calculator_builder.category_channel(parent_id);
+    }
+
+    let allowed_to_use_channel = access_calculator_builder.build().await?.calculate();
+
+    if !allowed_to_use_channel {
+        Err(UserNotAllowedError)?;
+    };
+    Ok(())
+}
+
+pub struct InVoiceWithUserResult<'a> {
+    in_voice: InVoice<'a>,
+    kind: InVoiceWithUserResultKind,
+}
+
+pub enum InVoiceWithUserResultKind {
+    UserIsDj,
+    ToBeDetermined,
+}
+
+pub fn noone_else_in(
+    channel_id: Id<ChannelMarker>,
+    ctx: &GuildCtx<impl CtxKind>,
+) -> Result<(), check::UserOnlyInError> {
+    if is_user_dj(ctx) {
+        return Ok(());
+    }
+
+    if someone_else_in(channel_id, ctx)? {
+        Err(InVoiceWithSomeoneElseError(channel_id))?;
+    }
+    Ok(())
+}
+
+pub struct PollStarterInfo {
+    topic: PollTopic,
+    error: PollResolvableError,
+    in_voice: PartialInVoice,
+}
+
+pub enum PollStarter {
+    NotRequired,
+    Required(PollStarterInfo),
+}
+
+impl PollStarter {
+    pub async fn start(
+        self,
+        ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ) -> Result<(), check::HandlePollError> {
+        if let Self::Required(s) = self {
+            return handle_poll(s.error, &s.topic, ctx, &s.in_voice).await;
+        };
+
+        Ok(())
+    }
+}
+
+impl<'a> InVoiceWithUserResult<'a> {
+    pub fn only(self) -> Result<(), check::UserOnlyInError> {
+        if matches!(self.kind, InVoiceWithUserResultKind::UserIsDj) {
+            return Ok(());
+        }
+        let InVoiceWithUserResult { in_voice, .. } = self;
+        let channel_id = in_voice.channel_id();
+
+        if someone_else_in(channel_id, &in_voice)? {
+            Err(InVoiceWithSomeoneElseError(channel_id))?;
+        }
+        Ok(())
+    }
+
+    pub fn only_else_poll(self, topic: PollTopic) -> CacheResult<PollStarter> {
+        let in_voice = From::from(&self.in_voice);
+        let Err(error) = self.only() else {
+            return Ok(PollStarter::NotRequired);
+        };
+
+        match error {
+            check::UserOnlyInError::InVoiceWithSomeoneElse(e) => {
+                Ok(PollStarter::Required(PollStarterInfo {
+                    topic,
+                    error: check::PollResolvableError::InVoiceWithSomeoneElse(e),
+                    in_voice,
+                }))
+            }
+            check::UserOnlyInError::Cache(e) => Err(e)?,
+        }
+    }
+}
+
+pub fn in_voice_with_user(
+    in_voice: InVoice<'_>,
+) -> Result<InVoiceWithUserResult<'_>, InVoiceWithoutUserError> {
+    if is_user_dj(&in_voice) {
+        return Ok(InVoiceWithUserResult {
+            in_voice,
+            kind: InVoiceWithUserResultKind::UserIsDj,
+        });
+    }
+
+    let channel_id = in_voice.channel_id();
+    in_voice
+        .cache
+        .voice_state(in_voice.author_id, in_voice.guild_id())
+        .filter(|voice_state| voice_state.channel_id() == channel_id)
+        .ok_or(InVoiceWithoutUserError(channel_id))?;
+
+    Ok(InVoiceWithUserResult {
+        in_voice,
+        kind: InVoiceWithUserResultKind::ToBeDetermined,
+    })
+}
+
+pub fn all_users_track(
+    positions: impl Iterator<Item = NonZeroUsize>,
+    in_voice_with_user: InVoiceWithUserResult,
+    queue: &lavalink::Queue,
+    ctx: &impl AuthorIdAware,
+) -> Result<(), check::UsersTrackError> {
+    if let (Some((position, track)), Err(e)) = (
+        positions
+            .map(|p| (p, &queue[p.get() - 1]))
+            .find(|(_, t)| t.requester() != ctx.author_id()),
+        in_voice_with_user.only(),
+    ) {
+        return Err(impl_users_track(position, track, e));
+    }
+
+    Ok(())
+}
+
+fn impl_users_track(
+    position: NonZeroUsize,
+    track: &QueueItem,
+    user_only_in: UserOnlyInError,
+) -> check::UsersTrackError {
+    let channel_id = match user_only_in {
+        check::UserOnlyInError::InVoiceWithSomeoneElse(e) => e.0,
+        check::UserOnlyInError::Cache(e) => return e.into(),
+    };
+    let title = track.track().info.corrected_title().into();
+    let requester = track.requester();
+
+    NotUsersTrackError {
+        requester,
+        position,
+        title,
+        channel_id,
+    }
+    .into()
+}
+
+pub fn users_track(
+    position: NonZeroUsize,
+    in_voice_with_user: InVoiceWithUserResult,
+    queue: &lavalink::Queue,
+    ctx: &impl AuthorIdAware,
+) -> Result<(), check::UsersTrackError> {
+    if let Err(e) = in_voice_with_user.only() {
+        let track = &queue[position.get() - 1];
+        if track.requester() != ctx.author_id() {
+            return Err(impl_users_track(position, track, e));
+        }
+    }
+
+    Ok(())
+}
+
+// async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, NotPlayingError> {
+//     let guild_id = ctx.guild_id();
+//     let lavalink = ctx.lavalink();
+//     let data = lavalink.player_data(guild_id);
+//     let data_r = data.read().await;
+//     let queue = data_r.queue();
+//     let (current, index) = queue.current_and_index().ok_or(NotPlayingError)?;
+//
+//     let requester = current.requester();
+//     let position = NonZeroUsize::new(index + 1).expect("index + 1 is non-zero");
+//     let title = current.track().info.corrected_title().into();
+//     let channel_id = lavalink.connection(guild_id).channel_id;
+//
+//     Ok(CurrentlyPlaying {
+//         requester,
+//         position,
+//         title,
+//         channel_id,
+//         context: CurrentlyPlayingContext::new_via(ctx),
+//     })
+// }
+//
+// struct CurrentlyPlayingContext {
+//     author_id: Id<UserMarker>,
+//     author_permissions: Permissions,
+// }
+//
+// impl CurrentlyPlayingContext {
+//     fn new_via(ctx: &Ctx<impl CtxKind>) -> Self {
+//         Self {
+//             author_id: ctx.author_id(),
+//             author_permissions: ctx.author_permissions(),
+//         }
+//     }
+// }
+//
+// impl AuthorPermissionsAware for CurrentlyPlayingContext {
+//     fn author_permissions(&self) -> Permissions {
+//         self.author_permissions
+//     }
+// }
+//
+// struct CurrentlyPlaying {
+//     requester: Id<UserMarker>,
+//     position: NonZeroUsize,
+//     title: Arc<str>,
+//     channel_id: Id<ChannelMarker>,
+//     context: CurrentlyPlayingContext,
+// }
+//
+// impl CurrentlyPlaying {
+//     pub fn users_track(&self) -> Result<(), NotUsersTrackError> {
+//         let Self {
+//             requester,
+//             position,
+//             title,
+//             channel_id,
+//             context: ctx,
+//         } = self;
+//
+//         if is_user_dj(ctx) {
+//             return Ok(());
+//         }
+//
+//         if *requester == ctx.author_id {
+//             return Err(NotUsersTrackError {
+//                 requester: *requester,
+//                 position: *position,
+//                 title: title.clone(),
+//                 channel_id: *channel_id,
+//             });
+//         }
+//         Ok(())
+//     }
+//
+//     pub fn paused(&self) -> Result<(), error::Paused> {
+//         todo!()
+//     }
+//
+//     pub fn stopped(&self) -> Result<(), error::Stopped> {
+//         todo!()
+//     }
+// }
+//
+// async fn currently_playing_users_track(
+//     ctx: &Ctx<impl CtxKind>,
+// ) -> Result<(), check::CurrentlyPlayingUsersTrackError> {
+//     Ok(currently_playing(ctx).await?.users_track()?)
+// }
+//
+// async fn queue_seekable(ctx: &Ctx<impl CtxKind>) -> Result<(), check::QueueSeekableError> {
+//     Ok(currently_playing(ctx)
+//         .await
+//         .map_err(|_| error::QueueNotSeekable)?
+//         .users_track()?)
+// }
+//
+//
+//
+// pub fn player_exist(ctx: &impl PlayerAware) -> Result<(), NoPlayerError> {
+//     ctx.get_player().ok_or(NoPlayerError)?;
+//     Ok(())
+// }
+//
+// #[allow(clippy::struct_excessive_bools)]
+// struct Checks {
+//     in_voice_with_user: InVoiceWithUserFlag,
+//     queue_not_empty: bool,
+//     not_suppressed: bool,
+//     currently_playing: CurrentlyPlayingFlag,
+//     player_stopped: bool,
+//     player_paused: bool,
+// }
+//
+// impl Checks {
+//     const fn new() -> Self {
+//         Self {
+//             in_voice_with_user: InVoiceWithUserFlag::Skip,
+//             queue_not_empty: false,
+//             not_suppressed: false,
+//             currently_playing: CurrentlyPlayingFlag::Skip,
+//             player_stopped: false,
+//             player_paused: false,
+//         }
+//     }
+// }
+//
+// enum InVoiceWithUserFlag {
+//     Skip,
+//     CheckOnly(bool),
+// }
+//
+// enum CurrentlyPlayingFlag {
+//     Skip,
+//     CheckUsersTrack(bool),
+//     CheckQueueSeekable,
+// }
+//
+// pub struct Voice;
+// pub trait VoiceMarker {}
+// impl VoiceMarker for Voice {}
+//
+// pub struct Queue;
+// pub trait QueueMarker {}
+// impl QueueMarker for Queue {}
+//
+// pub struct Playing;
+// pub trait PlayingMarker {}
+// impl PlayingMarker for Playing {}
+//
+// pub struct Null;
+// impl VoiceMarker for Null {}
+// impl QueueMarker for Null {}
+// impl PlayingMarker for Null {}
+//
+// pub struct CheckerBuilder<C: VoiceMarker = Null, Q: QueueMarker = Null, P: PlayingMarker = Null> {
+//     checks: Checks,
+//     poll_topic: Option<PollTopic>,
+//     in_voice_with_user: PhantomData<fn(C) -> C>,
+//     queue_not_empty: PhantomData<fn(Q) -> Q>,
+//     currently_playing: PhantomData<fn(P) -> P>,
+// }
+//
+// impl CheckerBuilder {
+//     pub const fn new() -> Self {
+//         Self {
+//             checks: Checks::new(),
+//             poll_topic: None,
+//             in_voice_with_user: PhantomData::<fn(Null) -> Null>,
+//             queue_not_empty: PhantomData::<fn(Null) -> Null>,
+//             currently_playing: PhantomData::<fn(Null) -> Null>,
+//         }
+//     }
+//
+//     pub const fn in_voice_with_user(mut self) -> CheckerBuilder<Voice> {
+//         self.checks.in_voice_with_user = InVoiceWithUserFlag::CheckOnly(false);
+//         CheckerBuilder {
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//             in_voice_with_user: PhantomData::<fn(Voice) -> Voice>,
+//             queue_not_empty: self.queue_not_empty,
+//             currently_playing: self.currently_playing,
+//         }
+//     }
+//
+//     pub const fn in_voice_with_user_only(mut self) -> CheckerBuilder<Voice> {
+//         self.checks.in_voice_with_user = InVoiceWithUserFlag::CheckOnly(true);
+//         CheckerBuilder {
+//             in_voice_with_user: PhantomData::<fn(Voice) -> Voice>,
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//             queue_not_empty: self.queue_not_empty,
+//             currently_playing: self.currently_playing,
+//         }
+//     }
+//
+//     pub const fn in_voice_with_user_only_with_poll(
+//         mut self,
+//         topic: PollTopic,
+//     ) -> CheckerBuilder<Voice, Null, Null> {
+//         self.checks.in_voice_with_user = InVoiceWithUserFlag::CheckOnly(true);
+//         CheckerBuilder {
+//             in_voice_with_user: PhantomData::<fn(Voice) -> Voice>,
+//             poll_topic: Some(topic),
+//             checks: self.checks,
+//             queue_not_empty: self.queue_not_empty,
+//             currently_playing: self.currently_playing,
+//         }
+//     }
+// }
+//
+// impl<Q: QueueMarker, P: PlayingMarker> CheckerBuilder<Voice, Q, P> {
+//     pub const fn not_suppressed(mut self) -> Self {
+//         self.checks.not_suppressed = true;
+//         self
+//     }
+// }
+//
+// impl CheckerBuilder<Voice, Null, Null> {
+//     pub const fn queue_not_empty(mut self) -> CheckerBuilder<Voice, Queue, Null> {
+//         self.checks.queue_not_empty = true;
+//         CheckerBuilder {
+//             queue_not_empty: PhantomData::<fn(Queue) -> Queue>,
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//             in_voice_with_user: self.in_voice_with_user,
+//             currently_playing: self.currently_playing,
+//         }
+//     }
+// }
+//
+// impl CheckerBuilder<Voice, Queue, Null> {
+//     pub const fn currently_playing(mut self) -> CheckerBuilder<Voice, Queue, Playing> {
+//         self.checks.currently_playing = CurrentlyPlayingFlag::CheckUsersTrack(false);
+//         CheckerBuilder {
+//             currently_playing: PhantomData::<fn(Playing) -> Playing>,
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//             in_voice_with_user: self.in_voice_with_user,
+//             queue_not_empty: self.queue_not_empty,
+//         }
+//     }
+//
+//     pub const fn currently_playing_users_track(mut self) -> CheckerBuilder<Voice, Queue, Playing> {
+//         self.checks.currently_playing = CurrentlyPlayingFlag::CheckUsersTrack(true);
+//         CheckerBuilder {
+//             currently_playing: PhantomData::<fn(Playing) -> Playing>,
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//             in_voice_with_user: self.in_voice_with_user,
+//             queue_not_empty: self.queue_not_empty,
+//         }
+//     }
+//
+//     pub const fn queue_seekable(mut self) -> CheckerBuilder<Voice, Queue, Playing> {
+//         self.checks.currently_playing = CurrentlyPlayingFlag::CheckQueueSeekable;
+//         CheckerBuilder {
+//             currently_playing: PhantomData::<fn(Playing) -> Playing>,
+//             poll_topic: self.poll_topic,
+//             checks: self.checks,
+//             in_voice_with_user: self.in_voice_with_user,
+//             queue_not_empty: self.queue_not_empty,
+//         }
+//     }
+// }
+//
+// impl CheckerBuilder<Voice, Queue, Playing> {
+//     pub const fn player_paused(mut self) -> Self {
+//         self.checks.player_paused = true;
+//         self
+//     }
+//
+//     pub const fn player_stopped(mut self) -> Self {
+//         self.checks.player_stopped = true;
+//         self
+//     }
+// }
+//
+// impl<C: VoiceMarker, Q: QueueMarker, P: PlayingMarker> CheckerBuilder<C, Q, P> {
+//     pub const fn build(self) -> Checker {
+//         Checker {
+//             checks: self.checks,
+//             poll_topic: self.poll_topic,
+//         }
+//     }
+// }
+//
+// #[must_use]
+// pub struct Checker {
+//     checks: Checks,
+//     poll_topic: Option<PollTopic>,
+// }
+//
+// impl Checker {
+//     pub async fn run(self, ctx: &mut Ctx<impl RespondViaMessage>) -> Result<(), check::RunError> {
+//         let checks = &self.checks;
+//         let InVoiceWithUserFlag::CheckOnly(only_in_voice_with_user) = checks.in_voice_with_user
+//         else {
+//             return Ok(());
+//         };
+//
+//         let in_voice = in_voice(ctx)?;
+//         if checks.queue_not_empty {
+//             queue_not_empty(ctx).await?;
+//         }
+//         if checks.not_suppressed {
+//             not_suppressed(ctx)?;
+//         }
+//
+//         let playing = match checks.currently_playing {
+//             CurrentlyPlayingFlag::CheckUsersTrack(_) => Some(currently_playing(ctx).await?),
+//             _ => None,
+//         };
+//
+//         let in_voice_with_user_only = in_voice.with_user()?.only();
+//         match in_voice_with_user_only {
+//             Err(check::UserOnlyInError::InVoiceWithSomeoneElse(e)) if only_in_voice_with_user => {
+//                 self.handle_in_voice_with_someone_else(e, playing.as_ref(), ctx)
+//                     .await?;
+//             }
+//             Err(check::UserOnlyInError::Cache(e)) => Err(e)?,
+//             _ => {}
+//         }
+//
+//         let Some(playing) = playing else {
+//             return Ok(());
+//         };
+//         if checks.player_paused {
+//             playing.paused()?;
+//         }
+//         if checks.player_stopped {
+//             playing.stopped()?;
+//         }
+//
+//         Ok(())
+//     }
+//
+//     async fn handle_in_voice_with_someone_else(
+//         &self,
+//         error: InVoiceWithSomeoneElseError,
+//         playing: Option<&CurrentlyPlaying>,
+//         ctx: &mut Ctx<impl RespondViaMessage>,
+//     ) -> Result<(), check::HandleInVoiceWithSomeoneElseError> {
+//         let e = {
+//             match (&self.checks.currently_playing, playing) {
+//                 (CurrentlyPlayingFlag::CheckQueueSeekable, _) => queue_seekable(ctx)
+//                     .await
+//                     .err()
+//                     .map(check::PollResolvableError::from),
+//                 (CurrentlyPlayingFlag::CheckUsersTrack(true), Some(playing)) => playing
+//                     .users_track()
+//                     .err()
+//                     .map(check::PollResolvableError::NotUsersTrack),
+//                 (CurrentlyPlayingFlag::CheckUsersTrack(false), Some(_)) => None,
+//                 (CurrentlyPlayingFlag::CheckUsersTrack(_), None) => unreachable!(),
+//                 (CurrentlyPlayingFlag::Skip, _) => {
+//                     Some(check::PollResolvableError::InVoiceWithSomeoneElse(error))
+//                 }
+//             }
+//         };
+//
+//         match (e, self.poll_topic.as_ref()) {
+//             (None, _) => Ok(()),
+//             (Some(e), Some(topic)) => Ok(handle_poll(e, topic, ctx).await?),
+//             (Some(e), None) => Err(e)?,
+//         }
+//     }
+// }
+//
+
+async fn handle_poll(
+    error: check::PollResolvableError,
+    topic: &PollTopic,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    in_voice: &PartialInVoice,
+) -> Result<(), check::HandlePollError> {
+    let connection = ctx.lavalink().connection_from(in_voice);
+    if let Some(poll) = connection.poll() {
+        let message = poll.message_owned();
+
+        let mut s = DefaultHasher::new();
+        topic.hash(&mut s);
+        if s.finish() == poll.topic_hash() {
+            if is_user_dj(ctx) {
+                connection.dispatch(Event::AlternateVoteDjCast);
+
+                Err(check::AnotherPollOngoingError {
+                    message: message.clone(),
+                    alternate_vote: Some(AlternateVoteResponse::DjCasted),
+                })?;
+            }
+            connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
+
+            let mut rx = connection.subscribe();
+
+            if let Some(event) = lavalink::wait_for_with(&mut rx, |e| {
+                matches!(
+                    e,
+                    Event::AlternateVoteCastDenied | Event::AlternateVoteCastedAlready(_)
+                )
+            })
+            .await?
+            {
+                if let Event::AlternateVoteCastedAlready(casted) = event {
+                    Err(check::AnotherPollOngoingError {
+                        message: message.clone(),
+                        alternate_vote: Some(AlternateVoteResponse::CastedAlready(casted)),
+                    })?;
+                }
+                Err(check::AnotherPollOngoingError {
+                    message: message.clone(),
+                    alternate_vote: Some(AlternateVoteResponse::CastDenied),
+                })?;
+            }
+            Err(check::AnotherPollOngoingError {
+                message: message.clone(),
+                alternate_vote: Some(AlternateVoteResponse::Casted),
+            })?;
+        }
+        Err(check::AnotherPollOngoingError {
+            message,
+            alternate_vote: None,
+        })?;
+    }
+
+    drop(connection);
+    let resolution = Box::pin(poll::start(topic, ctx, in_voice)).await;
+    ctx.lavalink().connection_mut_from(in_voice).reset_poll();
+    match resolution? {
+        PollResolution::UnanimousWin => Ok(()),
+        PollResolution::UnanimousLoss => Err(check::PollLossError {
+            source: error,
+            kind: check::PollLossErrorKind::UnanimousLoss,
+        })?,
+        PollResolution::TimedOut => Err(check::PollLossError {
+            source: error,
+            kind: check::PollLossErrorKind::TimedOut,
+        })?,
+        PollResolution::Voided(e) => Err(check::PollVoidedError(e))?,
+        PollResolution::SupersededWinViaDj => {
+            traced::tokio_spawn(send_superseded_win_notice(
+                ctx.interaction_token().to_owned(),
+                ctx.bot_owned(),
+            ));
+            Ok(())
+        }
+        PollResolution::SupersededLossViaDj => Err(check::PollLossError {
+            source: error,
+            kind: check::PollLossErrorKind::SupersededLossViaDj,
+        })?,
+    }
+}
+
+async fn send_superseded_win_notice(
+    interaction_token: String,
+    bot: Arc<BotState>,
+) -> Result<(), SendSupersededWinNoticeError> {
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    bot.interaction()
+        .await?
+        .create_followup(&interaction_token)
+        .flags(MessageFlags::EPHEMERAL)
+        .content("🪄 The poll was superseded to win by a DJ.")
+        .await?;
+
+    Ok(())
+}
