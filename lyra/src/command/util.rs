@@ -38,11 +38,11 @@ use crate::{
         command::{
             check::NotSuppressedError,
             util::{
-                AutoJoinOrCheckInVoiceWithUserError, AutoJoinSuppressedError, ConfirmationError,
+                AutoJoinOrCheckInVoiceWithUserError, AutoJoinSuppressedError,
                 HandleSuppressedAutoJoinError, PromptForConfirmationError,
             },
         },
-        Suppressed as SuppressedError,
+        ConfirmationTimedOut, Suppressed as SuppressedError,
     },
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, LavalinkAware},
@@ -279,7 +279,7 @@ async fn handle_suppressed_auto_join(
 
 pub async fn prompt_for_confirmation(
     mut ctx: GuildCtx<impl CommandDataAware + RespondViaModal>,
-) -> Result<GuildModalCtx, PromptForConfirmationError> {
+) -> Result<(GuildModalCtx, bool), PromptForConfirmationError> {
     let text_input = TextInput {
         custom_id: String::new(),
         label: String::from("This is a destructive command. Are you sure?"),
@@ -325,26 +325,23 @@ pub async fn prompt_for_confirmation(
     )
     .await;
 
-    let modal_ctx = match wait_for_modal_submit {
+    let ctx_and_confirmed = match wait_for_modal_submit {
         Ok(Ok(Event::InteractionCreate(interaction))) => {
             let ctx = ctx.into_modal_interaction(interaction);
-            if ctx.submit_data().components[0].components[0]
+            let confirmed = ctx.submit_data().components[0].components[0]
                 .value
                 .as_ref()
-                .is_some_and(|s| s == "YES")
-            {
-                Err(ConfirmationError::Cancelled)?;
-            }
-            ctx
+                .is_some_and(|s| s == "YES");
+            (ctx, confirmed)
         }
         // SAFETY: the future has been filtered to only match modal submit interaction
         //         so this branch is unreachable
         Ok(Ok(_)) => unsafe { std::hint::unreachable_unchecked() },
         Ok(Err(e)) => Err(e)?,
-        Err(_) => Err(ConfirmationError::TimedOut)?,
+        Err(_) => Err(ConfirmationTimedOut)?,
     };
 
-    Ok(modal_ctx)
+    Ok(ctx_and_confirmed)
 }
 
 pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<PlayerContext> {

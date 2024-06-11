@@ -173,3 +173,7 @@ pub enum RunError {
 #[derive(Error, Debug)]
 #[error("not in a guild")]
 pub struct NotInGuild;
+
+#[derive(Error, Debug)]
+#[error("confirmation timed out")]
+pub struct ConfirmationTimedOut;

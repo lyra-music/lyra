@@ -34,17 +34,15 @@ impl PrettyDurationDisplay for Duration {
     }
 }
 
-trait FromPrettyStr {
-    fn from_pretty_str(value: &str) -> Result<Self, &str>
-    where
-        Self: Sized;
+trait FromPrettyStr
+where
+    Self: Sized,
+{
+    fn from_pretty_str(value: &str) -> Result<Self, &str>;
 }
 
 impl FromPrettyStr for Duration {
-    fn from_pretty_str(value: &str) -> Result<Self, &str>
-    where
-        Self: Sized,
-    {
+    fn from_pretty_str(value: &str) -> Result<Self, &str> {
         let captures = if let Some(captures) = timestamp().captures(value) {
             captures
         } else if let Some(captures) = timestamp_2().captures(value) {

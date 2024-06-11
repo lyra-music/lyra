@@ -1,18 +1,24 @@
-pub fn multi_interleave<T, I, J>(iters: impl IntoIterator<Item = I>) -> MultiInterleave<J>
+pub fn multi_interleave<A>(iters: A) -> MultiInterleave<<A::Item as IntoIterator>::IntoIter>
 where
-    I: IntoIterator<Item = T>,
-    J: Iterator<Item = T>,
-    Box<[J]>: FromIterator<I::IntoIter>,
+    A: IntoIterator,
+    A::Item: IntoIterator,
+    <A::Item as IntoIterator>::IntoIter: Iterator,
 {
     MultiInterleave::new(iters.into_iter().map(IntoIterator::into_iter).collect())
 }
 
-pub struct MultiInterleave<I: Iterator> {
+pub struct MultiInterleave<I>
+where
+    I: Iterator,
+{
     iterators: Box<[I]>,
     current: usize,
 }
 
-impl<I: Iterator> MultiInterleave<I> {
+impl<I> MultiInterleave<I>
+where
+    I: Iterator,
+{
     fn new(iterators: Box<[I]>) -> Self {
         Self {
             iterators,
@@ -21,7 +27,10 @@ impl<I: Iterator> MultiInterleave<I> {
     }
 }
 
-impl<I: Iterator> Iterator for MultiInterleave<I> {
+impl<I> Iterator for MultiInterleave<I>
+where
+    I: Iterator,
+{
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -52,7 +61,7 @@ mod tests {
 
     #[rstest]
     #[case([], vec![])]
-    fn multi_interleave_0<const N: usize>(#[case] input: [Vec<u8>; N], #[case] expected: Vec<u8>) {
+    fn multi_interleave_0(#[case] input: [Vec<u8>; 0], #[case] expected: Vec<u8>) {
         assert_eq!(multi_interleave(input).collect::<Vec<_>>(), expected);
     }
 
@@ -61,7 +70,7 @@ mod tests {
     #[case([vec![1]]      , vec![1])]
     #[case([vec![1, 2]]   , vec![1, 2])]
     #[case([vec![1, 2, 3]], vec![1, 2, 3])]
-    fn multi_interleave_1<const N: usize>(#[case] input: [Vec<u8>; N], #[case] expected: Vec<u8>) {
+    fn multi_interleave_1(#[case] input: [Vec<u8>; 1], #[case] expected: Vec<u8>) {
         assert_eq!(multi_interleave(input).collect::<Vec<_>>(), expected);
     }
 
@@ -82,7 +91,7 @@ mod tests {
     #[case([vec![1]      , vec![1, 2, 3]], vec![1, 1, 2, 3])]
     #[case([vec![1, 2]   , vec![1, 2, 3]], vec![1, 1, 2, 2, 3])]
     #[case([vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 2, 2, 3, 3])]
-    fn multi_interleave_2<const N: usize>(#[case] input: [Vec<u8>; N], #[case] expected: Vec<u8>) {
+    fn multi_interleave_2(#[case] input: [Vec<u8>; 2], #[case] expected: Vec<u8>) {
         assert_eq!(multi_interleave(input).collect::<Vec<_>>(), expected);
     }
 
@@ -151,7 +160,7 @@ mod tests {
     #[case([vec![1]      , vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 3, 3])]
     #[case([vec![1, 2]   , vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3, 3])]
     #[case([vec![1, 2, 3], vec![1, 2, 3], vec![1, 2, 3]], vec![1, 1, 1, 2, 2, 2, 3, 3, 3])]
-    fn multi_interleave_3<const N: usize>(#[case] input: [Vec<u8>; N], #[case] expected: Vec<u8>) {
+    fn multi_interleave_3(#[case] input: [Vec<u8>; 3], #[case] expected: Vec<u8>) {
         assert_eq!(multi_interleave(input).collect::<Vec<_>>(), expected);
     }
 }

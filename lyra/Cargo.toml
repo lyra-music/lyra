@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
@@ -60,7 +60,7 @@ tokio = { version = "1.38.0", features = [
 ] }
 serde = "1.0.203"
 serde_json = "1.0.117"
-regex = "1.10.4"
+regex = "1.10.5"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
 log = "0.4.21"

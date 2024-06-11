@@ -1304,7 +1304,7 @@ dependencies = [
 
 [[package]]
 name = "lyra"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -1350,7 +1350,7 @@ dependencies = [
 
 [[package]]
 name = "lyra_ext"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "bitflags 2.5.0",
  "const-str",
@@ -1367,7 +1367,7 @@ dependencies = [
 
 [[package]]
 name = "lyra_proc"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "heck 0.4.1",
  "itertools 0.12.1",
@@ -1862,9 +1862,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.4"
+version = "1.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
+checksum = "b91213439dad192326a0d7c6ee3955910425f441d7038e0d6933b0aec5c4517f"
 dependencies = [
  "aho-corasick",
  "memchr",

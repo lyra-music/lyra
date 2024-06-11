@@ -1,13 +1,6 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[error("handling confirmation error failed: {:?}", .0)]
-pub enum MatchConfirmationError {
-    Http(#[from] twilight_http::Error),
-    Followup(#[from] super::core::FollowupError),
-}
-
-#[derive(Error, Debug)]
 pub enum ProcessError {
     #[error(transparent)]
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
@@ -25,8 +18,6 @@ pub enum ProcessError {
     Cache(#[from] super::Cache),
     #[error(transparent)]
     HandleVoiceStateUpdate(#[from] super::component::connection::HandleVoiceStateUpdateError),
-    #[error(transparent)]
-    MatchConfirmation(#[from] MatchConfirmationError),
     #[error(transparent)]
     Respond(#[from] super::command::RespondError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]

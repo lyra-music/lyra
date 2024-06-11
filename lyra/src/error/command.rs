@@ -82,7 +82,7 @@ pub enum FlattenedError<'a> {
     PollLoss(&'a check::PollLossError),
     PollVoided(&'a check::PollVoidedError),
     StandbyCanceled(&'a twilight_standby::future::Canceled),
-    Confirmation(&'a util::ConfirmationError),
+    ConfirmationTimedOut(&'a super::ConfirmationTimedOut),
     GatewaySend(&'a twilight_gateway::error::ChannelError),
     AutoJoinSuppressed(&'a util::AutoJoinSuppressedError),
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
@@ -246,7 +246,9 @@ impl<'a> Fe<'a> {
     const fn from_prompt_for_confirmation(error: &'a util::PromptForConfirmationError) -> Fe<'a> {
         match error {
             util::PromptForConfirmationError::StandbyCanceled(e) => Self::StandbyCanceled(e),
-            util::PromptForConfirmationError::Confirmation(e) => Self::Confirmation(e),
+            util::PromptForConfirmationError::ConfirmationTimedout(e) => {
+                Self::ConfirmationTimedOut(e)
+            }
             util::PromptForConfirmationError::Respond(e) => Self::from_respond(e),
         }
     }

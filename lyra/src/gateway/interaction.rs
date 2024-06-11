@@ -32,10 +32,10 @@ use crate::{
                 AlternateVoteResponse, AnotherPollOngoingError, PollLossError, PollLossErrorKind,
             },
             declare::{CommandExecuteError, Fuunacee},
-            util::{AutoJoinSuppressedError, ConfirmationError},
+            util::AutoJoinSuppressedError,
             Error as CommandError, Fe, RespondError,
         },
-        gateway::{MatchConfirmationError, ProcessError, ProcessResult},
+        gateway::{ProcessError, ProcessResult},
         AutoJoinAttemptFailed as AutoJoinAttemptFailedError, EPrint,
         PositionOutOfRange as PositionOutOfRangeError, Suppressed as SuppressedError,
     },
@@ -76,7 +76,9 @@ impl Process for Context {
             }
             // SAFETY: `self.inner.kind` is `MessageComponent`, so this is safe
             InteractionType::MessageComponent => unsafe { self.process_as_component() }.await,
-            InteractionType::ModalSubmit | InteractionType::Ping => Ok(()), // ignored
+            // SAFETY: `self.inner.kind` is `ModalSubmit`, so this is safe
+            InteractionType::ModalSubmit => unsafe { self.process_as_modal() }.await,
+            InteractionType::Ping => Ok(()), // ignored
             _ => unimplemented!(),
         }
     }
@@ -160,7 +162,8 @@ impl Context {
 
     async unsafe fn process_as_autocomplete(mut self) -> ProcessResult {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY:
+            // SAFETY: interaction is of type `ApplicationCommandAutocomplete`,
+            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
             unsafe { unreachable_unchecked() }
         };
 
@@ -182,8 +185,27 @@ impl Context {
     }
 
     #[allow(clippy::unused_async)]
-    async unsafe fn process_as_component(self) -> ProcessResult {
+    async unsafe fn process_as_component(mut self) -> ProcessResult {
+        let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
+            // SAFETY: interaction is of type `MessageComponent`,
+            //         so `self.inner.data.take()` will always be `InteractionData::MessageComponent(_)`
+            unsafe { unreachable_unchecked() }
+        };
+        tracing::trace!(?data);
         // TODO: implement controller
+
+        Ok(())
+    }
+
+    #[allow(clippy::unused_async)]
+    async unsafe fn process_as_modal(mut self) -> ProcessResult {
+        let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
+            // SAFETY: interaction is of type `ModalSubmit`,
+            //         so `self.inner.data.take()` will always be `InteractionData::ModalSubmit(_)`
+            unsafe { unreachable_unchecked() }
+        };
+        tracing::trace!(?data);
+
         Ok(())
     }
 }
@@ -258,7 +280,9 @@ async fn match_error(
                 i
             );
         }
-        Fe::Confirmation(e) => Ok(match_confirmation(e, i).await?),
+        Fe::ConfirmationTimedOut(_) => {
+            sus_fol!("Confirmation timed out.", i);
+        }
         Fe::NoPlayer(_) => {
             let play = InteractionClient::mention_command::<Play>();
             caut!(format!("Not yet played anything. Use {} first.", play), i);
@@ -361,20 +385,6 @@ async fn match_position_out_of_range(
     };
 
     bad!(message, i);
-}
-
-async fn match_confirmation(
-    error: &ConfirmationError,
-    i: InteractionInterface<'_>,
-) -> Result<(), MatchConfirmationError> {
-    match error {
-        ConfirmationError::Cancelled => {
-            note!("Cancelled executing this command.", i);
-        }
-        ConfirmationError::TimedOut => {
-            sus_fol!("Confirmation timed out.", i);
-        }
-    }
 }
 
 async fn match_another_poll_ongoing(

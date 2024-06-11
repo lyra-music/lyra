@@ -6,15 +6,7 @@ use twilight_model::id::{marker::MessageMarker, Id};
 pub enum PromptForConfirmationError {
     StandbyCanceled(#[from] twilight_standby::future::Canceled),
     Respond(#[from] super::RespondError),
-    Confirmation(#[from] ConfirmationError),
-}
-
-#[derive(Error, Debug)]
-pub enum ConfirmationError {
-    #[error("confirmation cancelled")]
-    Cancelled,
-    #[error("confirmation timed out")]
-    TimedOut,
+    ConfirmationTimedout(#[from] crate::error::ConfirmationTimedOut),
 }
 
 #[derive(thiserror::Error, Debug)]

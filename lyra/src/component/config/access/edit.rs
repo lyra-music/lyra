@@ -47,8 +47,7 @@ fn add_access<T: AccessCategoryMarker>(
 
     join_set.spawn(async move {
         sqlx::query(&format!(
-            "--sql
-            INSERT INTO {column}
+            "INSERT INTO {column}
                 SELECT ch_new.guild, ch_new.id
                 FROM (VALUES {values_clause}) AS ch_new (guild, id)
             WHERE NOT EXISTS
@@ -76,8 +75,7 @@ fn remove_access<T: AccessCategoryMarker>(
 
     join_set.spawn(async move {
         sqlx::query(&format!(
-            "--sql
-            DELETE FROM {column}
+            "DELETE FROM {column}
             WHERE guild = $1 AND ({where_clause});
             ",
         ))
