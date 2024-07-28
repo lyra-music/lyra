@@ -229,7 +229,7 @@ impl Queue {
 
     pub async fn not_advance_locked(&self) -> bool {
         let future = self.advance_lock.notified();
-        let duration = *crate::core::r#const::misc::queue_advance_locked_timeout();
+        let duration = *crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT;
         tokio::time::timeout(duration, future).await.is_err()
     }
 

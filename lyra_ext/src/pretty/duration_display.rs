@@ -1,26 +1,19 @@
-use std::{fmt::Display, sync::OnceLock, time::Duration};
+use std::{fmt::Display, sync::LazyLock, time::Duration};
 
 use regex::Regex;
 
-fn timestamp() -> &'static Regex {
-    static TIMESTAMP: OnceLock<Regex> = OnceLock::new();
-    TIMESTAMP.get_or_init(|| {
-        Regex::new(
-            r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$",
-        )
-        .expect("regex is valid")
-    })
-}
+static TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$",
+    )
+    .expect("regex is valid")
+});
 
-fn timestamp_2() -> &'static Regex {
-    static TIMESTAMP_2: OnceLock<Regex> = OnceLock::new();
-    TIMESTAMP_2.get_or_init(|| {
-            Regex::new(
-                r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$"
-            )
-            .expect("regex is valid")
-        })
-}
+static TIMESTAMP_2: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$"
+    ).expect("regex is valid")
+});
 
 pub struct PrettyDurationDisplayer(u128);
 
@@ -53,9 +46,9 @@ where
 
 impl FromPrettyStr for Duration {
     fn from_pretty_str(value: &str) -> Result<Self, FromPrettyStrError> {
-        let captures = if let Some(captures) = timestamp().captures(value) {
+        let captures = if let Some(captures) = TIMESTAMP.captures(value) {
             captures
-        } else if let Some(captures) = timestamp_2().captures(value) {
+        } else if let Some(captures) = TIMESTAMP_2.captures(value) {
             captures
         } else {
             return Err(FromPrettyStrError);

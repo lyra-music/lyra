@@ -39,7 +39,7 @@ use crate::{
     core::{
         model::{CacheAware, InteractionClient},
         r#const::{
-            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::fuzzy_matcher,
+            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
     },
     error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
@@ -156,7 +156,7 @@ pub fn generate_position_choices_from_fuzzy_match<'a>(
             Some((
                 p,
                 t,
-                fuzzy_matcher().fuzzy_match(&format!("{requester} {author} {title}",), focused)?,
+                FUZZY_MATCHER.fuzzy_match(&format!("{requester} {author} {title}",), focused)?,
             ))
         })
         .sorted_by_key(|(_, _, s)| -s)

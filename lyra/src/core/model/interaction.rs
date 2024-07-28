@@ -17,7 +17,7 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
     command::{
-        declare::{message_commands, slash_commands, POPULATED_COMMANDS_MAP},
+        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
         model::CommandInfoAware,
     },
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
@@ -220,9 +220,7 @@ impl<'a> Client<'a> {
     pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
         let commands = self
             .0
-            .set_global_commands(
-                &[slash_commands().as_slice(), message_commands().as_slice()].concat(),
-            )
+            .set_global_commands(&[SLASH_COMMANDS.as_slice(), MESSAGE_COMMANDS.as_slice()].concat())
             .await?
             .models()
             .await?;

@@ -111,7 +111,7 @@ async fn start_inactivity_timeout(
     );
 
     for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(*const_connection::inactivity_timeout_poll_interval()).await;
+        tokio::time::sleep(*const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
         if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
             return Ok(());
         }

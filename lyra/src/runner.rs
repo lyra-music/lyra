@@ -29,7 +29,7 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::{core::r#const::metadata::banner, lavalink::handlers, LavalinkAware};
+use crate::{core::r#const::metadata::BANNER, lavalink::handlers, LavalinkAware};
 
 use super::{
     core::{
@@ -107,7 +107,7 @@ pub async fn start() -> Result<(), StartError> {
         tasks.push(tokio::spawn(handle_gateway_events(shard, bot.clone())));
     }
 
-    println!("{}", banner());
+    println!("{}", *BANNER);
     Ok(wait_until_shutdown(senders, tasks).await?)
 }
 

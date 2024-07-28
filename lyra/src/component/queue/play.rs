@@ -238,7 +238,7 @@ impl BotAutocomplete for Autocomplete {
             })
             .map(|q| {
                 let source = self.source.unwrap_or_default();
-                (!regex::url().is_match(&q))
+                (!regex::URL.is_match(&q))
                     .then(|| format!("{}{}", source.value(), q).into_boxed_str())
                     .unwrap_or_else(|| q.into_boxed_str())
             })
