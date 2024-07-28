@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Display, sync::Arc};
 
-use lyra_ext::time::{rfc3339::rfc3339_time, unix::unix_time};
+use lyra_ext::{iso8601_time, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::Mention;
@@ -41,7 +41,8 @@ use crate::{
         Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{Connection, LavalinkAware},
+    lavalink::Connection,
+    LavalinkAware,
 };
 
 pub(super) enum Response {
@@ -101,17 +102,13 @@ type GetUsersVoiceChannelResult =
     Result<(Id<ChannelMarker>, ChannelType, Option<Id<ChannelMarker>>), GetUsersVoiceChannelError>;
 
 fn get_users_voice_channel(ctx: &GuildCtx<impl CtxKind>) -> GetUsersVoiceChannelResult {
-    let voice_state = ctx
+    let channel_id = ctx
         .cache()
         .voice_state(ctx.author_id(), ctx.guild_id())
-        .ok_or(UserNotInVoiceError)?;
-
-    let channel_id = voice_state.channel_id();
+        .ok_or(UserNotInVoiceError)?
+        .channel_id();
     let voice = ctx.cache().channel(channel_id).ok_or(CacheError)?;
-    let channel_type = voice.kind;
-    let channel_parent_id = voice.parent_id;
-
-    Ok((channel_id, channel_type, channel_parent_id))
+    Ok((channel_id, voice.kind, voice.parent_id))
 }
 
 async fn impl_join(
@@ -169,19 +166,19 @@ async fn connect_to(
 ) -> Result<Response, ConnectToError> {
     check_user_is_stage_manager(channel_type, ctx)?;
 
-    let old_channel_id = ctx
-        .current_voice_state()
-        .map(|voice_state| {
-            let old_channel_id = voice_state.channel_id();
+    let old_channel_id = match require::in_voice(ctx) {
+        Ok(ref in_voice) => {
+            let old_channel_id = in_voice.channel_id();
             if old_channel_id == channel_id {
-                Err(error::InVoiceAlready(channel_id))?;
+                return Err(error::InVoiceAlready(channel_id).into());
             }
 
-            check::noone_else_in(old_channel_id, ctx)?;
+            check::noone_else_in(in_voice.into(), ctx)?;
 
-            Ok::<_, ConnectToError>(old_channel_id)
-        })
-        .transpose()?;
+            Some(old_channel_id)
+        }
+        Err(_) => None,
+    };
 
     Ok(impl_connect_to(
         channel_id,
@@ -206,7 +203,7 @@ async fn impl_connect_to(
         .bot_permissions_for(channel_id)?
         .contains(Permissions::CONNECT)
     {
-        Err(error::ConnectionForbidden(channel_id))?;
+        return Err(error::ConnectionForbidden(channel_id).into());
     }
 
     check::user_allowed_to_use(channel_id, channel_parent_id, ctx).await?;
@@ -215,11 +212,12 @@ async fn impl_connect_to(
 
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
 
+    let lavalink = ctx.lavalink();
     let response = old_channel_id.map_or_else(
         || {
             let connection = Connection::new(channel_id, ctx.channel_id());
             connection.notify_change();
-            ctx.lavalink().new_connection_with(guild_id, connection);
+            lavalink.new_connection_with(guild_id, connection);
             Response::Joined {
                 voice: joined,
                 empty: voice_is_empty,
@@ -228,13 +226,11 @@ async fn impl_connect_to(
         |from| {
             // SAFETY: `old_channel_id` is of variant `Some`, meaning another connection exists,
             //         so `ctx.lavalink().get_connection_mut(guild_id).unwrap_unchecked()` is safe
-            let mut connection = unsafe {
-                ctx.lavalink()
-                    .get_connection_mut(guild_id)
-                    .unwrap_unchecked()
-            };
+            let mut connection =
+                unsafe { lavalink.get_connection_mut(guild_id).unwrap_unchecked() };
             connection.channel_id = channel_id;
             connection.notify_change();
+            drop(connection);
             Response::Moved {
                 from,
                 to: joined,
@@ -251,7 +247,7 @@ async fn impl_connect_to(
             .http()
             .update_current_user_voice_state(guild_id)
             .channel_id(channel_id)
-            .request_to_speak_timestamp(&rfc3339_time())
+            .request_to_speak_timestamp(&iso8601_time())
             .await?;
     }
 
@@ -322,7 +318,10 @@ async fn handle_response(
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
-            out!(stage_fmt(&format!("🖇️ {}", voice.id.mention()), stage), ?ctx);
+            out!(
+                stage_fmt(&format!("🖇️ {}", voice.id.mention()), stage),
+                ?ctx
+            );
             (voice, empty)
         }
         Response::Moved { from, to, empty } => {
@@ -419,7 +418,7 @@ impl BotSlashCommand for Join {
                     ctx
                 );
             }
-            Pfe::Other(e) => Err(e)?,
+            Pfe::Other(e) => Err(e.into()),
         }
     }
 }

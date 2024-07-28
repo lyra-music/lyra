@@ -4,19 +4,19 @@ use twilight_model::{
 };
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, CtxKind, CtxLocation, Guild, UnitRespondResult,
+    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location, UnitRespondResult,
 };
 
-pub struct ModalMarker;
-impl CtxKind for ModalMarker {}
-pub type ModalCtx = Ctx<ModalMarker>;
-pub type GuildModalCtx = Ctx<ModalMarker, Guild>;
+pub struct Marker;
+impl Kind for Marker {}
+pub type Modal = Ctx<Marker>;
+pub type Guild = Ctx<Marker, GuildMarker>;
 
-pub trait RespondViaModal: CtxKind {}
-impl<T: AppCtxKind> RespondViaModal for AppCtxMarker<T> {}
-impl RespondViaModal for ComponentMarker {}
+pub trait RespondVia: Kind {}
+impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
+impl RespondVia for ComponentMarker {}
 
-impl<U: CtxLocation> Ctx<ModalMarker, U> {
+impl<U: Location> Ctx<Marker, U> {
     pub fn submit_data(&self) -> &ModalInteractionData {
         let Some(InteractionData::ModalSubmit(ref data)) = self.inner.data else {
             // SAFETY: `self` is `Ctx<ModalMarker, _>`,
@@ -27,7 +27,7 @@ impl<U: CtxLocation> Ctx<ModalMarker, U> {
     }
 }
 
-impl<T: RespondViaModal, U: CtxLocation> Ctx<T, U> {
+impl<T: RespondVia, U: Location> Ctx<T, U> {
     pub async fn modal(
         &mut self,
         custom_id: impl Into<String> + Send,

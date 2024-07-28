@@ -17,7 +17,11 @@ pub enum ProcessError {
     #[error(transparent)]
     Cache(#[from] super::Cache),
     #[error(transparent)]
-    HandleVoiceStateUpdate(#[from] super::component::connection::HandleVoiceStateUpdateError),
+    ConnectionHandleVoiceStateUpdate(
+        #[from] super::component::connection::HandleVoiceStateUpdateError,
+    ),
+    #[error(transparent)]
+    PlaybackHandleVoiceStateUpdate(#[from] super::component::playback::HandleVoiceStateUpdateError),
     #[error(transparent)]
     Respond(#[from] super::command::RespondError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]

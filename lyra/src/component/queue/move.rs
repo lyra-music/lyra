@@ -13,7 +13,8 @@ use crate::{
     component::queue::normalize_queue_position,
     core::model::CacheAware,
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::{CorrectTrackInfo, PlayerAware},
+    lavalink::CorrectTrackInfo,
+    LavalinkAndGuildIdAware,
 };
 
 enum MoveAutocompleteOptionType {
@@ -28,11 +29,12 @@ struct MoveAutocompleteOptions {
     kind: MoveAutocompleteOptionType,
 }
 
-async fn generate_move_autocomplete_choices(
+#[allow(clippy::significant_drop_tightening)]
+async fn generate_move_choices(
     options: &MoveAutocompleteOptions,
-    ctx: &(impl PlayerAware + CacheAware + Sync),
+    cx: &(impl LavalinkAndGuildIdAware + CacheAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Ok(player) = require::player(ctx) else {
+    let Ok(player) = require::player(cx) else {
         return Vec::new();
     };
     let data = player.data();
@@ -41,10 +43,7 @@ async fn generate_move_autocomplete_choices(
         return Vec::new();
     };
 
-    let queue_iter = queue
-        .iter()
-        .enumerate()
-        .filter_map(|(i, t)| NonZeroUsize::new(i + 1).map(|i| (i, t)));
+    let queue_iter = queue.iter_positions_and_items();
 
     let excluded = match options.kind {
         MoveAutocompleteOptionType::TrackFocused | MoveAutocompleteOptionType::PositionFocused => {
@@ -67,9 +66,9 @@ async fn generate_move_autocomplete_choices(
     };
 
     match options.focused.parse::<i64>() {
-        Ok(input) => super::generate_position_choices_from_input(
-            input, queue_len, queue_iter, &excluded, ctx,
-        ),
+        Ok(input) => {
+            super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
+        }
         Err(e) if matches!(e.kind(), std::num::IntErrorKind::Empty) => match options.kind {
             MoveAutocompleteOptionType::TrackFocused
             | MoveAutocompleteOptionType::TrackFocusedPositionCompleted(_) => {
@@ -78,13 +77,13 @@ async fn generate_move_autocomplete_choices(
                     queue_len,
                     queue_iter,
                     &excluded,
-                    ctx,
+                    cx,
                 )
             }
             MoveAutocompleteOptionType::PositionFocused
             | MoveAutocompleteOptionType::PositionFocusedTrackCompleted(_) => {
                 super::generate_position_choices_reversed(
-                    queue_len, queue_len, queue_iter, &excluded, ctx,
+                    queue_len, queue_len, queue_iter, &excluded, cx,
                 )
             }
         },
@@ -92,7 +91,7 @@ async fn generate_move_autocomplete_choices(
             &options.focused,
             queue_iter,
             &excluded,
-            ctx,
+            cx,
         ),
     }
 }
@@ -131,7 +130,7 @@ impl BotAutocomplete for Autocomplete {
             focused: focused.into_boxed_str(),
             kind,
         };
-        let choices = generate_move_autocomplete_choices(&options, &ctx).await;
+        let choices = generate_move_choices(&options, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)
     }
 }
@@ -149,15 +148,15 @@ pub struct Move {
 }
 
 impl BotSlashCommand for Move {
+    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let in_voice_with_user =
-            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
+        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
+        let player = require::player(&ctx)?;
 
         let data = player.data();
         let mut data_w = data.write().await;
-        let queue = data_w.queue_mut();
+        let queue = require::queue_not_empty_mut(&mut data_w)?;
         let queue_len = queue.len();
 
         if queue_len == 1 {
@@ -167,7 +166,8 @@ impl BotSlashCommand for Move {
             );
         }
 
-        super::validate_input_positions(&[self.track, self.position], queue_len)?;
+        super::validate_input_position(self.track, queue_len)?;
+        super::validate_input_position(self.position, queue_len)?;
 
         if self.track == self.position {
             bad!(
@@ -176,17 +176,24 @@ impl BotSlashCommand for Move {
             );
         }
 
-        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let position = unsafe { NonZeroUsize::new_unchecked(self.position as usize) };
-        check::users_track(position, in_voice_with_user, queue, &ctx)?;
+        #[allow(clippy::cast_possible_truncation)]
+        let (track_usize, position_usize) = (
+            self.track.unsigned_abs() as usize,
+            self.position.unsigned_abs() as usize,
+        );
 
         // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let track_position = unsafe { NonZeroUsize::new_unchecked(self.track as usize) };
+        let position = unsafe { NonZeroUsize::new_unchecked(position_usize) };
+        let track = &queue[position];
+        check::track_is_users(track, position, in_voice_with_user)?;
+
+        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
+        let track_position = unsafe { NonZeroUsize::new_unchecked(track_usize) };
         let queue_position = queue.position();
 
         // SAFETY: `track_position.get() - 1` has been validated to be in-bounds, so this unwrap is safe
         let track = unsafe { queue.remove(track_position.get() - 1).unwrap_unchecked() };
-        let track_title = track.track().info.corrected_title();
+        let track_title = track.data().info.corrected_title();
         let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 
         let insert_position = position.get() - 1;

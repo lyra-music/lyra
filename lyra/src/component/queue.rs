@@ -8,11 +8,16 @@ mod repeat;
 mod shuffle;
 
 pub use clear::Clear;
+#[allow(clippy::module_name_repetitions)]
 pub use fair_queue::FairQueue;
-use lyra_ext::pretty::{
-    duration_display::PrettyDurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator,
+use lyra_ext::{
+    num::usize_to_i64_truncating,
+    pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
-pub use play::{AddToQueue, Autocomplete as PlayAutocomplete, File as PlayFile, Play};
+
+#[allow(clippy::module_name_repetitions)]
+pub use play::AddToQueue;
+pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
@@ -29,7 +34,7 @@ use crate::{
     command::{
         macros::{note_fol, out},
         model::{GuildCtx, RespondViaMessage},
-        require::Player,
+        require::PlayerInterface,
     },
     core::{
         model::{CacheAware, InteractionClient},
@@ -44,12 +49,12 @@ use crate::{
 fn generate_position_choice(
     position: NonZeroUsize,
     track: &QueueItem,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> CommandOptionChoice {
-    let track_info = &track.track().info;
+    let track_info = &track.data().info;
     let track_length = Duration::from_millis(track_info.length);
-    let requester = ctx.cache().user(track.requester()).map_or_else(
-        || "Unknown User".into(),
+    let requester = cx.cache().user(track.requester()).map_or_else(
+        || String::from("Unknown User"),
         |u| {
             u.global_name
                 .clone()
@@ -68,16 +73,16 @@ fn generate_position_choice(
             track_info.corrected_title().pretty_truncate(53)
         ),
         name_localizations: None,
-        value: CommandOptionChoiceValue::Integer(position.get() as i64),
+        value: CommandOptionChoiceValue::Integer(usize_to_i64_truncating(position.get())),
     }
 }
 
-fn generate_position_choices<'a>(
+pub fn generate_position_choices<'a>(
     position: NonZeroUsize,
     queue_len: NonZeroUsize,
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     impl_generate_position_choices(
         queue_iter
@@ -85,7 +90,7 @@ fn generate_position_choices<'a>(
             .skip_while(|(p, _)| *p < position)
             .take(queue_len.get()),
         excluded,
-        ctx,
+        cx,
     )
 }
 
@@ -94,7 +99,7 @@ fn generate_position_choices_reversed<'a>(
     queue_len: NonZeroUsize,
     queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     impl_generate_position_choices(
         queue_iter
@@ -103,48 +108,48 @@ fn generate_position_choices_reversed<'a>(
             .skip_while(|(p, _)| *p > position)
             .take(queue_len.get()),
         excluded,
-        ctx,
+        cx,
     )
 }
 
 fn impl_generate_position_choices<'a>(
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)> + Clone,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     queue_iter
         .filter(|(p, _)| !excluded.contains(p))
         .take(COMMAND_CHOICES_LIMIT)
-        .map(|(p, t)| generate_position_choice(p, t, ctx))
+        .map(|(p, t)| generate_position_choice(p, t, cx))
         .collect()
 }
 
-fn generate_position_choices_from_input<'a>(
+pub fn generate_position_choices_from_input<'a>(
     input: i64,
     queue_len: NonZeroUsize,
     queue_iter: impl Clone + DoubleEndedIterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     normalize_queue_position(input, queue_len)
         .filter(|p| !excluded.contains(p))
         .map_or_else(Vec::new, |position| {
             if input.is_positive() {
-                return generate_position_choices(position, queue_len, queue_iter, excluded, ctx);
+                return generate_position_choices(position, queue_len, queue_iter, excluded, cx);
             }
-            generate_position_choices_reversed(position, queue_len, queue_iter, excluded, ctx)
+            generate_position_choices_reversed(position, queue_len, queue_iter, excluded, cx)
         })
 }
 
-fn generate_position_choices_from_fuzzy_match<'a>(
+pub fn generate_position_choices_from_fuzzy_match<'a>(
     focused: &str,
     queue_iter: impl Iterator<Item = (NonZeroUsize, &'a QueueItem)>,
     excluded: &HashSet<NonZeroUsize>,
-    ctx: &impl CacheAware,
+    cx: &impl CacheAware,
 ) -> Vec<CommandOptionChoice> {
     let queue_iter = queue_iter
         .filter_map(|(p, t)| {
-            let track_info = &t.track().info;
+            let track_info = &t.data().info;
             let author = track_info.corrected_author();
             let title = track_info.corrected_title();
             let requester = t.requester();
@@ -156,32 +161,33 @@ fn generate_position_choices_from_fuzzy_match<'a>(
         })
         .sorted_by_key(|(_, _, s)| -s)
         .map(|(p, t, _)| (p, t));
-    impl_generate_position_choices(queue_iter, excluded, ctx)
+    impl_generate_position_choices(queue_iter, excluded, cx)
 }
 
 fn normalize_queue_position(position: i64, queue_len: NonZeroUsize) -> Option<NonZeroUsize> {
-    (1..=queue_len.get())
-        .contains(&(position.unsigned_abs() as usize))
-        .then(|| {
-            NonZeroUsize::new(
-                position
-                    .is_positive()
-                    .then(|| position.unsigned_abs() as usize)
-                    .unwrap_or_else(|| queue_len.get() - position.unsigned_abs() as usize + 1),
-            )
-        })?
+    #[allow(clippy::cast_possible_truncation)]
+    let position_usize = position.unsigned_abs() as usize;
+
+    (1..=queue_len.get()).contains(&position_usize).then(|| {
+        NonZeroUsize::new(
+            position
+                .is_positive()
+                .then_some(position_usize)
+                .unwrap_or_else(|| queue_len.get() - position_usize + 1),
+        )
+    })?
 }
 
-fn validate_input_positions(
-    inputs: &[i64],
+pub const fn validate_input_position(
+    input: i64,
     queue_len: usize,
 ) -> Result<(), PositionOutOfRangeError> {
-    if let Some(&position) = inputs.iter().find(|&i| !(1..=queue_len as i64).contains(i)) {
+    if 1 > input || input > usize_to_i64_truncating(queue_len) {
         return Err(if queue_len == 1 {
-            PositionOutOfRangeError::OnlyTrack(position)
+            PositionOutOfRangeError::OnlyTrack(input)
         } else {
             PositionOutOfRangeError::OutOfRange {
-                position,
+                position: input,
                 queue_len,
             }
         });
@@ -190,19 +196,33 @@ fn validate_input_positions(
     Ok(())
 }
 
+fn validate_input_positions(
+    inputs: &[i64],
+    queue_len: usize,
+) -> Result<(), PositionOutOfRangeError> {
+    inputs
+        .iter()
+        .try_for_each(|&input| validate_input_position(input, queue_len))?;
+
+    Ok(())
+}
+
 async fn remove_range(
     start: i64,
     end: i64,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
-    player: &Player,
+    player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
+    #[allow(clippy::cast_possible_truncation)]
+    let (start_usize, end_usize) = (start.unsigned_abs() as usize, end.unsigned_abs() as usize);
+
     let data = player.data();
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
 
-    let range = (start - 1) as usize..=(end - 1) as usize;
+    let range = (start_usize - 1)..end_usize;
     let queue_len = queue.len();
-    let positions_len = (end - start) as usize + 1;
+    let positions_len = (end_usize - start_usize) + 1;
     let queue_cleared = positions_len > 1 && positions_len == queue_len;
     let removed = if queue_cleared {
         queue.drain_all().collect::<Vec<_>>()
@@ -210,8 +230,8 @@ async fn remove_range(
         queue.drain(range).collect()
     };
 
-    let positions = (start..=end)
-        .filter_map(|p| NonZeroUsize::new(p as usize))
+    let positions = (start_usize..=end_usize)
+        .filter_map(NonZeroUsize::new)
         .collect();
 
     drop(data_w);
@@ -221,7 +241,7 @@ async fn remove_range(
 async fn remove(
     positions: Box<[NonZeroUsize]>,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
-    player: &Player,
+    player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
     let mut data_w = data.write().await;
@@ -240,12 +260,13 @@ async fn remove(
     impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
+#[allow(clippy::significant_drop_tightening)]
 async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
     queue_cleared: bool,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
-    player: &Player,
+    player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
     let mut data_w = data.write().await;
@@ -256,8 +277,8 @@ async fn impl_remove(
         0 => String::new(),
         1..=ADD_TRACKS_WRAP_LIMIT => removed
             .into_iter()
-            .map(|t| format!("`{}`", t.into_track().info.corrected_title()))
-            .collect::<Vec<_>>()
+            .map(|t| format!("`{}`", t.into_data().info.corrected_title()))
+            .collect::<Box<[_]>>()
             .pretty_join_with_and(),
         _ => format!("`{removed_len} tracks`"),
     };
@@ -274,17 +295,15 @@ async fn impl_remove(
     *queue.index_mut() -= positions[..before_current].len();
 
     if positions.binary_search(&current).is_ok() {
-        queue.adjust_repeat_mode();
-        let next = queue.current().map(|t| t.track().clone());
+        queue.downgrade_repeat_mode();
+        let next = queue.current().map(QueueItem::data);
 
-        queue
-            .with_advance_lock_and_stopped(&player.context, |p| async move {
-                if let Some(ref next) = next {
-                    p.play(next).await?;
-                }
-                Ok(())
-            })
-            .await?;
+        if let Some(next) = next {
+            queue.acquire_advance_lock();
+            player.context.play_now(next).await?;
+        } else {
+            player.acquire_advance_lock_and_stop_with(queue).await?;
+        }
     }
 
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);

@@ -24,7 +24,7 @@ use crate::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
-        r#const::exit_code::{DUBIOUS, FORBIDDEN, WARNING},
+        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
     },
     error::{
         command::{
@@ -36,10 +36,11 @@ use crate::{
             Error as CommandError, Fe, RespondError,
         },
         gateway::{ProcessError, ProcessResult},
-        AutoJoinAttemptFailed as AutoJoinAttemptFailedError, EPrint,
-        PositionOutOfRange as PositionOutOfRangeError, Suppressed as SuppressedError,
+        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
+        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
+        Suppressed as SuppressedError,
     },
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -140,10 +141,10 @@ impl Context {
         };
 
         match source.flatten_until_user_not_allowed_as() {
-            Fuunacee::UserNotAllowed(_) => {
+            Fuunacee::UserNotAllowed => {
                 nope!("You are not allowed to use commands in this context.", i);
             }
-            Fuunacee::Command(_) => {
+            Fuunacee::Command => {
                 let CommandExecuteError::Command(error) = source else {
                     // SAFETY: `source.flatten_until_user_not_allowed_as()` is `Fuunacee::Command(_)`,
                     //         so the unflattened source error must be `CommandExecuteError::Command(_)`
@@ -216,21 +217,21 @@ async fn match_error(
     i: InteractionInterface<'_>,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
-        Fe::Cache(_) => {
+        Fe::Cache => {
             tracing::warn!("cache error: {:#?}", error);
 
             crit!("Something isn't working at the moment, try again later.", i);
         }
-        Fe::UserNotDj(_) => {
+        Fe::UserNotDj => {
             nope!("You need to be a ***DJ*** to do that.", i);
         }
-        Fe::UserNotAccessManager(_) => {
+        Fe::UserNotAccessManager => {
             nope!("You need to be an ***Access Manager*** to do that.", i);
         }
         // Fe::UserNotPlaylistManager(_) => {
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
         // }
-        Fe::NotInVoice(_) => {
+        Fe::NotInVoice => {
             let join = InteractionClient::mention_command::<Join>();
             let play = InteractionClient::mention_command::<Play>();
             caut!(
@@ -251,7 +252,7 @@ async fn match_error(
             );
         }
         Fe::InVoiceWithSomeoneElse(e) => {
-            nope!(e.eprint(), i);
+            nope!(e.pretty_display(), i);
         }
         Fe::InVoiceWithoutSomeoneElse(e) => {
             bad!(format!("Not enough people are in {}.", e.0.mention()), i);
@@ -259,31 +260,38 @@ async fn match_error(
         Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
         Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
-        Fe::Stopped(_) => todo!(),
-        Fe::NotPlaying(_) => todo!(),
-        Fe::Paused(_) => todo!(),
-        Fe::QueueNotSeekable(e) => {
-            nope!(e.eprint(), i);
+        Fe::Stopped => todo!(),
+        Fe::NotPlaying => {
+            bad!("Currently not playing anything.", i);
         }
-        Fe::QueueEmpty(_) => {
+        Fe::Paused => {
+            bad!("Currently paused.", i);
+        }
+        Fe::QueueNotSeekable(e) => {
+            nope!(e.pretty_display(), i);
+        }
+        Fe::QueueEmpty => {
             bad!("The queue is currently empty.", i);
         }
         Fe::PositionOutOfRange(e) => Ok(match_position_out_of_range(e, i).await?),
         Fe::NotUsersTrack(e) => {
-            nope!(e.eprint(), i);
+            nope!(e.pretty_display(), i);
         }
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
         Fe::PollVoided(e) => {
             out_upd!(
-                format!("{WARNING} This poll has been voided as: {}.", e.eprint()),
+                format!(
+                    "{WARNING} This poll has been voided as: {}.",
+                    e.pretty_display()
+                ),
                 i
             );
         }
-        Fe::ConfirmationTimedOut(_) => {
+        Fe::ConfirmationTimedOut => {
             sus_fol!("Confirmation timed out.", i);
         }
-        Fe::NoPlayer(_) => {
+        Fe::NoPlayer => {
             let play = InteractionClient::mention_command::<Play>();
             caut!(format!("Not yet played anything. Use {} first.", play), i);
         }
@@ -427,5 +435,8 @@ async fn match_poll_loss(error: &PollLossError, i: InteractionInterface<'_>) -> 
         PollLossErrorKind::SupersededLossViaDj => "The poll was superseded to lose by a DJ: ",
     };
 
-    out_upd!(format!("{FORBIDDEN} {source_txt}{}", source.eprint()), i);
+    out_upd!(
+        format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
+        i
+    );
 }

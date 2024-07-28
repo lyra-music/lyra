@@ -75,7 +75,7 @@ impl BotSlashCommand for Set {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetPitch::new(self.multiplier) else {
-            bad!("Multiplier must not be 0", ctx);
+            bad!("Multiplier must not be zero", ctx);
         };
 
         let multiplier = update.multiplier();

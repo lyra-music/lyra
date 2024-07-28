@@ -14,10 +14,10 @@ use twilight_model::{
     gateway::payload::incoming::InteractionCreate,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, GuildMarker, UserMarker},
+        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
         Id,
     },
-    user::User,
+    user::User as TwilightUser,
 };
 
 use crate::{
@@ -30,25 +30,26 @@ use crate::{
         command::RespondError, core::DeserializeBodyFromHttpError, Cache, CacheResult, NotInGuild,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
-    lavalink::{Lavalink, LavalinkAware, PlayerAware},
+    lavalink::Lavalink,
+    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 use super::PartialInteractionData;
 
-use self::modal::ModalMarker;
+use self::modal::Marker as ModalMarker;
 pub use self::{
-    autocomplete::AutocompleteCtx,
-    command_data::CommandDataAware,
-    menu::{MessageCtx, UserCtx},
-    message::RespondViaMessage,
-    modal::{GuildModalCtx, RespondViaModal},
+    autocomplete::Autocomplete,
+    command_data::Aware as CommandDataAware,
+    menu::{Message, User},
+    message::RespondVia as RespondViaMessage,
+    modal::{Guild as GuildModal, RespondVia as RespondViaModal},
 };
 
 type RespondResult<T> = Result<T, RespondError>;
 type UnitRespondResult = RespondResult<()>;
-type CachedBotMember<'a> = Reference<'a, (Id<GuildMarker>, Id<UserMarker>), CachedMember>;
+type CachedBotMember<'a> = Reference<'a, (Id<TwilightGuildMarker>, Id<UserMarker>), CachedMember>;
 
-pub trait CtxKind {}
+pub trait Kind {}
 
 pub trait AppCtxKind {}
 
@@ -56,27 +57,31 @@ pub struct SlashAppMarker;
 impl AppCtxKind for SlashAppMarker {}
 
 pub struct AppCtxMarker<T: AppCtxKind>(PhantomData<fn(T) -> T>);
-impl<T: AppCtxKind> CtxKind for AppCtxMarker<T> {}
+impl<T: AppCtxKind> Kind for AppCtxMarker<T> {}
 
 pub type SlashMarker = AppCtxMarker<SlashAppMarker>;
-pub type SlashCtx = Ctx<SlashMarker>;
-pub type GuildSlashCtx = Ctx<SlashMarker, Guild>;
+pub type Slash = Ctx<SlashMarker>;
+pub type GuildSlash = Ctx<SlashMarker, GuildMarker>;
 
 pub struct ComponentMarker;
-impl CtxKind for ComponentMarker {}
+impl Kind for ComponentMarker {}
 
-pub type ComponentCtx = Ctx<ComponentMarker>;
+pub type Component = Ctx<ComponentMarker>;
 
-pub trait CtxLocation {}
+pub trait Location {}
 
 pub struct Unknown;
-impl CtxLocation for Unknown {}
+impl Location for Unknown {}
 
-pub struct Guild;
-impl CtxLocation for Guild {}
-pub type GuildCtx<T> = Ctx<T, Guild>;
+pub struct GuildMarker;
+impl Location for GuildMarker {}
+pub type Guild<T> = Ctx<T, GuildMarker>;
 
-pub struct Ctx<Of: CtxKind, In: CtxLocation = Unknown> {
+pub struct Ctx<Of, In = Unknown>
+where
+    Of: Kind,
+    In: Location,
+{
     inner: Box<InteractionCreate>,
     bot: OwnedBotState,
     latency: Latency,
@@ -87,7 +92,7 @@ pub struct Ctx<Of: CtxKind, In: CtxLocation = Unknown> {
     location: PhantomData<fn(In) -> In>,
 }
 
-impl<T: CtxKind> TryFrom<Ctx<T>> for Ctx<T, Guild> {
+impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
     type Error = NotInGuild;
 
     fn try_from(value: Ctx<T>) -> Result<Self, Self::Error> {
@@ -100,12 +105,12 @@ impl<T: CtxKind> TryFrom<Ctx<T>> for Ctx<T, Guild> {
             data: value.data,
             acknowledged: value.acknowledged,
             kind: value.kind,
-            location: PhantomData::<fn(Guild) -> Guild>,
+            location: PhantomData::<fn(GuildMarker) -> GuildMarker>,
         })
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> Ctx<T, U> {
+impl<T: Kind, U: Location> Ctx<T, U> {
     pub fn into_modal_interaction(self, inner: Box<InteractionCreate>) -> Ctx<ModalMarker, U> {
         Ctx {
             inner,
@@ -145,7 +150,7 @@ impl<T: CtxKind, U: CtxLocation> Ctx<T, U> {
         unsafe { self.inner.channel_unchecked() }
     }
 
-    pub fn author(&self) -> &User {
+    pub fn author(&self) -> &TwilightUser {
         // SAFETY: Interaction type is not `Ping`, so `author()` is present.
         unsafe { self.inner.author_unchecked() }
     }
@@ -162,7 +167,7 @@ impl<T: CtxKind, U: CtxLocation> Ctx<T, U> {
         Ok(self.bot.interaction().await?.interfaces(&self.inner))
     }
 
-    pub unsafe fn guild_id_unchecked(&self) -> Id<GuildMarker> {
+    pub unsafe fn guild_id_unchecked(&self) -> Id<TwilightGuildMarker> {
         // SAFETY: this interaction was invoked in a guild,
         //         so `self.inner.guild_id` is present
         unsafe { self.get_guild_id().unwrap_unchecked() }
@@ -190,7 +195,7 @@ impl<T: CtxKind, U: CtxLocation> Ctx<T, U> {
     }
 }
 
-impl<T: CtxKind> Ctx<T, Guild> {
+impl<T: Kind> Ctx<T, GuildMarker> {
     pub fn bot_member(&self) -> CacheResult<CachedBotMember> {
         self.cache()
             .member(self.guild_id(), self.bot().user_id())
@@ -249,66 +254,66 @@ impl<T: CtxKind> Ctx<T, Guild> {
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> BotStateAware for Ctx<T, U> {
+impl<T: Kind, U: Location> BotStateAware for Ctx<T, U> {
     fn bot(&self) -> &BotState {
         &self.bot
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> OwnedBotStateAware for Ctx<T, U> {
+impl<T: Kind, U: Location> OwnedBotStateAware for Ctx<T, U> {
     fn bot_owned(&self) -> Arc<BotState> {
         self.bot.clone()
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> SenderAware for Ctx<T, U> {
+impl<T: Kind, U: Location> SenderAware for Ctx<T, U> {
     fn sender(&self) -> &MessageSender {
         &self.sender
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> CacheAware for Ctx<T, U> {
+impl<T: Kind, U: Location> CacheAware for Ctx<T, U> {
     fn cache(&self) -> &InMemoryCache {
         self.bot.cache()
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> HttpAware for Ctx<T, U> {
+impl<T: Kind, U: Location> HttpAware for Ctx<T, U> {
     fn http(&self) -> &HttpClient {
         self.bot.http()
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> LavalinkAware for Ctx<T, U> {
+impl<T: Kind, U: Location> LavalinkAware for Ctx<T, U> {
     fn lavalink(&self) -> &Lavalink {
         self.bot.lavalink()
     }
 }
 
-impl<T: CtxKind> PlayerAware for GuildCtx<T> {}
+impl<T: Kind> LavalinkAndGuildIdAware for Guild<T> {}
 
-impl<T: CtxKind, U: CtxLocation> OptionallyGuildIdAware for Ctx<T, U> {
-    fn get_guild_id(&self) -> Option<Id<GuildMarker>> {
+impl<T: Kind, U: Location> OptionallyGuildIdAware for Ctx<T, U> {
+    fn get_guild_id(&self) -> Option<Id<TwilightGuildMarker>> {
         self.inner.guild_id
     }
 }
 
-impl<T: CtxKind, U: CtxLocation> AuthorIdAware for Ctx<T, U> {
+impl<T: Kind, U: Location> AuthorIdAware for Ctx<T, U> {
     fn author_id(&self) -> Id<UserMarker> {
         self.author().id
     }
 }
 
-impl<T: CtxKind> GuildIdAware for Ctx<T, Guild> {
+impl<T: Kind> GuildIdAware for Ctx<T, GuildMarker> {
     #[inline]
-    fn guild_id(&self) -> Id<GuildMarker> {
+    fn guild_id(&self) -> Id<TwilightGuildMarker> {
         // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
         //         so `self.guild_id_unchecked()` is safe.
         unsafe { self.guild_id_unchecked() }
     }
 }
 
-impl<T: CtxKind> AuthorPermissionsAware for Ctx<T, Guild> {
+impl<T: Kind> AuthorPermissionsAware for Ctx<T, GuildMarker> {
     fn author_permissions(&self) -> Permissions {
         // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
         //          so `self.author_permissions_unchecked()` is safe.
@@ -316,9 +321,9 @@ impl<T: CtxKind> AuthorPermissionsAware for Ctx<T, Guild> {
     }
 }
 
-pub struct WeakGuildCtx<'a, T: CtxKind>(&'a Ctx<T>);
+pub struct GuildRef<'a, T: Kind>(&'a Ctx<T>);
 
-impl<'a, T: CtxKind> TryFrom<&'a Ctx<T>> for WeakGuildCtx<'a, T> {
+impl<'a, T: Kind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
     type Error = NotInGuild;
 
     fn try_from(value: &'a Ctx<T>) -> Result<Self, Self::Error> {
@@ -327,8 +332,8 @@ impl<'a, T: CtxKind> TryFrom<&'a Ctx<T>> for WeakGuildCtx<'a, T> {
     }
 }
 
-impl<T: CtxKind> GuildIdAware for WeakGuildCtx<'_, T> {
-    fn guild_id(&self) -> Id<GuildMarker> {
+impl<T: Kind> GuildIdAware for GuildRef<'_, T> {
+    fn guild_id(&self) -> Id<TwilightGuildMarker> {
         // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
         //         proving that this was an interaction invoked in a guild,
         //         so `self.0.guild_id_unchecked()` is safe.
@@ -336,7 +341,7 @@ impl<T: CtxKind> GuildIdAware for WeakGuildCtx<'_, T> {
     }
 }
 
-impl<T: CtxKind> WeakGuildCtx<'_, T> {
+impl<T: Kind> GuildRef<'_, T> {
     pub fn member(&self) -> &PartialMember {
         // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
         //          proving that this was an interaction invoked in a guild,
@@ -345,7 +350,7 @@ impl<T: CtxKind> WeakGuildCtx<'_, T> {
     }
 }
 
-impl<T: CtxKind> AuthorPermissionsAware for WeakGuildCtx<'_, T> {
+impl<T: Kind> AuthorPermissionsAware for GuildRef<'_, T> {
     fn author_permissions(&self) -> Permissions {
         // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
         //          proving that this was an interaction invoked in a guild,

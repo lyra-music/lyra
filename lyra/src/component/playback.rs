@@ -1,71 +1,67 @@
-// use anyhow::Result;
-// use twilight_lavalink::model::{Pause, Seek, Stop};
-// use twilight_model::gateway::payload::incoming::MessageCreate;
+mod back;
+mod jump;
+mod play_pause;
+mod restart;
+mod seek;
+mod skip;
 
-// use crate::{
-//     commands::{models::App, Context},
-//     lavalink::LavalinkAware,
-// };
+pub use jump::{Autocomplete as JumpAutocomplete, Jump};
+pub use play_pause::PlayPause;
+pub use restart::Restart;
+pub use seek::Seek;
 
-// pub async fn pause(ctx: Context<App>) -> Result<()> {
-//     tracing::debug!(
-//         "pause command in channel {} by {}",
-//         ctx.channel_id(),
-//         ctx.author().name
-//     );
+use crate::{
+    command::require,
+    core::model::{BotStateAware, HttpAware},
+    error::component::playback::HandleVoiceStateUpdateError,
+    gateway::voice::Context,
+    LavalinkAndGuildIdAware,
+};
 
-//     let guild_id = ctx.guild_id().unwrap();
-//     let player = ctx.lavalink().player(guild_id).await.unwrap();
-//     let paused = player.paused();
-//     player.send(Pause::from((guild_id, !paused)))?;
+use super::connection::users_in_voice;
 
-//     let action = if paused { "Unpaused " } else { "Paused" };
+#[tracing::instrument(skip_all, name = "voice_state_update")]
+pub async fn handle_voice_state_update(
+    ctx: &Context,
+    connection_changed: bool,
+) -> Result<(), HandleVoiceStateUpdateError> {
+    let state = ctx.inner.as_ref();
+    let maybe_old_state = ctx.old_voice_state();
 
-//     ctx.respond(&format!("{action} the track")).await?;
+    tracing::trace!("handling voice state update");
+    let (connected_channel_id, text_channel_id) = {
+        let Some(connection) = ctx.get_connection() else {
+            tracing::trace!("no active connection");
+            return Ok(());
+        };
 
-//     Ok(())
-// }
+        if connection_changed {
+            tracing::trace!("received connection change notification");
+            return Ok(());
+        }
+        tracing::trace!("no connection change notification");
 
-// pub async fn seek(ctx: Context<App>) -> Result<()> {
-//     let bot = ctx.bot();
-//     let (author, channel_id) = (ctx.author(), ctx.channel_id());
+        (connection.channel_id, connection.text_channel_id)
+    };
 
-//     tracing::debug!("seek command in channel {} by {}", channel_id, author.name);
-//     ctx.http()
-//         .create_message(channel_id)
-//         .content("Where in the track do you want to seek to (in seconds)?")?
-//         .await?;
+    let Ok(player) = require::player(ctx) else {
+        return Ok(());
+    };
 
-//     let author_id = author.id;
-//     let msg = bot
-//         .standby()
-//         .wait_for_message(channel_id, move |new_msg: &MessageCreate| {
-//             new_msg.author.id == author_id
-//         })
-//         .await?;
-//     let guild_id = ctx.guild_id().unwrap();
-//     let position = msg.content.parse::<i64>()?;
+    if let Some(old_state) = maybe_old_state {
+        let old_channel_id = old_state.channel_id();
+        if state.user_id != ctx.bot().user_id()
+            && old_channel_id == connected_channel_id
+            && state.channel_id.is_some_and(|c| c != old_channel_id)
+            && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
+        {
+            player.set_pause(true).await?;
+            ctx.http()
+                .create_message(text_channel_id)
+                .content("⚡▶ Paused `(Bot is not used by anyone)`")
+                .await?;
+        }
+    }
 
-//     let player = ctx.lavalink().player(guild_id).await.unwrap();
-//     player.send(Seek::from((guild_id, position * 1000)))?;
-
-//     ctx.respond(&format!("Seeked to {position}s")).await?;
-
-//     Ok(())
-// }
-
-// pub async fn stop(ctx: Context<App>) -> Result<()> {
-//     tracing::debug!(
-//         "stop command in channel {} by {}",
-//         ctx.channel_id(),
-//         ctx.author().name
-//     );
-
-//     let guild_id = ctx.guild_id().unwrap();
-//     let player = ctx.lavalink().player(guild_id).await.unwrap();
-//     player.send(Stop::from(guild_id))?;
-
-//     ctx.respond("Stopped the track").await?;
-
-//     Ok(())
-// }
+    Ok(())
+}

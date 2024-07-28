@@ -6,7 +6,7 @@ use crate::{
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 /// Toggles server muting the bot

@@ -12,9 +12,7 @@ use lavalink_rs::{
 use linkify::{LinkFinder, LinkKind};
 use lyra_ext::{
     as_grapheme::AsGrapheme,
-    pretty::{
-        duration_display::PrettyDurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator,
-    },
+    pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 use twilight_interactions::command::{
     AutocompleteValue, CommandModel, CommandOption, CreateCommand, CreateOption,
@@ -43,9 +41,9 @@ use crate::{
     },
     gateway::GuildIdAware,
     lavalink::{
-        CorrectPlaylistInfo, CorrectTrackInfo, LavalinkAware, UnwrappedPlayerData,
-        UnwrappedPlayerInfoUri,
+        CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedPlayerData, UnwrappedPlayerInfoUri,
     },
+    LavalinkAware,
 };
 
 struct LoadTrackContext {
@@ -54,10 +52,10 @@ struct LoadTrackContext {
 }
 
 impl LoadTrackContext {
-    fn new_via(ctx: &(impl GuildIdAware + LavalinkAware)) -> Self {
+    fn new_via(cx: &(impl GuildIdAware + LavalinkAware)) -> Self {
         Self {
-            guild_id: ctx.guild_id(),
-            lavalink: ctx.lavalink().clone_inner(),
+            guild_id: cx.guild_id(),
+            lavalink: cx.lavalink().clone_inner(),
         }
     }
 }
@@ -315,7 +313,7 @@ impl BotAutocomplete for Autocomplete {
 
                 choices
             }
-            TrackLoadType::Error => Err(LoadFailedError(query))?,
+            TrackLoadType::Error => return Err(LoadFailedError(query).into()),
             TrackLoadType::Empty => Vec::new(),
         };
 
@@ -388,18 +386,17 @@ async fn play(
 
             let total_tracks = Vec::from(results);
             // SAFETY: at least one tracks must be loaded, so this unwrap is safe
-            let first_track = unsafe { total_tracks.first().cloned().unwrap_unchecked() };
+            let first_track = unsafe { total_tracks.first().unwrap_unchecked() };
 
             let player = util::auto_new_player(ctx).await?;
 
+            player.play(first_track).await?;
             player
                 .data_unwrapped()
                 .write()
                 .await
                 .queue_mut()
                 .enqueue(total_tracks, ctx.author_id());
-
-            player.play(&first_track).await?;
 
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }
@@ -421,7 +418,7 @@ async fn play(
                     );
                 }
             },
-            LoadTrackProcessManyError::Lavalink(e) => Err(e)?,
+            LoadTrackProcessManyError::Lavalink(e) => Err(e.into()),
         },
     }
 }

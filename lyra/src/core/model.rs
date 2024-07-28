@@ -21,10 +21,7 @@ use twilight_model::{
 };
 use twilight_standby::Standby;
 
-use crate::{
-    error::core::DeserializeBodyFromHttpError,
-    lavalink::{self, Lavalink},
-};
+use crate::{error::core::DeserializeBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
 
 pub use self::interaction::{
     Client as InteractionClient, Interface as InteractionInterface, MessageResponse,
@@ -188,7 +185,7 @@ impl BotState {
     }
 }
 
-impl lavalink::LavalinkAware for BotState {
+impl LavalinkAware for BotState {
     fn lavalink(&self) -> &Lavalink {
         &self.lavalink
     }

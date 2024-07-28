@@ -1,3 +1,5 @@
+use std::{num::NonZeroUsize, time::Duration};
+
 use lavalink_rs::{
     error::LavalinkResult, model::player::Player as PlayerInfo, player_context::PlayerContext,
 };
@@ -14,54 +16,83 @@ use twilight_model::{
 use crate::{
     core::model::{AuthorIdAware, AuthorPermissionsAware, CacheAware},
     error::{
-        command::check, lavalink::NoPlayerError, Cache, CacheResult, InVoiceWithoutSomeoneElse,
-        NotInGuild, NotInVoice, QueueEmpty, Suppressed,
+        command::require::{InVoiceWithSomeoneElseError, UnsuppressedError},
+        lavalink::NoPlayerError,
+        Cache, CacheResult, InVoiceWithoutSomeoneElse, NotInGuild, NotInVoice, NotPlaying,
+        QueueEmpty, Suppressed,
     },
     gateway::GuildIdAware,
-    lavalink::{PlayerAware, PlayerDataRwLockArc, UnwrappedPlayerData},
+    lavalink::{
+        OwnedPlayerData, PlayerDataRead, PlayerDataWrite, Queue, QueueItem, UnwrappedPlayerData,
+    },
+    LavalinkAndGuildIdAware,
 };
 
-use super::model::{Ctx, CtxKind, GuildCtx, WeakGuildCtx};
+use super::model::{Ctx, CtxKind, GuildCtx, GuildCtxRef};
 
 pub fn guild<T: CtxKind>(ctx: Ctx<T>) -> Result<GuildCtx<T>, NotInGuild> {
     GuildCtx::try_from(ctx)
 }
 
-pub fn guild_weak<T: CtxKind>(ctx: &Ctx<T>) -> Result<WeakGuildCtx<T>, NotInGuild> {
-    WeakGuildCtx::try_from(ctx)
+pub fn guild_ref<T: CtxKind>(ctx: &Ctx<T>) -> Result<GuildCtxRef<T>, NotInGuild> {
+    GuildCtxRef::try_from(ctx)
 }
 
-pub struct Player {
+pub fn player(cx: &impl LavalinkAndGuildIdAware) -> Result<PlayerInterface, NoPlayerError> {
+    let context = cx.get_player().ok_or(NoPlayerError)?;
+    Ok(PlayerInterface { context })
+}
+
+pub struct PlayerInterface {
     pub context: PlayerContext,
 }
 
-impl Player {
+impl PlayerInterface {
     pub async fn info(&self) -> LavalinkResult<PlayerInfo> {
         self.context.get_player().await
     }
 
-    pub fn data(&self) -> PlayerDataRwLockArc {
+    pub fn data(&self) -> OwnedPlayerData {
         self.context.data_unwrapped()
     }
 
-    pub async fn and_queue_not_empty(self) -> Result<Self, QueueEmpty> {
-        if self.data().read().await.queue().is_empty() {
-            return Err(QueueEmpty);
-        }
-
-        Ok(self)
+    pub async fn acquire_advance_lock_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
+        queue.acquire_advance_lock();
+        self.context.stop_now().await?;
+        Ok(())
     }
-}
 
-pub fn player(ctx: &impl PlayerAware) -> Result<Player, NoPlayerError> {
-    let context = ctx.get_player().ok_or(NoPlayerError)?;
-    Ok(Player { context })
+    pub async fn seek_to_with<'data, 'guard>(
+        &self,
+        timestamp: Duration,
+        data_w: &'guard mut PlayerDataWrite<'data>,
+    ) -> LavalinkResult<()> {
+        data_w.seek_to(timestamp);
+        self.context.set_position(timestamp).await?;
+        Ok(())
+    }
+
+    pub async fn set_pause(&self, state: bool) -> LavalinkResult<()> {
+        let data = self.data();
+        let mut data_w = data.write().await;
+        self.set_pause_with(state, &mut data_w).await
+    }
+
+    pub async fn set_pause_with<'data, 'guard>(
+        &self,
+        state: bool,
+        data_w: &'guard mut PlayerDataWrite<'data>,
+    ) -> LavalinkResult<()> {
+        data_w.set_pause(state);
+        self.context.set_pause(state).await?;
+        Ok(())
+    }
 }
 
 pub type CachedVoiceStateRef<'a> =
     Reference<'a, (Id<GuildMarker>, Id<UserMarker>), CachedVoiceState>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InVoiceCachedVoiceState {
     guild_id: Id<GuildMarker>,
     channel_id: Id<ChannelMarker>,
@@ -89,16 +120,21 @@ pub struct InVoice<'a> {
 }
 
 #[must_use]
+#[derive(Debug, Clone)]
 pub struct PartialInVoice {
     state: InVoiceCachedVoiceState,
-    pub author_id: Id<UserMarker>,
+}
+
+impl PartialInVoice {
+    pub const fn channel_id(&self) -> Id<ChannelMarker> {
+        self.state.channel_id
+    }
 }
 
 impl From<&InVoice<'_>> for PartialInVoice {
     fn from(value: &InVoice<'_>) -> Self {
         Self {
             state: value.state.clone(),
-            author_id: value.author_id,
         }
     }
 }
@@ -132,27 +168,27 @@ impl<'a> InVoice<'a> {
         self.state.channel_id
     }
 
-    pub fn and_unsuppressed(self) -> Result<Self, check::NotSuppressedError> {
+    pub fn and_unsuppressed(self) -> Result<Self, UnsuppressedError> {
         let state = &self.state;
-        let voice_state_channel = self.cache.channel(state.channel_id).ok_or(Cache)?;
+        let voice_state_channel_kind = self.cache.channel(state.channel_id).ok_or(Cache)?.kind;
 
         if state.mute {
-            Err(Suppressed::Muted)?;
+            return Err(Suppressed::Muted.into());
         }
         let speaker_in_stage =
-            state.suppress && matches!(voice_state_channel.kind, ChannelType::GuildStageVoice);
+            state.suppress && matches!(voice_state_channel_kind, ChannelType::GuildStageVoice);
 
         if speaker_in_stage {
-            Err(Suppressed::NotSpeaker)?;
+            return Err(Suppressed::NotSpeaker.into());
         }
         Ok(self)
     }
 
-    pub fn and_with_someone_else(self) -> Result<Self, check::InVoiceWithSomeoneElseError> {
+    pub fn and_with_someone_else(self) -> Result<Self, InVoiceWithSomeoneElseError> {
         let channel_id = self.channel_id();
 
         if !someone_else_in(channel_id, &self)? {
-            Err(InVoiceWithoutSomeoneElse(channel_id))?;
+            return Err(InVoiceWithoutSomeoneElse(channel_id).into());
         }
         Ok(self)
     }
@@ -184,18 +220,62 @@ impl GuildIdAware for InVoice<'_> {
 
 pub fn someone_else_in(
     channel_id: Id<ChannelMarker>,
-    ctx: &(impl CacheAware + AuthorIdAware),
+    cx: &(impl CacheAware + AuthorIdAware),
 ) -> CacheResult<bool> {
-    let cache = ctx.cache();
+    let cache = cx.cache();
     cache
         .voice_channel_states(channel_id)
         .and_then(|states| {
             for state in states {
-                if !cache.user(state.user_id())?.bot && state.user_id() != ctx.author_id() {
+                if !cache.user(state.user_id())?.bot && state.user_id() != cx.author_id() {
                     return Some(true);
                 }
             }
             Some(false)
         })
         .ok_or(Cache)
+}
+
+fn impl_queue_not_empty(queue: &Queue) -> Result<(), QueueEmpty> {
+    if queue.is_empty() {
+        return Err(QueueEmpty);
+    }
+    Ok(())
+}
+
+pub fn queue_not_empty<'guard, 'data, 'borrow>(
+    data_r: &'guard PlayerDataRead<'data>,
+) -> Result<&'borrow Queue, QueueEmpty>
+where
+    'guard: 'borrow,
+    'data: 'borrow,
+{
+    let queue = data_r.queue();
+    impl_queue_not_empty(queue)?;
+    Ok(queue)
+}
+
+pub fn queue_not_empty_mut<'guard, 'data, 'borrow>(
+    data_w: &'guard mut PlayerDataWrite<'data>,
+) -> Result<&'borrow mut Queue, QueueEmpty>
+where
+    'guard: 'borrow,
+    'data: 'borrow,
+{
+    let queue = data_w.queue_mut();
+    impl_queue_not_empty(queue)?;
+    Ok(queue)
+}
+
+pub fn current_track(queue: &Queue) -> Result<CurrentTrack, NotPlaying> {
+    let (current, position) = queue.current_and_position();
+    Ok(CurrentTrack {
+        track: current.ok_or(NotPlaying)?,
+        position,
+    })
+}
+
+pub struct CurrentTrack<'a> {
+    pub track: &'a QueueItem,
+    pub position: NonZeroUsize,
 }

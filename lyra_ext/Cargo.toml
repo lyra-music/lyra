@@ -3,17 +3,17 @@ name = "lyra_ext"
 version = "0.8.0"
 edition = "2021"
 
+[lints.rust]
+unsafe_op_in_unsafe_fn = "forbid"
+
 [lints.clippy]
 multiple_unsafe_ops_per_block = "forbid"
 undocumented_unsafe_blocks = "forbid"
 enum_glob_use = "forbid"
 unwrap_used = "forbid"
+try_err = "forbid"
 pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
-
-module_name_repetitions = "allow"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
 
 [dependencies]
 rstest = "0.21.0"
@@ -23,6 +23,7 @@ unicode-segmentation = "1"
 bitflags = "2"
 regex = "1"
 rayon = "1"
+mock_instant = "0.5.1"
 
 [dependencies.kmeans_colors]
 version = "0.6.0"
@@ -30,7 +31,7 @@ features = ["palette_color"]
 default-features = false
 
 [dependencies.image]
-version = "0.25.1"
+version = "0.25.2"
 features = ["jpeg", "png", "gif", "tiff"]
 default-features = false
 

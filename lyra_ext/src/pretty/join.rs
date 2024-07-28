@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 
-pub trait PrettyJoin<J> {
+pub trait Join<J> {
     type Joined;
 
     fn pretty_join(slice: &Self, sep: J, last_sep: J) -> Self::Joined;
@@ -13,33 +13,33 @@ pub trait PrettyJoiner {
     fn and() -> Self::Joiner;
     fn or() -> Self::Joiner;
 
-    fn pretty_join<J>(&self, sep: J, last_sep: J) -> <Self as PrettyJoin<J>>::Joined
+    fn pretty_join<J>(&self, sep: J, last_sep: J) -> <Self as Join<J>>::Joined
     where
-        Self: PrettyJoin<J>,
+        Self: Join<J>,
     {
-        PrettyJoin::pretty_join(self, sep, last_sep)
+        Join::pretty_join(self, sep, last_sep)
     }
-    fn pretty_join_with(&self, last_sep: Self::Joiner) -> <Self as PrettyJoin<Self::Joiner>>::Joined
+    fn pretty_join_with(&self, last_sep: Self::Joiner) -> <Self as Join<Self::Joiner>>::Joined
     where
-        Self: PrettyJoin<Self::Joiner>,
+        Self: Join<Self::Joiner>,
     {
-        PrettyJoin::pretty_join(self, Self::sep(), last_sep)
+        Join::pretty_join(self, Self::sep(), last_sep)
     }
-    fn pretty_join_with_and(&self) -> <Self as PrettyJoin<Self::Joiner>>::Joined
+    fn pretty_join_with_and(&self) -> <Self as Join<Self::Joiner>>::Joined
     where
-        Self: PrettyJoin<Self::Joiner>,
+        Self: Join<Self::Joiner>,
     {
-        PrettyJoin::pretty_join(self, Self::sep(), Self::and())
+        Join::pretty_join(self, Self::sep(), Self::and())
     }
-    fn pretty_join_with_or(&self) -> <Self as PrettyJoin<Self::Joiner>>::Joined
+    fn pretty_join_with_or(&self) -> <Self as Join<Self::Joiner>>::Joined
     where
-        Self: PrettyJoin<Self::Joiner>,
+        Self: Join<Self::Joiner>,
     {
-        PrettyJoin::pretty_join(self, Self::sep(), Self::or())
+        Join::pretty_join(self, Self::sep(), Self::or())
     }
 }
 
-impl<S: Borrow<str>> PrettyJoin<&str> for [S] {
+impl<S: Borrow<str>> Join<&str> for [S] {
     type Joined = String;
 
     fn pretty_join(slice: &Self, sep: &str, last_sep: &str) -> Self::Joined {

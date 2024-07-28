@@ -13,15 +13,13 @@ use crate::{
     core::model::OwnedBotState,
 };
 
-use super::{
-    autocomplete::AutocompleteMarker, AppCtxKind, AppCtxMarker, Ctx, CtxKind, CtxLocation,
-};
+use super::{autocomplete::Marker, AppCtxKind, AppCtxMarker, Ctx, Kind, Location};
 
-pub trait CommandDataAware: CtxKind {}
-impl<T: AppCtxKind> CommandDataAware for AppCtxMarker<T> {}
-impl CommandDataAware for AutocompleteMarker {}
+pub trait Aware: Kind {}
+impl<T: AppCtxKind> Aware for AppCtxMarker<T> {}
+impl Aware for Marker {}
 
-impl<T: CommandDataAware> Ctx<T> {
+impl<T: Aware> Ctx<T> {
     pub fn from_partial_data(
         inner: Box<InteractionCreate>,
         data: &CommandData,
@@ -44,7 +42,7 @@ impl<T: CommandDataAware> Ctx<T> {
     }
 }
 
-impl<T: CommandDataAware, U: CtxLocation> Ctx<T, U> {
+impl<T: Aware, U: Location> Ctx<T, U> {
     pub fn command_data(&self) -> &PartialCommandData {
         // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
         //         so `self.data` is present
@@ -93,9 +91,5 @@ impl<T: CommandDataAware, U: CtxLocation> Ctx<T, U> {
         )
         .join(" ")
         .into()
-    }
-
-    pub fn command_mention_full(&self) -> Box<str> {
-        format!("</{}:{}>", self.command_name_full(), self.command_data().id).into()
     }
 }

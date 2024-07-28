@@ -7,19 +7,18 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 use crate::{core::model::MessageResponse, error::command::FollowupError};
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, CtxKind, CtxLocation, ModalMarker,
-    RespondResult,
+    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, Kind, Location, ModalMarker, RespondResult,
 };
 
 type MessageRespondResult = RespondResult<MessageResponse>;
 type MessageFollowupResult = Result<MessageResponse, FollowupError>;
 
-pub trait RespondViaMessage: CtxKind {}
-impl<T: AppCtxKind> RespondViaMessage for AppCtxMarker<T> {}
-impl RespondViaMessage for ModalMarker {}
-impl RespondViaMessage for ComponentMarker {}
+pub trait RespondVia: Kind {}
+impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
+impl RespondVia for ModalMarker {}
+impl RespondVia for ComponentMarker {}
 
-impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
+impl<T: RespondVia, U: Location> Ctx<T, U> {
     fn base_response_data_builder() -> InteractionResponseDataBuilder {
         InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
     }
@@ -38,7 +37,7 @@ impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
         self.respond_with(Some(data)).await
     }
 
-    pub async fn update_no_components_embeds(&mut self, content: &str) -> MessageFollowupResult {
+    pub async fn update_no_components_embeds(&self, content: &str) -> MessageFollowupResult {
         Ok(self
             .interface()
             .await?

@@ -6,7 +6,9 @@ mod view;
 use bitflags::bitflags;
 use const_str::concat as const_str_concat;
 use itertools::Itertools;
-use lyra_ext::{logical_bind::LogicalBind, pretty::flags_display::PrettyFlagsDisplay};
+use lyra_ext::{
+    logical_bind::LogicalBind, num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay,
+};
 use sqlx::{Pool, Postgres};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
@@ -54,7 +56,7 @@ pub struct CalculatorBuilder {
 
 impl CalculatorBuilder {
     pub fn new(guild_id: Id<GuildMarker>, db: Pool<Postgres>) -> Self {
-        let guild_id = guild_id.get() as i64;
+        let guild_id = u64_to_i64_truncating(guild_id.get());
         Self {
             set: JoinSet::new(),
             db,
@@ -126,27 +128,27 @@ impl CalculatorBuilder {
     }
 
     pub fn user(self, user_id: Id<UserMarker>) -> Self {
-        let id = user_id.get() as i64;
+        let id = u64_to_i64_truncating(user_id.get());
         self.query(&AccessCategoryFlag::Users, id)
     }
 
     pub fn thread(self, thread_id: Id<ChannelMarker>) -> Self {
-        let id = thread_id.get() as i64;
+        let id = u64_to_i64_truncating(thread_id.get());
         self.query(&AccessCategoryFlag::Threads, id)
     }
 
     pub fn text_channel(self, text_channel_id: Id<ChannelMarker>) -> Self {
-        let id = text_channel_id.get() as i64;
+        let id = u64_to_i64_truncating(text_channel_id.get());
         self.query(&AccessCategoryFlag::TextChannels, id)
     }
 
     pub fn voice_channel(self, voice_channel_id: Id<ChannelMarker>) -> Self {
-        let id = voice_channel_id.get() as i64;
+        let id = u64_to_i64_truncating(voice_channel_id.get());
         self.query(&AccessCategoryFlag::VoiceChannels, id)
     }
 
     pub fn category_channel(self, category_channel_id: Id<ChannelMarker>) -> Self {
-        let id = category_channel_id.get() as i64;
+        let id = u64_to_i64_truncating(category_channel_id.get());
         self.query(&AccessCategoryFlag::CategoryChannels, id)
     }
 
@@ -187,7 +189,7 @@ impl TryFrom<AccessCategoryFlags> for AccessCategoryFlag {
 
         // SAFETY: `value` is guruanteed to only have one flag,
         //         so this transmute is safe
-        Ok(unsafe { std::mem::transmute(value.bits()) })
+        Ok(unsafe { std::mem::transmute::<u8, Self>(value.bits()) })
     }
 }
 
@@ -231,11 +233,12 @@ bitflags! {
     }
 }
 
-impl PrettyFlagsDisplay for AccessCategoryFlags {}
+impl FlagsDisplay for AccessCategoryFlags {}
 
 impl From<AccessCategory> for AccessCategoryFlags {
     fn from(category: AccessCategory) -> Self {
-        Self::from_bits_retain(category.value() as u8)
+        #[allow(clippy::cast_possible_truncation)]
+        Self::from_bits_retain(category.value().unsigned_abs() as u8)
     }
 }
 

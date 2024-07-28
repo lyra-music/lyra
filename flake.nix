@@ -57,6 +57,7 @@
               # scripts.hello.exec = "";
 
               enterShell = ''
+                ./scripts/get-lavalink
               '';
 
               # https://devenv.sh/tests/

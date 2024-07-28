@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools;
-use lyra_ext::pretty::flags_display::PrettyFlagsDisplay;
+use lyra_ext::{num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay};
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
 
 use super::AccessCategory;
@@ -105,7 +105,7 @@ impl BotSlashCommand for Mode {
         check::user_is_access_manager(&ctx)?;
 
         let access_mode = <Option<bool>>::from(self.mode);
-        let sql_access_mode = access_mode.map_or_else(|| "null".into(), |b| b.to_string());
+        let sql_access_mode = access_mode.map_or_else(|| String::from("null"), |b| b.to_string());
 
         let category_flags = AccessCategoryFlags::from(self.category);
         let set_statements = category_flags
@@ -120,7 +120,7 @@ impl BotSlashCommand for Mode {
         let res = sqlx::query(&format!(
             "UPDATE guild_configs SET {set_statements} WHERE id = $1 AND ({where_clause});"
         ))
-        .bind(ctx.guild_id().get() as i64)
+        .bind(u64_to_i64_truncating(ctx.guild_id().get()))
         .bind(access_mode)
         .execute(ctx.db())
         .await?;

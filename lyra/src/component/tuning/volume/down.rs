@@ -8,7 +8,7 @@ use crate::{
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 /// Decrease the playback volume
@@ -29,9 +29,10 @@ impl BotSlashCommand for Down {
         let data = player.data();
         let old_percent = data.read().await.volume();
 
+        #[allow(clippy::cast_possible_truncation)]
         let maybe_new_percent = old_percent
             .get()
-            .checked_sub(self.percent.unwrap_or(10) as u16)
+            .checked_sub(self.percent.unwrap_or(10).unsigned_abs() as u16)
             .and_then(NonZeroU16::new);
 
         let emoji = super::volume_emoji(maybe_new_percent);

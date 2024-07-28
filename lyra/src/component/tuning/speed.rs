@@ -1,11 +1,15 @@
-use lavalink_rs::model::player::{Filters, Timescale};
+use lavalink_rs::{
+    error::LavalinkResult,
+    model::player::{Filters, Timescale},
+};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
         macros::{bad, out},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require::{self, PlayerInterface},
+        SlashCtx,
     },
     component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
     error::CommandResult,
@@ -89,6 +93,14 @@ impl ApplyFilter for SpeedFilter {
     }
 }
 
+impl PlayerInterface {
+    async fn set_speed(&self, update: SpeedFilter) -> LavalinkResult<()> {
+        self.data().write().await.set_speed(update.multiplier());
+        self.update_filter(update).await?;
+        Ok(())
+    }
+}
+
 /// Sets the playback speed
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "speed", dm_permission = false)]
@@ -107,12 +119,12 @@ impl BotSlashCommand for Speed {
 
         let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
         else {
-            bad!("Multiplier must not be 0", ctx);
+            bad!("Multiplier must not be zero", ctx);
         };
 
         let multiplier = update.multiplier();
         let emoji = update.tier().emoji();
-        player.update_filter(update).await?;
+        player.set_speed(update).await?;
 
         out!(
             format!("{emoji} Set the playback speed to `{multiplier}`×."),

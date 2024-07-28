@@ -15,18 +15,18 @@ use crate::{
     command::{
         check,
         model::{CtxKind, GuildCtx},
-        require::{self, InVoice, Player},
+        require::{self, InVoice, PlayerInterface},
     },
     core::model::{BotStateAware, HttpAware},
-    error::CommandError,
     gateway::{voice, GuildIdAware},
-    lavalink::{DelegateMethods, LavalinkAware},
+    lavalink::DelegateMethods,
+    CommandError, LavalinkAware,
 };
 
 #[inline]
 fn check_user_is_dj_and_require_unsuppressed_player(
     ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(InVoice, Player), CommandError> {
+) -> Result<(InVoice, PlayerInterface), CommandError> {
     check::user_is_dj(ctx)?;
     let in_voice = require::in_voice(ctx)?.and_unsuppressed()?;
     let player = require::player(ctx)?;
@@ -45,7 +45,7 @@ fn unmuting_checks(ctx: &GuildCtx<impl CtxKind>) -> Result<InVoice, CommandError
 #[inline]
 fn check_user_is_dj_and_require_player(
     ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(InVoice, Player), CommandError> {
+) -> Result<(InVoice, PlayerInterface), CommandError> {
     check::user_is_dj(ctx)?;
     let in_voice = require::in_voice(ctx)?;
     let player = require::player(ctx)?;
@@ -61,7 +61,7 @@ trait UpdateFilter {
     async fn update_filter(&self, update: impl ApplyFilter + Send + Sync) -> LavalinkResult<()>;
 }
 
-impl UpdateFilter for Player {
+impl UpdateFilter for PlayerInterface {
     async fn update_filter(&self, update: impl ApplyFilter + Send + Sync) -> LavalinkResult<()> {
         let old_filter = self.info().await?.filters.unwrap_or_default();
 

@@ -1,3 +1,5 @@
+use std::fmt::{Display, Write};
+
 use twilight_http::{request::application::interaction::UpdateResponse, Response};
 use twilight_model::{
     application::{command::CommandOptionChoice, interaction::Interaction},
@@ -7,7 +9,7 @@ use twilight_model::{
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{InteractionMarker, MessageMarker},
+        marker::{CommandMarker, InteractionMarker, MessageMarker},
         Id,
     },
 };
@@ -20,6 +22,12 @@ use crate::{
     },
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
 };
+
+pub type MessageResponse = Response<Message>;
+pub type UnitRespondResult = RespondResult<()>;
+pub type MessageRespondResult = RespondResult<MessageResponse>;
+pub type UnitFollowupResult = FollowupResult<()>;
+pub type MessageFollowupResult = FollowupResult<MessageResponse>;
 
 pub struct Client<'a>(twilight_http::client::InteractionClient<'a>);
 
@@ -231,21 +239,22 @@ impl<'a> Client<'a> {
 
     pub fn populated_command<T: CommandInfoAware>(
     ) -> &'static twilight_model::application::command::Command {
+        let name = T::name();
         POPULATED_COMMANDS_MAP
             .get()
             .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
-            .get(T::name())
-            .unwrap_or_else(|| panic!("command not found: {}", T::name()))
+            .get(name)
+            .unwrap_or_else(|| panic!("command not found: {name}"))
     }
 
-    pub fn mention_command<T: CommandInfoAware>() -> Box<str> {
+    pub fn mention_command<T: CommandInfoAware>() -> MentionCommand {
         let cmd = Self::populated_command::<T>();
 
-        let name = &cmd.name;
+        let name = cmd.name.clone().into();
         let id = cmd
             .id
             .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"));
-        format!("</{name}:{id}>").into_boxed_str()
+        MentionCommand::new(name, id)
     }
 
     #[inline]
@@ -266,8 +275,25 @@ impl<'a> Client<'a> {
     }
 }
 
-pub type MessageResponse = Response<Message>;
-pub type UnitRespondResult = RespondResult<()>;
-pub type MessageRespondResult = RespondResult<MessageResponse>;
-pub type UnitFollowupResult = FollowupResult<()>;
-pub type MessageFollowupResult = FollowupResult<MessageResponse>;
+pub struct MentionCommand {
+    name: Box<str>,
+    id: Id<CommandMarker>,
+}
+
+impl MentionCommand {
+    pub const fn new(name: Box<str>, id: Id<CommandMarker>) -> Self {
+        Self { name, id }
+    }
+}
+
+impl Display for MentionCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("</")?;
+        f.write_str(&self.name)?;
+        f.write_char(':')?;
+        self.id.fmt(f)?;
+        f.write_char('>')?;
+
+        Ok(())
+    }
+}

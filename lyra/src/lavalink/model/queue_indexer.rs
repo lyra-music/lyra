@@ -11,13 +11,13 @@ pub enum IndexerType {
     Shuffled,
 }
 
-pub(super) enum QueueIndexer {
+pub(super) enum Indexer {
     Standard,
     Fair(FairIndexer),
     Shuffled(ShuffledIndexer),
 }
 
-impl QueueIndexer {
+impl Indexer {
     pub(super) const fn kind(&self) -> IndexerType {
         match self {
             Self::Standard => IndexerType::Standard,

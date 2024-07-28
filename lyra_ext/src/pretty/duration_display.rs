@@ -22,33 +22,43 @@ fn timestamp_2() -> &'static Regex {
         })
 }
 
-pub struct PrettyDurationRefDisplayer<'a>(&'a Duration);
+pub struct PrettyDurationDisplayer(u128);
 
-pub trait PrettyDurationDisplay {
-    fn pretty_display(&self) -> PrettyDurationRefDisplayer;
+pub trait DurationDisplay {
+    fn pretty_display(&self) -> PrettyDurationDisplayer;
 }
 
-impl PrettyDurationDisplay for Duration {
-    fn pretty_display(&self) -> PrettyDurationRefDisplayer {
-        PrettyDurationRefDisplayer(self)
+impl DurationDisplay for Duration {
+    fn pretty_display(&self) -> PrettyDurationDisplayer {
+        PrettyDurationDisplayer(self.as_millis())
     }
 }
 
-trait FromPrettyStr
+impl DurationDisplay for u128 {
+    fn pretty_display(&self) -> PrettyDurationDisplayer {
+        PrettyDurationDisplayer(*self)
+    }
+}
+
+pub struct FromPrettyStrError;
+
+pub trait FromPrettyStr
 where
     Self: Sized,
 {
-    fn from_pretty_str(value: &str) -> Result<Self, &str>;
+    /// # Errors
+    /// if `value` doesn't match `timestamp` or `timestamp_2` regex
+    fn from_pretty_str(value: &str) -> Result<Self, FromPrettyStrError>;
 }
 
 impl FromPrettyStr for Duration {
-    fn from_pretty_str(value: &str) -> Result<Self, &str> {
+    fn from_pretty_str(value: &str) -> Result<Self, FromPrettyStrError> {
         let captures = if let Some(captures) = timestamp().captures(value) {
             captures
         } else if let Some(captures) = timestamp_2().captures(value) {
             captures
         } else {
-            return Err(value);
+            return Err(FromPrettyStrError);
         };
 
         let ms = captures
@@ -75,23 +85,20 @@ impl FromPrettyStr for Duration {
     }
 }
 
-fn fmt(millis: u128, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let divrem = |x, y| (x / y, x % y);
-
-    let (s, ms) = divrem(millis, 1000);
-    let (m, s) = divrem(s, 60);
-    let (h, m) = divrem(m, 60);
-
-    match (h, m, s) {
-        (0, 0, 0) => write!(f, "0:00.{ms:03}"),
-        (0, m, s) => write!(f, "{m}:{s:02}"),
-        (h, m, s) => write!(f, "{h}:{m:02}:{s:02}"),
-    }
-}
-
-impl Display for PrettyDurationRefDisplayer<'_> {
+impl Display for PrettyDurationDisplayer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt(self.0.as_millis(), f)
+        let f: &mut std::fmt::Formatter<'_> = f;
+        let divrem = |x, y| (x / y, x % y);
+
+        let (s, ms) = divrem(self.0, 1000);
+        let (m, s) = divrem(s, 60);
+        let (h, m) = divrem(m, 60);
+
+        match (h, m, s) {
+            (0, 0, 0) => write!(f, "0:00.{ms:03}"),
+            (0, m, s) => write!(f, "{m}:{s:02}"),
+            (h, m, s) => write!(f, "{h}:{m:02}:{s:02}"),
+        }
     }
 }
 
@@ -101,7 +108,7 @@ mod test {
 
     use rstest::rstest;
 
-    use super::{FromPrettyStr, PrettyDurationDisplay};
+    use super::{DurationDisplay, FromPrettyStr};
 
     #[rstest]
     #[case(Duration::ZERO, "0:00.000")]

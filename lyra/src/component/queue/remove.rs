@@ -15,15 +15,16 @@ use crate::{
     },
     core::model::CacheAware,
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::PlayerAware,
+    LavalinkAndGuildIdAware,
 };
 
+#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_choices(
     focused: &str,
     finished: Vec<i64>,
-    ctx: &(impl CacheAware + PlayerAware + Sync),
+    cx: &(impl CacheAware + LavalinkAndGuildIdAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Ok(player) = require::player(ctx) else {
+    let Ok(player) = require::player(cx) else {
         return Vec::new();
     };
     let data = player.data();
@@ -37,24 +38,17 @@ async fn generate_remove_choices(
         .filter_map(|i| super::normalize_queue_position(i, queue_len))
         .collect::<HashSet<_>>();
 
-    let queue_iter = queue
-        .iter()
-        .enumerate()
-        .filter_map(|(i, t)| NonZeroUsize::new(i + 1).map(|i| (i, t)));
+    let queue_iter = queue.iter_positions_and_items();
 
     match focused.parse::<i64>() {
-        Ok(input) => super::generate_position_choices_from_input(
-            input, queue_len, queue_iter, &excluded, ctx,
-        ),
-        Err(e) if matches!(e.kind(), IntErrorKind::Empty) => super::generate_position_choices(
-            queue.position(),
-            queue_len,
-            queue_iter,
-            &excluded,
-            ctx,
-        ),
+        Ok(input) => {
+            super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
+        }
+        Err(e) if matches!(e.kind(), IntErrorKind::Empty) => {
+            super::generate_position_choices(queue.position(), queue_len, queue_iter, &excluded, cx)
+        }
         Err(_) => {
-            super::generate_position_choices_from_fuzzy_match(focused, queue_iter, &excluded, ctx)
+            super::generate_position_choices_from_fuzzy_match(focused, queue_iter, &excluded, cx)
         }
     }
 }
@@ -128,14 +122,12 @@ pub struct Remove {
 impl BotSlashCommand for Remove {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let in_voice_with_user =
-            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
+        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
 
+        let player = require::player(&ctx)?;
         let data = player.data();
         let data_r = data.read().await;
-        let queue = data_r.queue();
-        let queue_len = queue.len();
+        let queue = require::queue_not_empty(&data_r)?;
 
         let inputs = [
             Some(self.track),
@@ -149,14 +141,15 @@ impl BotSlashCommand for Remove {
         .unique()
         .collect::<Box<_>>();
 
-        super::validate_input_positions(&inputs, queue_len)?;
+        super::validate_input_positions(&inputs, queue.len())?;
 
+        #[allow(clippy::cast_possible_truncation)]
         let mut positions = inputs
             .iter()
-            .filter_map(|p| NonZeroUsize::new(*p as usize))
+            .filter_map(|&p| NonZeroUsize::new(p.unsigned_abs() as usize))
             .collect::<Vec<_>>();
 
-        check::all_users_track(positions.iter().copied(), in_voice_with_user, queue, &ctx)?;
+        check::all_users_track(queue, positions.iter().copied(), in_voice_with_user)?;
 
         positions.sort_unstable();
 

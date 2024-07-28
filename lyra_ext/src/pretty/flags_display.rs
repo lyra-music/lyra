@@ -28,13 +28,13 @@ where
                 }
                 flag
             })
-            .collect::<Box<_>>()
+            .collect::<Box<[_]>>()
             .pretty_join_with_and();
         f.write_str(&s)
     }
 }
 
-pub trait PrettyFlagsDisplay: Flags {
+pub trait FlagsDisplay: Flags {
     fn pretty_display(&self) -> PrettyFlagsDisplayer<Self> {
         PrettyFlagsDisplayer {
             inner: self,
@@ -55,7 +55,7 @@ mod test {
     use bitflags::bitflags;
     use rstest::rstest;
 
-    use super::PrettyFlagsDisplay;
+    use super::FlagsDisplay;
 
     bitflags! {
         struct TestFlag: u8 {
@@ -71,7 +71,7 @@ mod test {
         }
     }
 
-    impl PrettyFlagsDisplay for TestFlag {}
+    impl FlagsDisplay for TestFlag {}
 
     #[rstest]
     #[case(TestFlag::empty(), "")]
@@ -103,7 +103,7 @@ mod test {
         }
     }
 
-    impl PrettyFlagsDisplay for TestFlag2 {}
+    impl FlagsDisplay for TestFlag2 {}
 
     #[rstest]
     #[case(TestFlag2::empty(), "")]

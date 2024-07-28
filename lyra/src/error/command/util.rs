@@ -160,7 +160,7 @@ impl crate::error::component::connection::join::AutoJoinError {
 #[error(transparent)]
 pub enum AutoJoinOrCheckInVoiceWithUserError {
     InVoiceWithoutUser(#[from] crate::error::InVoiceWithoutUser),
-    CheckNotSuppressed(#[from] super::check::NotSuppressedError),
+    RequireUnsuppressed(#[from] super::require::UnsuppressedError),
     AutoJoinAttempt(#[from] AutoJoinAttemptError),
     HandleSuppressedAutoJoin(#[from] HandleSuppressedAutoJoinError),
 }

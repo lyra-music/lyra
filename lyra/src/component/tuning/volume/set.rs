@@ -23,16 +23,14 @@ impl BotSlashCommand for Set {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         // SAFETY: `self.percent as u16` is in range [1, 1_000], so it is non-zero
-        let percent = unsafe { NonZeroU16::new_unchecked(self.percent as u16) };
+        #[allow(clippy::cast_possible_truncation)]
+        let percent = unsafe { NonZeroU16::new_unchecked(self.percent.unsigned_abs() as u16) };
         player.context.set_volume(percent.get()).await?;
         player.data().write().await.set_volume(percent);
 
         let emoji = super::volume_emoji(Some(percent));
         let warning = super::clipping_warning(percent);
 
-        out!(
-            format!("{emoji} Set playback volume to `{percent}`%{warning}."),
-            ctx
-        );
+        out!(format!("{emoji} `{percent}`%{warning}"), ctx);
     }
 }

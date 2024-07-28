@@ -1,13 +1,13 @@
 use twilight_model::application::command::CommandOptionChoice;
 
-use super::{Ctx, CtxKind, CtxLocation, Guild, UnitRespondResult};
+use super::{Ctx, GuildMarker, Kind, Location, UnitRespondResult};
 
-pub struct AutocompleteMarker;
-impl CtxKind for AutocompleteMarker {}
-pub type AutocompleteCtx = Ctx<AutocompleteMarker>;
-pub type GuildAutocompleteCtx = Ctx<AutocompleteMarker, Guild>;
+pub struct Marker;
+impl Kind for Marker {}
+pub type Autocomplete = Ctx<Marker>;
+pub type GuildAutocompleteCtx = Ctx<Marker, GuildMarker>;
 
-impl<U: CtxLocation> Ctx<AutocompleteMarker, U> {
+impl<U: Location> Ctx<Marker, U> {
     pub async fn autocomplete(
         &mut self,
         choices: impl IntoIterator<Item = CommandOptionChoice> + Send,

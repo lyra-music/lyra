@@ -12,7 +12,7 @@ use crate::{
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 /// Increase the playback volume
@@ -26,16 +26,18 @@ pub struct Up {
 
 impl BotSlashCommand for Up {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
+        // SAFETY: `1_000` is non-zero
+        const MAX_PERCENT: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1_000) };
+
         let mut ctx = require::guild(ctx)?;
         let (in_voice, player) = check_user_is_dj_and_require_player(&ctx)?;
 
         let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
         let data = player.data();
-        let percent_u16 = self.percent.unwrap_or(10) as u16;
+        #[allow(clippy::cast_possible_truncation)]
+        let percent_u16 = self.percent.unwrap_or(10).unsigned_abs() as u16;
 
-        // SAFETY: `1_000` is non-zero
-        let max_percent = unsafe { NonZeroU16::new_unchecked(1_000) };
         let (old_percent_str, new_percent) = if lavalink.connection_from(&in_voice).mute {
             lavalink.connection_mut_from(&in_voice).mute = false;
             ctx.http()
@@ -51,20 +53,20 @@ impl BotSlashCommand for Up {
         } else {
             let old_percent = data.read().await.volume();
 
-            if old_percent >= max_percent {
+            if old_percent >= MAX_PERCENT {
                 note!("Already at max playback volume.", ctx);
             }
 
             (
                 format!("`{old_percent}%`"),
-                old_percent.saturating_add(percent_u16).min(max_percent),
+                old_percent.saturating_add(percent_u16).min(MAX_PERCENT),
             )
         };
 
         let emoji = super::volume_emoji(Some(new_percent));
         let warning = super::clipping_warning(new_percent);
 
-        let maxed_note = (new_percent == max_percent)
+        let maxed_note = (new_percent == MAX_PERCENT)
             .then_some(" (`Max`)")
             .unwrap_or_default();
 

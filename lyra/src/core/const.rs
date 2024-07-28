@@ -77,9 +77,9 @@ pub mod connection {
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
-    pub fn connection_changed_timeout() -> &'static Duration {
-        static CONNECTION_CHANGED_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-        CONNECTION_CHANGED_TIMEOUT.get_or_init(|| Duration::from_millis(500))
+    pub fn changed_timeout() -> &'static Duration {
+        static CHANGED_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        CHANGED_TIMEOUT.get_or_init(|| Duration::from_millis(250))
     }
 
     pub fn get_lavalink_connection_info_timeout() -> &'static Duration {
@@ -111,6 +111,11 @@ pub mod misc {
     pub fn destructive_command_confirmation_timeout() -> &'static Duration {
         static DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: OnceLock<Duration> = OnceLock::new();
         DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT.get_or_init(|| Duration::from_secs(60))
+    }
+
+    pub fn queue_advance_locked_timeout() -> &'static Duration {
+        static QUEUE_ADVANCE_LOCKED_TIMEOUT: OnceLock<Duration> = OnceLock::new();
+        QUEUE_ADVANCE_LOCKED_TIMEOUT.get_or_init(|| Duration::from_millis(250))
     }
 }
 

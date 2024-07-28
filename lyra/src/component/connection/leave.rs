@@ -20,7 +20,8 @@ use crate::{
         CommandResult,
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{self, Event, LavalinkAware},
+    lavalink::Event,
+    LavalinkAware,
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -31,18 +32,18 @@ impl Display for LeaveResponse {
     }
 }
 
-pub(super) fn disconnect(ctx: &(impl SenderAware + GuildIdAware)) -> Result<(), ChannelError> {
-    ctx.sender()
-        .command(&UpdateVoiceState::new(ctx.guild_id(), None, false, false))?;
+pub(super) fn disconnect(cx: &(impl SenderAware + GuildIdAware)) -> Result<(), ChannelError> {
+    cx.sender()
+        .command(&UpdateVoiceState::new(cx.guild_id(), None, false, false))?;
 
     Ok(())
 }
 
 pub(super) async fn pre_disconnect_cleanup(
-    ctx: &(impl GuildIdAware + lavalink::LavalinkAware + Sync),
+    cx: &(impl GuildIdAware + LavalinkAware + Sync),
 ) -> Result<(), PreDisconnectCleanupError> {
-    let guild_id = ctx.guild_id();
-    let lavalink = ctx.lavalink();
+    let guild_id = cx.guild_id();
+    let lavalink = cx.lavalink();
 
     if let Some(connection) = lavalink.get_connection(guild_id) {
         connection.dispatch(Event::QueueClear);
@@ -59,7 +60,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let in_voice = require::in_voice(ctx)?;
     let connection = ctx.lavalink().connection_from(&in_voice);
     let channel_id = in_voice.channel_id();
-    check::in_voice_with_user(in_voice)?.only()?;
+    check::user_in(in_voice)?.only()?;
 
     connection.notify_change();
     drop(connection);
@@ -87,7 +88,7 @@ impl BotSlashCommand for Leave {
                 leave::NotInVoiceMatchedError::NotInVoice(_) => {
                     caut!("Not currently connected to a voice channel.", ctx);
                 }
-                leave::NotInVoiceMatchedError::Other(e) => Err(e)?,
+                leave::NotInVoiceMatchedError::Other(e) => Err(e.into()),
             },
         }
     }

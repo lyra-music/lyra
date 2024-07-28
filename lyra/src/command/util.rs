@@ -1,5 +1,5 @@
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
-use lyra_ext::time::unix::unix_time;
+use lyra_ext::unix_time;
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_gateway::Event;
 use twilight_model::{
@@ -36,7 +36,7 @@ use crate::{
     },
     error::{
         command::{
-            check::NotSuppressedError,
+            require::UnsuppressedError,
             util::{
                 AutoJoinOrCheckInVoiceWithUserError, AutoJoinSuppressedError,
                 HandleSuppressedAutoJoinError, PromptForConfirmationError,
@@ -45,7 +45,8 @@ use crate::{
         ConfirmationTimedOut, Suppressed as SuppressedError,
     },
     gateway::GuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    lavalink::DelegateMethods,
+    LavalinkAware,
 };
 
 pub trait MessageLinkAware {
@@ -132,7 +133,8 @@ pub trait AvatarUrlAware {
         let avatar = self.avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
-        format!("{}/avatars/{}/{}.{}", CDN_URL, self.id(), avatar, ext).into()
+        let formatted = format!("{}/avatars/{}/{}.{}", CDN_URL, self.id(), avatar, ext);
+        Some(formatted)
     }
 }
 
@@ -152,15 +154,15 @@ pub trait GuildAvatarUrlAware {
         let avatar = self.avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
-        format!(
+        let formatted = format!(
             "{}/guilds/{}/users/{}/avatars/{}.{}",
             CDN_URL,
             guild_id,
             self.id(),
             avatar,
             ext,
-        )
-        .into()
+        );
+        Some(formatted)
     }
 }
 
@@ -207,14 +209,14 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
 ) -> Result<(), AutoJoinOrCheckInVoiceWithUserError> {
     if let Ok(in_voice) = require::in_voice(ctx) {
         let in_voice = in_voice.and_unsuppressed()?;
-        check::in_voice_with_user(in_voice)?;
+        check::user_in(in_voice)?;
         return Ok(());
     }
 
     match auto_join(ctx).await {
-        Err(e) => Err(e.unflatten_into_auto_join_attempt())?,
+        Err(e) => Err(e.unflatten_into_auto_join_attempt().into()),
         Ok(state) => {
-            let Err(NotSuppressedError::Suppressed(suppressed)) = {
+            let Err(UnsuppressedError::Suppressed(suppressed)) = {
                 // SAFETY: as `auto_join` was called and ran successfully,
                 //         there must now be an active voice connection.
                 unsafe { InVoice::new(state, ctx) }
@@ -234,7 +236,7 @@ async fn handle_suppressed_auto_join(
 ) -> Result<(), HandleSuppressedAutoJoinError> {
     let bot_user_id = ctx.bot().user_id();
     match error {
-        SuppressedError::Muted => Err(AutoJoinSuppressedError::Muted)?,
+        SuppressedError::Muted => Err(AutoJoinSuppressedError::Muted.into()),
         SuppressedError::NotSpeaker => {
             let bot = ctx.bot_owned();
             let wait_for_speaker =
@@ -268,9 +270,10 @@ async fn handle_suppressed_auto_join(
             );
 
             if wait_for_speaker.await.is_err() {
-                Err(AutoJoinSuppressedError::StillNotSpeaker {
+                return Err(AutoJoinSuppressedError::StillNotSpeaker {
                     last_followup_id: requested_to_speak_message.id,
-                })?;
+                }
+                .into());
             }
             Ok(())
         }
@@ -337,8 +340,8 @@ pub async fn prompt_for_confirmation(
         // SAFETY: the future has been filtered to only match modal submit interaction
         //         so this branch is unreachable
         Ok(Ok(_)) => unsafe { std::hint::unreachable_unchecked() },
-        Ok(Err(e)) => Err(e)?,
-        Err(_) => Err(ConfirmationTimedOut)?,
+        Ok(Err(e)) => return Err(e.into()),
+        Err(_) => return Err(ConfirmationTimedOut.into()),
     };
 
     Ok(ctx_and_confirmed)

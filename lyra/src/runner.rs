@@ -29,7 +29,7 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::core::r#const::metadata::banner;
+use crate::{core::r#const::metadata::banner, lavalink::handlers, LavalinkAware};
 
 use super::{
     core::{
@@ -38,7 +38,7 @@ use super::{
     },
     error::runner::{StartError, WaitForSignalError, WaitUntilShutdownError},
     gateway,
-    lavalink::{self, DelegateMethods, LavalinkAware},
+    lavalink::DelegateMethods,
 };
 use super::{gateway::LastCachedStates, lavalink::Lavalink};
 
@@ -67,7 +67,7 @@ fn build_shard_config() -> ShardConfig {
                 UpdatePresencePayload::new(
                     [Activity::from(MinimalActivity {
                         kind: ActivityType::Listening,
-                        name: "/play".into(),
+                        name: String::from("/play"),
                         url: None,
                     })],
                     false,
@@ -123,11 +123,11 @@ async fn build_and_split_shards(
 
 #[tracing::instrument(skip_all, name = "lavalink")]
 async fn build_lavalink_client(user_id: Id<UserMarker>) -> Lavalink {
-    let events = lavalink::handlers();
+    let events = handlers();
 
     let nodes = Vec::from([lavalink_rs::node::NodeBuilder {
-        hostname: (*CONFIG.lavalink_host).to_string(),
-        password: (*CONFIG.lavalink_pwd).to_string(),
+        hostname: String::from(CONFIG.lavalink_host),
+        password: String::from(CONFIG.lavalink_pwd),
         user_id: user_id.into(),
         ..Default::default()
     }]);
