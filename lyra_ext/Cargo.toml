@@ -16,7 +16,7 @@ pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 
 [dependencies]
-rstest = "0.21.0"
+rstest = "0.22.0"
 heck = "0.5.0"
 const-str = "0.5.7"
 unicode-segmentation = "1"
