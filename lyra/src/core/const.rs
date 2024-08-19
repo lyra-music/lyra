@@ -69,37 +69,26 @@ pub mod metadata {
 }
 
 pub mod connection {
-    use std::{sync::LazyLock, time::Duration};
+    use std::time::Duration;
 
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
-    pub static CHANGED_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| Duration::from_millis(250));
-
-    pub static GET_LAVALINK_CONNECTION_INFO_TIMEOUT: LazyLock<Duration> =
-        LazyLock::new(|| Duration::from_millis(2_000));
-
-    pub static INACTIVITY_TIMEOUT_POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
-        Duration::from_secs(
-            u64::from(INACTIVITY_TIMEOUT_SECS) / u64::from(INACTIVITY_TIMEOUT_POLL_N),
-        )
-    });
+    pub const CHANGED_TIMEOUT: Duration = Duration::from_millis(250);
+    pub const GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
+    pub const INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
+        Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64 / INACTIVITY_TIMEOUT_POLL_N as u64);
 }
 
 pub mod misc {
-    use std::{sync::LazyLock, time::Duration};
+    use std::time::Duration;
 
     pub const ADD_TRACKS_WRAP_LIMIT: usize = 3;
     pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS: u8 = 30;
 
-    pub static WAIT_FOR_BOT_EVENTS_TIMEOUT: LazyLock<Duration> =
-        LazyLock::new(|| Duration::from_millis(1_000));
-
-    pub static DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: LazyLock<Duration> =
-        LazyLock::new(|| Duration::from_secs(60));
-
-    pub static QUEUE_ADVANCE_LOCKED_TIMEOUT: LazyLock<Duration> =
-        LazyLock::new(|| Duration::from_millis(250));
+    pub const WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
+    pub const DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
+    pub const QUEUE_ADVANCE_LOCKED_TIMEOUT: Duration = Duration::from_millis(250);
 }
 
 pub mod text {

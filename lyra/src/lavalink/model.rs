@@ -261,7 +261,7 @@ pub trait DelegateMethods {
         let info = self
             .get_connection_info(
                 guild_id,
-                *r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+                r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
             )
             .await?;
         tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
