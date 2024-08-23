@@ -222,6 +222,19 @@ impl Queue {
         }
     }
 
+    pub fn recede(&mut self) {
+        match self.repeat_mode {
+            RepeatMode::Off => {
+                self.index = self.index.saturating_sub(1);
+            }
+            RepeatMode::All => {
+                let len = self.len();
+                self.index = ((self.index + len).saturating_sub(1)) % len;
+            }
+            RepeatMode::Track => {}
+        }
+    }
+
     pub fn acquire_advance_lock(&self) {
         tracing::trace!("acquired queue advance lock");
         self.advance_lock.notify_one();

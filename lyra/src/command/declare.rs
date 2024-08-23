@@ -18,7 +18,7 @@ use crate::{
         config::Config,
         connection::{Join, Leave},
         misc::Ping,
-        playback::{Jump, JumpAutocomplete, PlayPause, Restart, Seek},
+        playback::{Back, Jump, JumpAutocomplete, PlayPause, Restart, Seek, Skip},
         queue::{
             AddToQueue, Clear, FairQueue, Move, MoveAutocomplete, Play, PlayAutocomplete, PlayFile,
             Remove, RemoveAutocomplete, RemoveRange, RemoveRangeAutocomplete, Repeat, Shuffle,
@@ -185,6 +185,8 @@ declare_slash_commands![
     Seek,
     Restart,
     Jump,
+    Skip,
+    Back,
 ];
 declare_message_commands![AddToQueue,];
 

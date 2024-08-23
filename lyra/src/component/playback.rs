@@ -5,10 +5,12 @@ mod restart;
 mod seek;
 mod skip;
 
+pub use back::Back;
 pub use jump::{Autocomplete as JumpAutocomplete, Jump};
 pub use play_pause::PlayPause;
 pub use restart::Restart;
 pub use seek::Seek;
+pub use skip::Skip;
 
 use crate::{
     command::require,
