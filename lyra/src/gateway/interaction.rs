@@ -130,9 +130,7 @@ impl Context {
 
         if let Some(guild_id) = inner_guild_id {
             if let Some(mut connection) = bot.lavalink().get_connection_mut(guild_id) {
-                if connection.text_channel_id != channel_id {
-                    connection.text_channel_id = channel_id;
-                }
+                connection.text_channel_id = channel_id;
             }
         }
 

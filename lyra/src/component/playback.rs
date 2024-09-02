@@ -14,13 +14,11 @@ pub use skip::Skip;
 
 use crate::{
     command::require,
-    core::model::{BotStateAware, HttpAware},
+    core::model::{BotStateAware, CacheAware, HttpAware},
     error::component::playback::HandleVoiceStateUpdateError,
     gateway::voice::Context,
     LavalinkAndGuildIdAware,
 };
-
-use super::connection::users_in_voice;
 
 #[tracing::instrument(skip_all, name = "voice_state_update")]
 pub async fn handle_voice_state_update(
@@ -31,7 +29,7 @@ pub async fn handle_voice_state_update(
     let maybe_old_state = ctx.old_voice_state();
 
     tracing::trace!("handling voice state update");
-    let (connected_channel_id, text_channel_id) = {
+    let text_channel_id = {
         let Some(connection) = ctx.get_connection() else {
             tracing::trace!("no active connection");
             return Ok(());
@@ -43,26 +41,29 @@ pub async fn handle_voice_state_update(
         }
         tracing::trace!("no connection change notification");
 
-        (connection.channel_id, connection.text_channel_id)
+        connection.text_channel_id
     };
 
     let Ok(player) = require::player(ctx) else {
         return Ok(());
     };
 
-    if let Some(old_state) = maybe_old_state {
-        let old_channel_id = old_state.channel_id();
-        if state.user_id != ctx.bot().user_id()
-            && old_channel_id == connected_channel_id
-            && state.channel_id.is_some_and(|c| c != old_channel_id)
-            && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
-        {
-            player.set_pause(true).await?;
-            ctx.http()
-                .create_message(text_channel_id)
-                .content("⚡▶ Paused `(Bot is not used by anyone)`")
-                .await?;
-        }
+    if state.user_id == ctx.bot().user_id()
+        && state.suppress
+        && maybe_old_state.is_some_and(|old_state| {
+            state.channel_id.is_some_and(|channel_id| {
+                channel_id == old_state.channel_id()
+                    && ctx.cache().channel(channel_id).is_some_and(|channel| {
+                        channel.kind == twilight_model::channel::ChannelType::GuildStageVoice
+                    })
+            }) && !old_state.suppress()
+        })
+    {
+        player.set_pause(true).await?;
+        ctx.http()
+            .create_message(text_channel_id)
+            .content("⚡▶ Paused `(Bot was moved to audience)`")
+            .await?;
     }
 
     Ok(())

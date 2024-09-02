@@ -242,6 +242,22 @@ async fn impl_connect_to(
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;
 
+    if let Ok(player) = require::player(ctx) {
+        if old_channel_id.is_some() {
+            tracing::trace!("waiting for voice server update...");
+            let _ = ctx
+                .bot()
+                .standby()
+                .wait_for_event(move |e: &Event| match e {
+                    Event::VoiceServerUpdate(v) => v.guild_id == guild_id,
+                    _ => false,
+                })
+                .await;
+            tracing::trace!("voice server update received");
+            player.update_voice_channel(voice_is_empty).await?;
+        }
+    }
+
     if joined.kind == JoinedChannelType::Stage {
         ctx.bot()
             .http()

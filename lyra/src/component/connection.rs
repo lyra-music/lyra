@@ -18,6 +18,7 @@ use twilight_model::id::{
 
 use self::join::JoinedChannel;
 use crate::{
+    command::require,
     component::connection::{
         join::JoinedChannelType,
         leave::{disconnect, pre_disconnect_cleanup, LeaveResponse},
@@ -171,6 +172,14 @@ pub async fn handle_voice_state_update(
                 && state.channel_id != Some(old_channel_id)
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
+                if let Ok(player) = require::player(ctx) {
+                    player.set_pause(true).await?;
+                    ctx.http()
+                        .create_message(text_channel_id)
+                        .content("⚡▶ Paused `(Bot is not used by anyone)`")
+                        .await?;
+                };
+
                 traced::tokio_spawn(start_inactivity_timeout(
                     InactivityTimeoutContext::new_via(ctx),
                     connected_channel_id,
@@ -229,6 +238,9 @@ async fn match_state_channel_id(
                 empty: voice_is_empty,
             };
 
+            if let Ok(player) = require::player(ctx) {
+                player.update_voice_channel(voice_is_empty).await?;
+            }
             let forcefully_moved_notice = if voice_is_empty {
                 format!(
                     "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",

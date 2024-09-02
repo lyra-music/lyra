@@ -23,7 +23,8 @@ use crate::{
     },
     gateway::GuildIdAware,
     lavalink::{
-        OwnedPlayerData, PlayerDataRead, PlayerDataWrite, Queue, QueueItem, UnwrappedPlayerData,
+        DelegateMethods, OwnedPlayerData, PlayerDataRead, PlayerDataWrite, Queue, QueueItem,
+        UnwrappedPlayerData,
     },
     LavalinkAndGuildIdAware,
 };
@@ -59,6 +60,24 @@ impl PlayerInterface {
     pub async fn acquire_advance_lock_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
         queue.acquire_advance_lock();
         self.context.stop_now().await?;
+        Ok(())
+    }
+
+    pub async fn update_voice_channel(&self, voice_is_empty: bool) -> LavalinkResult<()> {
+        let mut update_player = lavalink_rs::model::http::UpdatePlayer {
+            voice: Some(
+                self.context
+                    .client
+                    .get_connection_info_traced(self.context.guild_id)
+                    .await?,
+            ),
+            ..Default::default()
+        };
+        if voice_is_empty {
+            update_player.paused = Some(true);
+            self.data().write().await.set_pause(true);
+        }
+        self.context.update_player(&update_player, true).await?;
         Ok(())
     }
 

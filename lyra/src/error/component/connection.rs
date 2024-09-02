@@ -323,6 +323,7 @@ pub enum HandleVoiceStateUpdateError {
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     MatchStateChannelID(#[from] MatchStateChannelIdError),
     PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 
 #[derive(Error, Debug)]
@@ -331,4 +332,5 @@ pub enum MatchStateChannelIdError {
     Http(#[from] twilight_http::Error),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Cache(#[from] crate::error::Cache),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }

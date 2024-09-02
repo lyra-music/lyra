@@ -246,6 +246,20 @@ pub trait DelegateMethods {
         guild_id: impl Into<LavalinkGuildId> + Send,
         timeout: std::time::Duration,
     ) -> LavalinkResult<ConnectionInfo>;
+    async fn get_connection_info_traced(
+        &self,
+        guild_id: impl Into<LavalinkGuildId> + Send,
+    ) -> LavalinkResult<ConnectionInfo> {
+        let now = tokio::time::Instant::now();
+        let info = self
+            .get_connection_info(
+                guild_id,
+                r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+            )
+            .await?;
+        tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
+        Ok(info)
+    }
 
     async fn create_player_context_with_data<Data: std::any::Any + Send + Sync>(
         &self,
@@ -257,15 +271,7 @@ pub trait DelegateMethods {
         &self,
         guild_id: impl Into<LavalinkGuildId> + Send + Copy,
     ) -> LavalinkResult<PlayerContext> {
-        let now = tokio::time::Instant::now();
-        let info = self
-            .get_connection_info(
-                guild_id,
-                r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
-            )
-            .await?;
-        tracing::trace!("getting lavalink connection info took {:?}", now.elapsed());
-
+        let info = self.get_connection_info_traced(guild_id).await?;
         let data = Arc::new(RwLock::new(RawPlayerData::new()));
         let player = self
             .create_player_context_with_data(guild_id, info, data)
