@@ -29,7 +29,11 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::{core::r#const::metadata::BANNER, lavalink::handlers, LavalinkAware};
+use crate::{
+    core::r#const::metadata::BANNER,
+    lavalink::{handlers, ClientData},
+    LavalinkAware,
+};
 
 use super::{
     core::{
@@ -52,11 +56,12 @@ const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
-fn build_http_client() -> Client {
+fn build_http_client() -> Arc<Client> {
     ClientBuilder::default()
         .default_allowed_mentions(AllowedMentions::default())
         .token(CONFIG.token.to_owned())
         .build()
+        .into()
 }
 
 fn build_shard_config() -> ShardConfig {
@@ -93,7 +98,8 @@ pub async fn start() -> Result<(), StartError> {
     let http = build_http_client();
 
     let user_id = http.current_user().await?.model().await?.id;
-    let lavalink = build_lavalink_client(user_id).await;
+    let data = ClientData::new(http.clone());
+    let lavalink = build_lavalink_client(user_id, data).await;
 
     let shards = build_and_split_shards(&http).await?;
     let shards_len = shards.len();
@@ -122,7 +128,7 @@ async fn build_and_split_shards(
 }
 
 #[tracing::instrument(skip_all, name = "lavalink")]
-async fn build_lavalink_client(user_id: Id<UserMarker>) -> Lavalink {
+async fn build_lavalink_client(user_id: Id<UserMarker>, data: ClientData) -> Lavalink {
     let events = handlers();
 
     let nodes = Vec::from([lavalink_rs::node::NodeBuilder {
@@ -132,7 +138,8 @@ async fn build_lavalink_client(user_id: Id<UserMarker>) -> Lavalink {
         ..Default::default()
     }]);
 
-    let client = LavalinkClient::new(events, nodes, NodeDistributionStrategy::new()).await;
+    let strategy = NodeDistributionStrategy::new();
+    let client = LavalinkClient::new_with_data(events, nodes, strategy, data.into()).await;
     client.into()
 }
 

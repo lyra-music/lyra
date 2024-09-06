@@ -23,7 +23,7 @@ pub struct Down {
 impl BotSlashCommand for Down {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let (in_voice, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let guild_id = ctx.guild_id();
         let data = player.data();
@@ -45,7 +45,7 @@ impl BotSlashCommand for Down {
                 super::clipping_warning(new_percent),
             )
         } else {
-            ctx.lavalink().connection_mut_from(&in_voice).mute = true;
+            ctx.lavalink().try_get_connection_mut(guild_id)?.mute = true;
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(true)

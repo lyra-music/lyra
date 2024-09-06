@@ -127,7 +127,7 @@ pub trait HttpAware {
 
 pub struct BotState {
     cache: InMemoryCache,
-    http: Client,
+    http: Arc<Client>,
     standby: Standby,
     lavalink: Lavalink,
     db: Pool<Postgres>,
@@ -135,7 +135,7 @@ pub struct BotState {
 }
 
 impl BotState {
-    pub fn new(db: Pool<Postgres>, http: Client, lavalink: Lavalink) -> Self {
+    pub fn new(db: Pool<Postgres>, http: Arc<Client>, lavalink: Lavalink) -> Self {
         let info = BotInfo {
             started: Instant::now(),
             guild_counter: GuildCounter::new(),

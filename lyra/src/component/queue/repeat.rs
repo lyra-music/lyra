@@ -6,8 +6,7 @@ use crate::{
         macros::out_or_upd,
         model::BotSlashCommand,
         poll::Topic,
-        require::{self, PartialInVoice},
-        SlashCtx,
+        require, SlashCtx,
     },
     error::CommandResult,
     gateway::GuildIdAware,
@@ -60,7 +59,6 @@ impl BotSlashCommand for Repeat {
         };
 
         let in_voice = require::in_voice(&ctx)?;
-        let partial_in_voice = PartialInVoice::from(&in_voice);
         let player = require::player(&ctx)?;
         let data = player.data();
 
@@ -75,7 +73,7 @@ impl BotSlashCommand for Repeat {
             .await?;
 
         ctx.lavalink()
-            .connection_from(&partial_in_voice)
+            .try_get_connection(guild_id)?
             .dispatch(Event::QueueRepeat);
         data.write().await.queue_mut().set_repeat_mode(mode);
 

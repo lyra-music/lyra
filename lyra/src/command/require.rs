@@ -24,7 +24,7 @@ use crate::{
     gateway::GuildIdAware,
     lavalink::{
         DelegateMethods, OwnedPlayerData, PlayerDataRead, PlayerDataWrite, Queue, QueueItem,
-        UnwrappedPlayerData,
+        UnwrappedData,
     },
     LavalinkAndGuildIdAware,
 };

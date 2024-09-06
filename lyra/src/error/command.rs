@@ -51,6 +51,7 @@ pub enum Error {
     HandlePoll(#[from] check::HandlePollError),
     NotPlaying(#[from] super::NotPlaying),
     Paused(#[from] super::Paused),
+    UnrecognisedConnection(#[from] super::UnrecognisedConnection),
 }
 
 pub enum FlattenedError<'a> {
@@ -89,6 +90,7 @@ pub enum FlattenedError<'a> {
     Lavalink,
     NoPlayer,
     NotInGuild,
+    UnrecognisedConnection,
 }
 
 pub use FlattenedError as Fe;
@@ -287,6 +289,9 @@ impl<'a> Fe<'a> {
             super::component::connection::join::ResidualImplConnectToError::Lavalink(_) => {
                 Self::Lavalink
             }
+            super::component::connection::join::ResidualImplConnectToError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            },
             super::component::connection::join::ResidualImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed_residual(e)
             }
@@ -377,6 +382,9 @@ impl<'a> Fe<'a> {
     ) -> Self {
         match error {
             super::component::connection::leave::ResidualError::GatewaySend(_) => Self::GatewaySend,
+            super::component::connection::leave::ResidualError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            }
             super::component::connection::leave::ResidualError::InVoiceWithoutUser(e) => {
                 Self::InVoiceWithoutUser(e)
             }
@@ -518,9 +526,10 @@ impl Error {
             Self::Cache(_) => Fe::Cache,
             Self::NotPlaying(_) => Fe::NotPlaying,
             Self::Paused(_) => Fe::Paused,
-            Self::RequireUnsuppressed(e) => Fe::from_require_unsuppressed_error(e),
+            Self::UnrecognisedConnection(_) => Fe::UnrecognisedConnection,
             Self::PositionOutOfRange(e) => Fe::PositionOutOfRange(e),
             Self::InVoiceWithoutUser(e) => Fe::InVoiceWithoutUser(e),
+            Self::RequireUnsuppressed(e) => Fe::from_require_unsuppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
             Self::RequireInVoiceWithSomeoneElse(e) => {
                 Fe::from_require_in_voice_with_someone_else_error(e)

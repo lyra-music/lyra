@@ -290,7 +290,8 @@ async fn impl_remove(
         _ => "**`≡-`**",
     };
 
-    let current = queue.position();
+    // SAFETY: `queue.index() + 1` is non-zero
+    let current = unsafe { NonZeroUsize::new_unchecked(queue.index() + 1) };
     let before_current = positions.partition_point(|&i| i < current);
     *queue.index_mut() -= positions[..before_current].len();
 

@@ -58,7 +58,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let guild_id = ctx.guild_id();
 
     let in_voice = require::in_voice(ctx)?;
-    let connection = ctx.lavalink().connection_from(&in_voice);
+    let connection = ctx.lavalink().try_get_connection(guild_id)?;
     let channel_id = in_voice.channel_id();
     check::user_in(in_voice)?.only()?;
 

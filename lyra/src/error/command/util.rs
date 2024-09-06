@@ -114,6 +114,11 @@ impl AutoJoinAttemptError {
                     ),
                 ))
             }
+            crate::error::component::connection::join::ImplConnectToError::UnrecognisedConnection(_) => {
+                // SAFETY: if an auto-join was performed, then the `require::in_voice(_)` call was unsuccessful,
+                // which is impossible as this error will only be raised if there is an unrecognised connection found.
+                unsafe { std::hint::unreachable_unchecked() }
+            },
             crate::error::component::connection::join::ImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed(e)
             }

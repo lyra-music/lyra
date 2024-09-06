@@ -5,8 +5,9 @@ use lavalink_rs::{
 };
 
 use crate::{
+    core::model::HttpAware,
     error::lavalink::ProcessResult,
-    lavalink::{model::CorrectTrackInfo, UnwrappedPlayerData},
+    lavalink::{model::CorrectTrackInfo, UnwrappedData},
 };
 
 #[tracing::instrument(err, skip_all, name = "track_start")]
@@ -71,17 +72,55 @@ async fn impl_end(lavalink: LavalinkClient, _: String, event: &TrackEnd) -> Proc
 }
 
 #[tracing::instrument(err, skip_all, name = "track_exception")]
-async fn impl_exception(_: LavalinkClient, _: String, event: &TrackException) -> ProcessResult {
+async fn impl_exception(
+    lavalink: LavalinkClient,
+    _: String,
+    event: &TrackException,
+) -> ProcessResult {
+    let guild_id = event.guild_id;
     tracing::error!(?event, "track exception");
 
-    Ok(()) // TODO: handle track exception
+    let Some(player) = lavalink.get_player_context(guild_id) else {
+        return Ok(());
+    };
+
+    let channel_id = {
+        let data = player.data_unwrapped();
+        let data_r = data.read().await;
+        data_r.text_channel_id()
+    };
+
+    lavalink
+        .data_unwrapped()
+        .http()
+        .create_message(channel_id)
+        .content(&format!(
+            "💔**`ー`** ~~`{}`~~ `(Error playing this track)`",
+            event.track.info.title()
+        ))
+        .await?;
+
+    Ok(())
 }
 
 #[tracing::instrument(err, skip_all, name = "track_stuck")]
-async fn impl_stuck(_: LavalinkClient, _: String, event: &TrackStuck) -> ProcessResult {
+async fn impl_stuck(lavalink: LavalinkClient, _: String, event: &TrackStuck) -> ProcessResult {
+    let guild_id = event.guild_id;
     tracing::warn!(?event, "track stuck");
 
-    Ok(()) // TODO: handle track stuck
+    let Some(player) = lavalink.get_player_context(guild_id) else {
+        return Ok(());
+    };
+
+    let channel_id = player.data_unwrapped().read().await.text_channel_id();
+    lavalink
+        .data_unwrapped()
+        .http()
+        .create_message(channel_id)
+        .content("🌀 Playback interrupted. Please wait or try using the bot again later.")
+        .await?;
+
+    Ok(())
 }
 
 #[hook]

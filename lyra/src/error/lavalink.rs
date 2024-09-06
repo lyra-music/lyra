@@ -8,6 +8,7 @@ pub struct NoPlayerError;
 #[error("processing lavalink event failed: {:?}", .0)]
 pub enum ProcessError {
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    TwilightHttp(#[from] twilight_http::Error),
 }
 
 pub type ProcessResult = Result<(), ProcessError>;

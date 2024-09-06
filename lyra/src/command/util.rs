@@ -351,7 +351,7 @@ pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<Pla
 
     let player = match lavalink.get_player_context(guild_id) {
         Some(player) => player,
-        None => lavalink.new_player(guild_id).await?,
+        None => lavalink.new_player(guild_id, ctx.channel_id()).await?,
     };
 
     Ok(player)

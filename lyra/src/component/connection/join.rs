@@ -213,31 +213,25 @@ async fn impl_connect_to(
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
 
     let lavalink = ctx.lavalink();
-    let response = old_channel_id.map_or_else(
-        || {
-            let connection = Connection::new(channel_id, ctx.channel_id());
-            connection.notify_change();
-            lavalink.new_connection_with(guild_id, connection);
-            Response::Joined {
-                voice: joined,
-                empty: voice_is_empty,
-            }
-        },
-        |from| {
-            // SAFETY: `old_channel_id` is of variant `Some`, meaning another connection exists,
-            //         so `ctx.lavalink().get_connection_mut(guild_id).unwrap_unchecked()` is safe
-            let mut connection =
-                unsafe { lavalink.get_connection_mut(guild_id).unwrap_unchecked() };
-            connection.channel_id = channel_id;
-            connection.notify_change();
-            drop(connection);
-            Response::Moved {
-                from,
-                to: joined,
-                empty: voice_is_empty,
-            }
-        },
-    );
+    let response = if let Some(from) = old_channel_id {
+        let mut connection = lavalink.try_get_connection_mut(guild_id)?;
+        connection.channel_id = channel_id;
+        connection.notify_change();
+        drop(connection);
+        Response::Moved {
+            from,
+            to: joined,
+            empty: voice_is_empty,
+        }
+    } else {
+        let connection = Connection::new(channel_id, ctx.channel_id());
+        connection.notify_change();
+        lavalink.new_connection_with(guild_id, connection);
+        Response::Joined {
+            voice: joined,
+            empty: voice_is_empty,
+        }
+    };
 
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;

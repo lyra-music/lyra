@@ -17,10 +17,10 @@ pub struct ToggleMute;
 impl BotSlashCommand for ToggleMute {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let in_voice = unmuting_checks(&ctx)?;
+        let _ = unmuting_checks(&ctx)?;
 
         let guild_id = ctx.guild_id();
-        let mut connection = ctx.lavalink().connection_mut_from(&in_voice);
+        let mut connection = ctx.lavalink().try_get_connection_mut(guild_id)?;
 
         let mute = !connection.mute;
         ctx.http()

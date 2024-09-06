@@ -212,3 +212,7 @@ pub struct NotInGuild;
 #[derive(Error, Debug)]
 #[error("confirmation timed out")]
 pub struct ConfirmationTimedOut;
+
+#[derive(Error, Debug)]
+#[error("unrecognised voice connection")]
+pub struct UnrecognisedConnection;

@@ -15,6 +15,7 @@ use crate::{
     command::{
         macros::{bad, cant, caut, crit, err, hid, nope, note, out_upd, sus, sus_fol},
         model::NonPingInteraction,
+        require,
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },
@@ -129,8 +130,12 @@ impl Context {
         };
 
         if let Some(guild_id) = inner_guild_id {
-            if let Some(mut connection) = bot.lavalink().get_connection_mut(guild_id) {
+            let lavalink = bot.lavalink();
+            if let Some(mut connection) = lavalink.get_connection_mut(guild_id) {
                 connection.text_channel_id = channel_id;
+            }
+            if let Ok(player) = require::player(&(lavalink, guild_id)) {
+                player.data().write().await.set_text_channel_id(channel_id);
             }
         }
 
@@ -292,6 +297,12 @@ async fn match_error(
         Fe::NoPlayer => {
             let play = InteractionClient::mention_command::<Play>();
             caut!(format!("Not yet played anything. Use {} first.", play), i);
+        }
+        Fe::UnrecognisedConnection => {
+            crit!(
+                "The bot wasn't disconnected properly last session. Please wait for it to automatically leave the voice channel, then try again.",
+                i
+            );
         }
         _ => {
             err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?i);

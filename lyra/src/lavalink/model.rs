@@ -14,11 +14,16 @@ use lavalink_rs::{
 };
 use lyra_ext::time::track_timestamp::TrackTimestamp;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use twilight_model::id::{marker::GuildMarker, Id};
+use twilight_http::Client;
+use twilight_model::id::{
+    marker::{ChannelMarker, GuildMarker},
+    Id,
+};
 
 use crate::{
     command::require::{InVoice, PartialInVoice},
-    core::r#const,
+    core::{model::HttpAware, r#const},
+    error::UnrecognisedConnection,
     gateway::GuildIdAware,
 };
 
@@ -37,6 +42,7 @@ pub type OwnedPlayerData = Arc<PlayerData>;
 pub type PlayerDataRead<'a> = RwLockReadGuard<'a, RawPlayerData>;
 pub type PlayerDataWrite<'a> = RwLockWriteGuard<'a, RawPlayerData>;
 
+pub type OwnedClientData = Arc<ClientData>;
 pub trait ClientAware {
     fn lavalink(&self) -> &Lavalink;
 }
@@ -55,16 +61,32 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
     }
 }
 
+type ClientRefAndGuildId<'a> = (&'a Lavalink, Id<GuildMarker>);
+
+impl ClientAware for ClientRefAndGuildId<'_> {
+    fn lavalink(&self) -> &Lavalink {
+        self.0
+    }
+}
+impl GuildIdAware for ClientRefAndGuildId<'_> {
+    fn guild_id(&self) -> Id<GuildMarker> {
+        self.1
+    }
+}
+impl ClientAndGuildIdAware for ClientRefAndGuildId<'_> {}
+
 pub struct RawPlayerData {
     queue: Queue,
     volume: NonZeroU16,
     pitch: Pitch,
     track_timestamp: TrackTimestamp,
+    text_channel_id: Id<ChannelMarker>,
 }
 
 impl RawPlayerData {
-    pub fn new() -> Self {
+    pub fn new(text_channel_id: Id<ChannelMarker>) -> Self {
         Self {
+            text_channel_id,
             // SAFETY: `100` is non-zero
             volume: unsafe { NonZeroU16::new_unchecked(100) },
             pitch: Pitch::new(),
@@ -123,6 +145,14 @@ impl RawPlayerData {
     #[inline]
     pub fn set_speed(&mut self, multiplier: f64) {
         self.track_timestamp.set_speed(multiplier);
+    }
+
+    pub const fn text_channel_id(&self) -> Id<ChannelMarker> {
+        self.text_channel_id
+    }
+
+    pub fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
+        self.text_channel_id = text_channel_id;
     }
 }
 
@@ -270,9 +300,10 @@ pub trait DelegateMethods {
     async fn new_player(
         &self,
         guild_id: impl Into<LavalinkGuildId> + Send + Copy,
+        channel_id: Id<ChannelMarker>,
     ) -> LavalinkResult<PlayerContext> {
         let info = self.get_connection_info_traced(guild_id).await?;
-        let data = Arc::new(RwLock::new(RawPlayerData::new()));
+        let data = Arc::new(RwLock::new(RawPlayerData::new(channel_id)));
         let player = self
             .create_player_context_with_data(guild_id, info, data)
             .await?;
@@ -305,6 +336,23 @@ impl Lavalink {
 
     pub fn get_connection(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRef> {
         self.connections.get(&guild_id)
+    }
+
+    #[inline]
+    pub fn try_get_connection(
+        &self,
+        guild_id: Id<GuildMarker>,
+    ) -> Result<ConnectionRef, UnrecognisedConnection> {
+        self.get_connection(guild_id).ok_or(UnrecognisedConnection)
+    }
+
+    #[inline]
+    pub fn try_get_connection_mut(
+        &self,
+        guild_id: Id<GuildMarker>,
+    ) -> Result<ConnectionRefMut, UnrecognisedConnection> {
+        self.get_connection_mut(guild_id)
+            .ok_or(UnrecognisedConnection)
     }
 
     pub fn connection_from(&self, cx: &impl GetConnection) -> ConnectionRef {
@@ -380,13 +428,23 @@ impl DelegateMethods for LavalinkClient {
     }
 }
 
-pub trait UnwrappedPlayerData {
-    fn data_unwrapped(&self) -> OwnedPlayerData;
+pub trait UnwrappedData {
+    type Data;
+    fn data_unwrapped(&self) -> Self::Data;
 }
 
-impl UnwrappedPlayerData for PlayerContext {
-    fn data_unwrapped(&self) -> OwnedPlayerData {
+impl UnwrappedData for PlayerContext {
+    type Data = OwnedPlayerData;
+    fn data_unwrapped(&self) -> Self::Data {
         // SAFETY: Player data exists of type `Arc<RwLock<PlayerData>>`
+        unsafe { self.data().unwrap_unchecked() }
+    }
+}
+
+impl UnwrappedData for LavalinkClient {
+    type Data = OwnedClientData;
+    fn data_unwrapped(&self) -> Self::Data {
+        // SAFETY: Lavalink data exists of type `Arc<ClientData>`
         unsafe { self.data().unwrap_unchecked() }
     }
 }
@@ -413,3 +471,19 @@ pub trait GetConnection: GuildIdAware {}
 
 impl GetConnection for InVoice<'_> {}
 impl GetConnection for PartialInVoice {}
+
+pub struct ClientData {
+    http: Arc<Client>,
+}
+
+impl HttpAware for ClientData {
+    fn http(&self) -> &Client {
+        &self.http
+    }
+}
+
+impl ClientData {
+    pub fn new(http: Arc<Client>) -> Self {
+        Self { http }
+    }
+}

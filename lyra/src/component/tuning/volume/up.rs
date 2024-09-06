@@ -30,7 +30,7 @@ impl BotSlashCommand for Up {
         const MAX_PERCENT: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1_000) };
 
         let mut ctx = require::guild(ctx)?;
-        let (in_voice, player) = check_user_is_dj_and_require_player(&ctx)?;
+        let (_, player) = check_user_is_dj_and_require_player(&ctx)?;
 
         let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
@@ -38,8 +38,8 @@ impl BotSlashCommand for Up {
         #[allow(clippy::cast_possible_truncation)]
         let percent_u16 = self.percent.unwrap_or(10).unsigned_abs() as u16;
 
-        let (old_percent_str, new_percent) = if lavalink.connection_from(&in_voice).mute {
-            lavalink.connection_mut_from(&in_voice).mute = false;
+        let (old_percent_str, new_percent) = if lavalink.try_get_connection(guild_id)?.mute {
+            lavalink.try_get_connection_mut(guild_id)?.mute = false;
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(false)

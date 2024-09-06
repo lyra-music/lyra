@@ -40,9 +40,7 @@ use crate::{
         CommandResult, LoadFailed as LoadFailedError,
     },
     gateway::GuildIdAware,
-    lavalink::{
-        CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedPlayerData, UnwrappedPlayerInfoUri,
-    },
+    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedData, UnwrappedPlayerInfoUri},
     LavalinkAware,
 };
 
