@@ -1,5 +1,6 @@
 use std::{hint::unreachable_unchecked, marker::PhantomData, sync::Arc};
 
+use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_model::{
     application::interaction::application_command::{
@@ -26,6 +27,7 @@ impl<T: Aware> Ctx<T> {
         bot: OwnedBotState,
         latency: Latency,
         sender: MessageSender,
+        acknowledgement: oneshot::Sender<()>,
     ) -> Self {
         Self {
             data: Some(PartialInteractionData::Command(PartialCommandData::new(
@@ -36,6 +38,7 @@ impl<T: Aware> Ctx<T> {
             latency,
             sender,
             acknowledged: false,
+            acknowledgement: Some(acknowledgement),
             kind: PhantomData::<fn(T) -> T>,
             location: PhantomData,
         }

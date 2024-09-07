@@ -90,13 +90,15 @@ impl Interface<'_> {
         self.inner.0.update_response(self.interaction_token())
     }
 
-    pub async fn update_no_components_embeds(&self, content: &str) -> MessageFollowupResult {
-        Ok(self
-            .update()
+    pub async fn update_no_components_embeds(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> MessageRespondResult {
+        self.update()
             .components(None)
             .embeds(None)
-            .content(Some(content))
-            .await?)
+            .content(Some(&content.into()))
+            .await
     }
 
     pub async fn update_message_embeds_only(
@@ -107,7 +109,15 @@ impl Interface<'_> {
         Ok(self.update_message_with(Some(data)).await?)
     }
 
-    pub async fn ephem(&self, content: impl Into<String> + Send) -> MessageRespondResult {
+    pub async fn respond(&self, content: impl Into<String> + Send) -> MessageRespondResult {
+        let data = Self::base_response_data_builder().content(content).build();
+        self.respond_with(Some(data)).await
+    }
+
+    pub async fn respond_ephemeral(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> MessageRespondResult {
         let data = Self::base_response_data_builder()
             .content(content)
             .flags(MessageFlags::EPHEMERAL)
@@ -115,22 +125,25 @@ impl Interface<'_> {
         self.respond_with(Some(data)).await
     }
 
-    pub async fn followup(&self, content: &str) -> MessageFollowupResult {
+    pub async fn followup(&self, content: impl Into<String> + Send) -> MessageFollowupResult {
         Ok(self
             .inner
             .0
             .create_followup(self.interaction_token())
-            .content(content)
+            .content(&content.into())
             .await?)
     }
 
-    pub async fn followup_ephem(&self, content: &str) -> MessageFollowupResult {
+    pub async fn followup_ephemeral(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> MessageFollowupResult {
         Ok(self
             .inner
             .0
             .create_followup(self.interaction_token())
             .flags(MessageFlags::EPHEMERAL)
-            .content(content)
+            .content(&content.into())
             .await?)
     }
 
@@ -190,6 +203,36 @@ impl Interface<'_> {
         Ok(())
     }
 
+    async fn defer_as(&self, ephemeral: bool) -> UnitRespondResult {
+        let mut data = Self::base_response_data_builder();
+        if ephemeral {
+            data = data.flags(MessageFlags::EPHEMERAL);
+        }
+
+        self.inner
+            .0
+            .create_response(
+                self.interaction_id,
+                self.interaction_token(),
+                &InteractionResponse {
+                    kind: InteractionResponseType::DeferredChannelMessageWithSource,
+                    data: data.build().into(),
+                },
+            )
+            .await?;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn defer(&self) -> UnitRespondResult {
+        self.defer_as(false).await
+    }
+
+    #[inline]
+    pub async fn defer_ephem(&self) -> UnitRespondResult {
+        self.defer_as(true).await
+    }
+
     pub async fn update_followup(
         &self,
         message_id: Id<MessageMarker>,
@@ -201,6 +244,109 @@ impl Interface<'_> {
             .content(Some(content))
             .await?;
         Ok(())
+    }
+}
+
+pub trait AcknowledgementAware {
+    type FollowupError;
+    type RespondError;
+    type RespondOrFollowupError: From<Self::RespondError> + From<Self::FollowupError>;
+
+    fn acknowledged(&self) -> bool;
+    async fn respond(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError>;
+    async fn respond_ephemeral(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError>;
+    async fn update(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError>;
+    async fn followup(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError>;
+    async fn followup_ephemeral(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError>;
+
+    async fn respond_or_update(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        if self.acknowledged() {
+            return self.update(&content.into()).await;
+        }
+        self.respond(content).await
+    }
+    async fn respond_or_followup(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondOrFollowupError> {
+        if self.acknowledged() {
+            return Ok(self.followup(&content.into()).await?);
+        }
+
+        Ok(self.respond(content).await?)
+    }
+    async fn respond_ephemeral_or_followup(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondOrFollowupError> {
+        if self.acknowledged() {
+            return Ok(self.followup_ephemeral(&content.into()).await?);
+        }
+
+        Ok(self.respond_ephemeral(content).await?)
+    }
+}
+
+impl AcknowledgementAware for (Interface<'_>, bool) {
+    type FollowupError = crate::error::core::FollowupError;
+    type RespondError = twilight_http::Error;
+    type RespondOrFollowupError = crate::error::core::FollowupError;
+
+    fn acknowledged(&self) -> bool {
+        self.1
+    }
+
+    async fn respond_ephemeral(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        self.0.respond_ephemeral(content).await
+    }
+
+    async fn respond(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        self.0.respond(content).await
+    }
+
+    async fn update(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        self.0.update_no_components_embeds(content).await
+    }
+
+    async fn followup(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError> {
+        self.0.followup(content).await
+    }
+
+    async fn followup_ephemeral(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError> {
+        self.0.followup_ephemeral(content).await
     }
 }
 

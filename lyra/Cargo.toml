@@ -37,22 +37,22 @@ lyra_ext = { path = "../lyra_ext" }
 
 paste = "1.0.15"
 const-str = "0.5.7"
-const_panic = { version = "0.2.8", features = ["derive"] }
+const_panic = { version = "0.2.9", features = ["derive"] }
 bitflags = "2.6.0"
-dashmap = "6.0.1"
+dashmap = "6.1.0"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "1.0.63"
 color-eyre = "0.6.3"
 futures = "0.3.30"
-tokio = { version = "1.39.3", features = [
+tokio = { version = "1.40.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
     "macros",
 ] }
-serde = "1.0.208"
-serde_json = "1.0.125"
+serde = "1.0.210"
+serde_json = "1.0.128"
 regex = "1.10.6"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
@@ -62,7 +62,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 rayon = "1.10.0"
-sqlx = { version = "0.8.0", features = ["postgres", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
 lavalink-rs = { version = "0.13.0", features = ["twilight16"] }
 aho-corasick = "1.1.3"

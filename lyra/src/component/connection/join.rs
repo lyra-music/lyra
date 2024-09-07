@@ -18,7 +18,7 @@ use twilight_model::{
 use crate::{
     command::{
         check,
-        macros::{bad, cant, nope, note, note_fol, out, sus_fol},
+        macros::{bad, cant, nope, note, note_fol, out_or_fol, sus_fol},
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
         require::{self, InVoiceCachedVoiceState},
         SlashCtx,
@@ -328,7 +328,7 @@ async fn handle_response(
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
-            out!(
+            out_or_fol!(
                 stage_fmt(&format!("🖇️ {}", voice.id.mention()), stage),
                 ?ctx
             );
@@ -336,7 +336,7 @@ async fn handle_response(
         }
         Response::Moved { from, to, empty } => {
             let stage = matches!(to.kind, JoinedChannelType::Stage);
-            out!(
+            out_or_fol!(
                 stage_fmt(
                     &format!("️📎🖇️ ~~{}~~ ➜ __{}__", from.mention(), to.id.mention()),
                     stage,

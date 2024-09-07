@@ -6,6 +6,7 @@ mod modal;
 
 use std::{marker::PhantomData, sync::Arc};
 
+use tokio::sync::oneshot;
 use twilight_cache_inmemory::{model::CachedMember, InMemoryCache, Reference};
 use twilight_gateway::{Latency, MessageSender};
 use twilight_http::Client as HttpClient;
@@ -88,6 +89,7 @@ where
     sender: MessageSender,
     data: Option<PartialInteractionData>,
     acknowledged: bool,
+    acknowledgement: Option<oneshot::Sender<()>>,
     kind: PhantomData<fn(Of) -> Of>,
     location: PhantomData<fn(In) -> In>,
 }
@@ -104,6 +106,7 @@ impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
             sender: value.sender,
             data: value.data,
             acknowledged: value.acknowledged,
+            acknowledgement: value.acknowledgement,
             kind: value.kind,
             location: PhantomData::<fn(GuildMarker) -> GuildMarker>,
         })
@@ -120,6 +123,7 @@ impl<T: Kind, U: Location> Ctx<T, U> {
             location: self.location,
             data: None,
             acknowledged: false,
+            acknowledgement: None,
             kind: PhantomData::<fn(ModalMarker) -> ModalMarker>,
         }
     }
@@ -128,12 +132,11 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         &self.latency
     }
 
-    pub const fn acknowledged(&self) -> bool {
-        self.acknowledged
-    }
-
     pub fn acknowledge(&mut self) {
         self.acknowledged = true;
+        if let Some(tx) = std::mem::take(&mut self.acknowledgement) {
+            let _ = tx.send(());
+        }
     }
 
     pub fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {

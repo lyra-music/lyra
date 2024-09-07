@@ -24,8 +24,8 @@ use twilight_standby::Standby;
 use crate::{error::core::DeserializeBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
 
 pub use self::interaction::{
-    Client as InteractionClient, Interface as InteractionInterface, MessageResponse,
-    UnitFollowupResult, UnitRespondResult,
+    AcknowledgementAware, Client as InteractionClient, Interface as InteractionInterface,
+    MessageResponse, UnitFollowupResult, UnitRespondResult,
 };
 
 pub struct Config {

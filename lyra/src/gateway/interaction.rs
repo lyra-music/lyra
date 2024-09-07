@@ -1,5 +1,6 @@
 use std::{hint::unreachable_unchecked, sync::Arc};
 
+use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
 use twilight_model::{
@@ -13,7 +14,10 @@ use twilight_model::{
 use super::model::Process;
 use crate::{
     command::{
-        macros::{bad, cant, caut, crit, err, hid, nope, note, out_upd, sus, sus_fol},
+        macros::{
+            bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
+            note, out_upd, sus, sus_fol,
+        },
         model::NonPingInteraction,
         require,
         util::MessageLinkAware,
@@ -34,7 +38,7 @@ use crate::{
             },
             declare::{CommandExecuteError, Fuunacee},
             util::AutoJoinSuppressedError,
-            Error as CommandError, Fe, RespondError,
+            Error as CommandError, Fe,
         },
         gateway::{ProcessError, ProcessResult},
         AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
@@ -101,6 +105,7 @@ impl Context {
         let inner_guild_id = self.inner.guild_id;
         // SAFETY: interaction type is not `Ping`, so `channel` is present
         let channel_id = unsafe { self.inner.channel_id_unchecked() };
+        let (tx, mut rx) = oneshot::channel::<()>();
 
         let result = match data.kind {
             CommandType::ChatInput => {
@@ -110,11 +115,11 @@ impl Context {
                     bot.clone(),
                     self.latency,
                     self.sender,
+                    tx,
                 )
                 .execute(*data)
                 .await
             }
-            CommandType::User => todo!(),
             CommandType::Message => {
                 MessageCtx::from_partial_data(
                     self.inner,
@@ -122,10 +127,12 @@ impl Context {
                     bot.clone(),
                     self.latency,
                     self.sender,
+                    tx,
                 )
                 .execute(*data)
                 .await
             }
+            CommandType::User => todo!(),
             _ => unimplemented!(),
         };
 
@@ -143,6 +150,7 @@ impl Context {
             return Ok(());
         };
 
+        let acknowledged = rx.try_recv().is_ok();
         match source.flatten_until_user_not_allowed_as() {
             Fuunacee::UserNotAllowed => {
                 nope!("You are not allowed to use commands in this context.", i);
@@ -153,7 +161,7 @@ impl Context {
                     //         so the unflattened source error must be `CommandExecuteError::Command(_)`
                     unsafe { unreachable_unchecked() }
                 };
-                match_error(error, name, i).await
+                match_error(error, name, acknowledged, i).await
             }
             _ => {
                 crit!(format!(
@@ -172,12 +180,14 @@ impl Context {
         };
 
         let name = data.name.clone().into();
+        let (tx, _) = oneshot::channel::<()>();
         let Err(source) = <AutocompleteCtx>::from_partial_data(
             self.inner,
             &data,
             self.bot,
             self.latency,
             self.sender,
+            tx,
         )
         .execute(*data)
         .await
@@ -217,13 +227,17 @@ impl Context {
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
+    acknowledged: bool,
     i: InteractionInterface<'_>,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         Fe::Cache => {
             tracing::warn!("cache error: {:#?}", error);
 
-            crit!("Something isn't working at the moment, try again later.", i);
+            crit_or_fol!(
+                "Something isn't working at the moment, try again later.",
+                (i, acknowledged)
+            );
         }
         Fe::UserNotDj => {
             nope!("You need to be a ***DJ*** to do that.", i);
@@ -246,12 +260,12 @@ async fn match_error(
             );
         }
         Fe::InVoiceWithoutUser(e) => {
-            nope!(
+            nope_or_fol!(
                 format!(
                     "You are not with the bot in {}; You need to be a ***DJ*** to do that.",
                     e.0.mention(),
                 ),
-                i
+                (i, acknowledged)
             );
         }
         Fe::InVoiceWithSomeoneElse(e) => {
@@ -260,9 +274,11 @@ async fn match_error(
         Fe::InVoiceWithoutSomeoneElse(e) => {
             bad!(format!("Not enough people are in {}.", e.0.mention()), i);
         }
-        Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
+        Fe::Suppressed(e) => Ok(match_suppressed(e, (i, acknowledged)).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
+        Fe::AutoJoinAttemptFailed(e) => {
+            Ok(match_autojoin_attempt_failed(e, (i, acknowledged)).await?)
+        }
         Fe::Stopped => todo!(),
         Fe::NotPlaying => {
             bad!("Currently not playing anything.", i);
@@ -316,14 +332,14 @@ async fn match_error(
 
 async fn match_suppressed(
     error: &SuppressedError,
-    i: InteractionInterface<'_>,
-) -> UnitRespondResult {
+    mut ia: (InteractionInterface<'_>, bool),
+) -> UnitFollowupResult {
     match error {
         SuppressedError::Muted => {
-            bad!("Currently server muted.", i);
+            bad_or_fol!("Currently server muted.", ia);
         }
         SuppressedError::NotSpeaker => {
-            bad!("Not currently a speaker in this stage channel.", i);
+            bad_or_fol!("Not currently a speaker in this stage channel.", ia);
         }
     }
 }
@@ -350,33 +366,33 @@ async fn match_autojoin_suppressed(
 
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
-    i: InteractionInterface<'_>,
-) -> Result<(), RespondError> {
+    mut ia: (InteractionInterface<'_>, bool),
+) -> UnitFollowupResult {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
-            bad!(
+            bad_or_fol!(
                 format!(
                     "Please join a voice channel, or use {} to connect to a channel.",
                     join
                 ),
-                i
+                ia
             );
         }
         AutoJoinAttemptFailedError::UserNotAllowed(_) => {
-            nope!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", i);
+            nope_or_fol!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", ia);
         }
         AutoJoinAttemptFailedError::Forbidden(e) => {
-            cant!(
+            cant_or_fol!(
                 format!(
                     "Attempting to join {} failed due to insufficient permissions.",
                     e.0.mention()
                 ),
-                i
+                ia
             );
         }
         AutoJoinAttemptFailedError::UserNotStageManager(_) => {
-            nope!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", i);
+            nope_or_fol!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", ia);
         }
     }
 }

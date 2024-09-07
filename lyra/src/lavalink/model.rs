@@ -483,7 +483,7 @@ impl HttpAware for ClientData {
 }
 
 impl ClientData {
-    pub fn new(http: Arc<Client>) -> Self {
+    pub const fn new(http: Arc<Client>) -> Self {
         Self { http }
     }
 }

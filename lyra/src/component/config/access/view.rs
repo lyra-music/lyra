@@ -31,7 +31,7 @@ impl BotSlashCommand for View {
         );
         let embed = embed.validate()?.build();
 
-        ctx.respond_embeds_only([embed]).await?;
+        ctx.respond_embeds([embed]).await?;
         Ok(())
     }
 }

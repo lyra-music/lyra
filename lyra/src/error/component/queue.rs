@@ -21,7 +21,7 @@ pub mod play {
     pub enum Error {
         RequireUnsuppressed(#[from] crate::error::command::require::UnsuppressedError),
         Respond(#[from] crate::error::command::RespondError),
-        Followup(#[from] crate::error::command::FollowupError),
+        RespondOrFollowup(#[from] crate::error::command::RespondOrFollowupError),
         AutoJoinOrCheckInVoiceWithUser(
             #[from] crate::error::command::util::AutoJoinOrCheckInVoiceWithUserError,
         ),

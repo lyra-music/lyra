@@ -26,7 +26,7 @@ use twilight_util::builder::command::CommandBuilder;
 
 use crate::{
     command::{
-        macros::{bad, crit, out_or_fol, what},
+        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol, what_or_fol},
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
         require, util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
@@ -323,6 +323,7 @@ async fn play(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
+    ctx.defer().await?;
     let load_ctx = LoadTrackContext::new_via(ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
@@ -401,13 +402,13 @@ async fn play(
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    crit!(format!("Failed to load tracks for query: `{}`", query), ctx);
+                    crit_or_fol!(format!("Failed to load tracks for query: `{}`", query), ctx);
                 }
                 QueryError::NoMatches(query) => {
-                    what!(format!("No matches found for query: `{}`", query), ctx);
+                    what_or_fol!(format!("No matches found for query: `{}`", query), ctx);
                 }
                 QueryError::SearchResult(query) => {
-                    bad!(
+                    bad_or_fol!(
                         format!(
                             "Given query is not a URL: `{}`. Try using the command's autocomplete to search for tracks.",
                             query

@@ -19,7 +19,7 @@ impl<I> MultiInterleave<I>
 where
     I: Iterator,
 {
-    fn new(iterators: Box<[I]>) -> Self {
+    const fn new(iterators: Box<[I]>) -> Self {
         Self {
             iterators,
             current: 0,

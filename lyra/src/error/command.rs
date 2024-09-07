@@ -19,6 +19,13 @@ pub enum FollowupError {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[error("creating a response or followup failed: {}", 0)]
+pub enum RespondOrFollowupError {
+    Respond(#[from] RespondError),
+    Followup(#[from] FollowupError),
+}
+
+#[derive(thiserror::Error, Debug)]
 #[error("command failed: {}", .0)]
 pub enum Error {
     UserNotAccessManager(#[from] super::UserNotAccessManager),
@@ -243,6 +250,13 @@ impl<'a> Fe<'a> {
         }
     }
 
+    const fn from_respond_or_followup(error: &'a RespondOrFollowupError) -> Self {
+        match error {
+            RespondOrFollowupError::Respond(e) => Self::from_respond(e),
+            RespondOrFollowupError::Followup(e) => Self::from_followup(e),
+        }
+    }
+
     const fn from_prompt_for_confirmation(error: &'a util::PromptForConfirmationError) -> Self {
         match error {
             util::PromptForConfirmationError::StandbyCanceled(_) => Self::StandbyCanceled,
@@ -342,8 +356,8 @@ impl<'a> Fe<'a> {
             super::component::connection::join::HandleResponseError::DeserializeBody(_) => {
                 Self::DeserializeBody
             }
-            super::component::connection::join::HandleResponseError::Respond(e) => {
-                Self::from_respond(e)
+            super::component::connection::join::HandleResponseError::RespondOrFollowup(e) => {
+                Self::from_respond_or_followup(e)
             }
             super::component::connection::join::HandleResponseError::Followup(e) => {
                 Self::from_followup(e)
@@ -490,7 +504,9 @@ impl<'a> Fe<'a> {
                 Self::from_require_unsuppressed_error(e)
             }
             super::component::queue::play::Error::Respond(e) => Self::from_respond(e),
-            super::component::queue::play::Error::Followup(e) => Self::from_followup(e),
+            super::component::queue::play::Error::RespondOrFollowup(e) => {
+                Self::from_respond_or_followup(e)
+            }
             super::component::queue::play::Error::AutoJoinOrCheckInVoiceWithUser(e) => {
                 Self::from_auto_join_or_check_in_voice_with_user(e)
             }
