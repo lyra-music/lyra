@@ -51,6 +51,7 @@
                 act
                 sqlx-cli
                 pgcli
+		cargo-edit
               ];
 
               # https://devenv.sh/scripts/
