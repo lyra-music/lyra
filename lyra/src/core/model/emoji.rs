@@ -38,7 +38,7 @@ macro_rules! generate_emojis {
 }
 
 generate_emojis![
-    (shuffle_off, "🔀"),
+    (shuffle_off, "⬅️"),
     (shuffle_on, "🔀"),
     (previous, "⏮️"),
     (play, "▶️"),
