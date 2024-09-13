@@ -7,6 +7,11 @@ mod gateway;
 mod lavalink;
 mod runner;
 
+pub use {
+    error::command::Error as CommandError,
+    lavalink::{ClientAndGuildIdAware as LavalinkAndGuildIdAware, ClientAware as LavalinkAware},
+};
+
 #[tokio::main]
 #[tracing::instrument]
 async fn main() {

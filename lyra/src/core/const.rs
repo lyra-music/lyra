@@ -1,5 +1,5 @@
 pub mod metadata {
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
 
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
@@ -54,68 +54,45 @@ pub mod metadata {
         "%cargo_opt_level",
     ];
 
-    pub fn banner() -> &'static str {
-        static BANNER: OnceLock<&'static str> = OnceLock::new();
-        BANNER.get_or_init(|| {
-            use aho_corasick::AhoCorasick;
+    pub static BANNER: LazyLock<&'static str> = LazyLock::new(|| {
+        use aho_corasick::AhoCorasick;
 
-            let rdr = include_str!("../../../assets/lyra2-ascii.ans");
-            let mut wtr = Vec::new();
+        let rdr = include_str!("../../../assets/lyra2-ascii.ans");
+        let mut wtr = Vec::new();
 
-            let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
-            ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
-                .expect("searching is infallible");
-            // SAFETY: since `rdr` is utf-8, `wtr` must also be utf-8
-            unsafe { String::from_utf8_unchecked(wtr).leak() }
-        })
-    }
+        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
+        ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
+            .expect("searching is infallible");
+        // SAFETY: since `rdr` is utf-8, `wtr` must also be utf-8
+        unsafe { String::from_utf8_unchecked(wtr).leak() }
+    });
 }
 
 pub mod connection {
-    use std::{sync::OnceLock, time::Duration};
+    use std::time::Duration;
 
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
-    pub fn connection_changed_timeout() -> &'static Duration {
-        static CONNECTION_CHANGED_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-        CONNECTION_CHANGED_TIMEOUT.get_or_init(|| Duration::from_millis(500))
-    }
-
-    pub fn get_lavalink_connection_info_timeout() -> &'static Duration {
-        static GET_LAVALINK_CONNECTION_INFO_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-        GET_LAVALINK_CONNECTION_INFO_TIMEOUT.get_or_init(|| Duration::from_millis(2_000))
-    }
-
-    pub fn inactivity_timeout_poll_interval() -> &'static Duration {
-        static INACTIVITY_TIMEOUT_POLL_INTERVAL: OnceLock<Duration> = OnceLock::new();
-        INACTIVITY_TIMEOUT_POLL_INTERVAL.get_or_init(|| {
-            Duration::from_secs(
-                u64::from(INACTIVITY_TIMEOUT_SECS) / u64::from(INACTIVITY_TIMEOUT_POLL_N),
-            )
-        })
-    }
+    pub const CHANGED_TIMEOUT: Duration = Duration::from_millis(250);
+    pub const GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
+    pub const INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
+        Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64 / INACTIVITY_TIMEOUT_POLL_N as u64);
 }
 
 pub mod misc {
-    use std::{sync::OnceLock, time::Duration};
+    use std::time::Duration;
 
     pub const ADD_TRACKS_WRAP_LIMIT: usize = 3;
     pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS: u8 = 30;
 
-    pub fn wait_for_bot_events_timeout() -> &'static Duration {
-        static WAIT_FOR_BOT_EVENTS_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-        WAIT_FOR_BOT_EVENTS_TIMEOUT.get_or_init(|| Duration::from_millis(1_000))
-    }
-
-    pub fn destructive_command_confirmation_timeout() -> &'static Duration {
-        static DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: OnceLock<Duration> = OnceLock::new();
-        DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT.get_or_init(|| Duration::from_secs(60))
-    }
+    pub const WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
+    pub const DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
+    pub const QUEUE_ADVANCE_LOCKED_TIMEOUT: Duration = Duration::from_millis(250);
 }
 
 pub mod text {
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
 
     use fuzzy_matcher::skim::SkimMatcherV2;
 
@@ -125,26 +102,20 @@ pub mod text {
     pub const EMPTY_EMBED_FIELD: &str = "`-Empty-`";
     pub const NO_ROWS_AFFECTED_MESSAGE: &str = "🔐 No changes were made.";
 
-    pub fn fuzzy_matcher() -> &'static SkimMatcherV2 {
-        static FUZZY_MATCHER: OnceLock<SkimMatcherV2> = OnceLock::new();
-        FUZZY_MATCHER.get_or_init(SkimMatcherV2::default)
-    }
+    pub static FUZZY_MATCHER: LazyLock<SkimMatcherV2> = LazyLock::new(SkimMatcherV2::default);
 }
 
 pub mod regex {
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
 
     use regex::Regex;
 
-    pub fn url() -> &'static Regex {
-        static URL: OnceLock<Regex> = OnceLock::new();
-        URL.get_or_init(|| {
-            Regex::new(
-                r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?"
-            )
-            .expect("regex is valid")
-        })
-    }
+    pub static URL: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?"
+        )
+        .expect("regex is valid")
+    });
 }
 
 pub mod exit_code {

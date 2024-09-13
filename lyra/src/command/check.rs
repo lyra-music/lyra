@@ -32,7 +32,7 @@ use crate::{
             self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
             UserOnlyInError,
         },
-        CacheResult,
+        Cache,
         InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError,
         NotUsersTrack as NotUsersTrackError,
@@ -47,16 +47,16 @@ use crate::{
         CorrectTrackInfo,
         // DelegateMethods,
         Event,
-        LavalinkAware,
         // PlayerAware,
         QueueItem,
     },
+    LavalinkAware,
 };
 
 use super::{
     model::{GuildCtx, RespondViaMessage},
     poll::{self, Resolution as PollResolution, Topic as PollTopic},
-    require::{self, someone_else_in, InVoice, PartialInVoice},
+    require::{self, someone_else_in, CurrentTrack, InVoice, PartialInVoice},
 };
 
 pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissions::MUTE_MEMBERS);
@@ -107,7 +107,7 @@ pub fn user_is_stage_manager(
 }
 
 pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserAllowedError> {
-    let Some(weak) = require::guild_weak(ctx).ok() else {
+    let Some(weak) = require::guild_ref(ctx).ok() else {
         return Ok(());
     };
 
@@ -146,7 +146,7 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
 
     let user_allowed_to_use_commands = access_calculator_builder.build().await?.calculate();
     if !user_allowed_to_use_commands {
-        Err(UserNotAllowedError)?;
+        return Err(UserNotAllowedError.into());
     }
     Ok(())
 }
@@ -171,7 +171,7 @@ pub async fn user_allowed_to_use(
     let allowed_to_use_channel = access_calculator_builder.build().await?.calculate();
 
     if !allowed_to_use_channel {
-        Err(UserNotAllowedError)?;
+        return Err(UserNotAllowedError.into());
     };
     Ok(())
 }
@@ -187,18 +187,20 @@ pub enum InVoiceWithUserResultKind {
 }
 
 pub fn noone_else_in(
-    channel_id: Id<ChannelMarker>,
+    in_voice: PartialInVoice,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<(), check::UserOnlyInError> {
     if is_user_dj(ctx) {
         return Ok(());
     }
 
-    if someone_else_in(channel_id, ctx)? {
-        Err(InVoiceWithSomeoneElseError(channel_id))?;
+    if someone_else_in(in_voice.channel_id(), ctx)? {
+        return Err(InVoiceWithSomeoneElseError(in_voice).into());
     }
     Ok(())
 }
+
+pub struct PollStarter(PollStarterInfo);
 
 pub struct PollStarterInfo {
     topic: PollTopic,
@@ -206,58 +208,75 @@ pub struct PollStarterInfo {
     in_voice: PartialInVoice,
 }
 
-pub enum PollStarter {
-    NotRequired,
-    Required(PollStarterInfo),
-}
-
-impl PollStarter {
-    pub async fn start(
-        self,
-        ctx: &mut GuildCtx<impl RespondViaMessage>,
-    ) -> Result<(), check::HandlePollError> {
-        if let Self::Required(s) = self {
-            return handle_poll(s.error, &s.topic, ctx, &s.in_voice).await;
-        };
-
-        Ok(())
-    }
-}
+type InVoiceWithUserOnlyResult = Result<(), check::UserOnlyInError>;
 
 impl<'a> InVoiceWithUserResult<'a> {
-    pub fn only(self) -> Result<(), check::UserOnlyInError> {
+    pub fn only(self) -> InVoiceWithUserOnlyResult {
         if matches!(self.kind, InVoiceWithUserResultKind::UserIsDj) {
             return Ok(());
         }
-        let InVoiceWithUserResult { in_voice, .. } = self;
-        let channel_id = in_voice.channel_id();
 
-        if someone_else_in(channel_id, &in_voice)? {
-            Err(InVoiceWithSomeoneElseError(channel_id))?;
-        }
-        Ok(())
+        user_only_in(&self.in_voice)
     }
+}
 
-    pub fn only_else_poll(self, topic: PollTopic) -> CacheResult<PollStarter> {
-        let in_voice = From::from(&self.in_voice);
-        let Err(error) = self.only() else {
-            return Ok(PollStarter::NotRequired);
+pub trait ResolveWithPoll {
+    type Error;
+    fn or_else_try_resolve_with(self, topic: PollTopic)
+        -> Result<Option<PollStarter>, Self::Error>;
+}
+
+impl ResolveWithPoll for InVoiceWithUserOnlyResult {
+    type Error = Cache;
+
+    fn or_else_try_resolve_with(
+        self,
+        topic: PollTopic,
+    ) -> Result<Option<PollStarter>, Self::Error> {
+        let Err(error) = self else {
+            return Ok(None);
         };
 
         match error {
             check::UserOnlyInError::InVoiceWithSomeoneElse(e) => {
-                Ok(PollStarter::Required(PollStarterInfo {
+                let in_voice = e.0.clone();
+                Ok(Some(PollStarter(PollStarterInfo {
                     topic,
                     error: check::PollResolvableError::InVoiceWithSomeoneElse(e),
                     in_voice,
-                }))
+                })))
             }
-            check::UserOnlyInError::Cache(e) => Err(e)?,
+            check::UserOnlyInError::Cache(e) => Err(e),
         }
     }
 }
 
-pub fn in_voice_with_user(
+pub trait StartPoll {
+    async fn and_then_start(
+        self,
+        ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ) -> Result<(), check::HandlePollError>
+    where
+        Self: Sized;
+}
+
+impl StartPoll for Option<PollStarter> {
+    async fn and_then_start(
+        self,
+        ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ) -> Result<(), check::HandlePollError>
+    where
+        Self: Sized,
+    {
+        let Some(PollStarter(info)) = self else {
+            return Ok(());
+        };
+
+        handle_poll(info.error, &info.topic, ctx, &info.in_voice).await
+    }
+}
+
+pub fn user_in(
     in_voice: InVoice<'_>,
 ) -> Result<InVoiceWithUserResult<'_>, InVoiceWithoutUserError> {
     if is_user_dj(&in_voice) {
@@ -280,34 +299,25 @@ pub fn in_voice_with_user(
     })
 }
 
-pub fn all_users_track(
-    positions: impl Iterator<Item = NonZeroUsize>,
-    in_voice_with_user: InVoiceWithUserResult,
-    queue: &lavalink::Queue,
-    ctx: &impl AuthorIdAware,
-) -> Result<(), check::UsersTrackError> {
-    if let (Some((position, track)), Err(e)) = (
-        positions
-            .map(|p| (p, &queue[p.get() - 1]))
-            .find(|(_, t)| t.requester() != ctx.author_id()),
-        in_voice_with_user.only(),
-    ) {
-        return Err(impl_users_track(position, track, e));
+fn user_only_in(in_voice: &InVoice<'_>) -> InVoiceWithUserOnlyResult {
+    let channel_id = in_voice.channel_id();
+    if someone_else_in(channel_id, in_voice)? {
+        return Err(InVoiceWithSomeoneElseError(PartialInVoice::from(in_voice)).into());
     }
 
     Ok(())
 }
 
 fn impl_users_track(
-    position: NonZeroUsize,
     track: &QueueItem,
+    position: NonZeroUsize,
     user_only_in: UserOnlyInError,
 ) -> check::UsersTrackError {
     let channel_id = match user_only_in {
-        check::UserOnlyInError::InVoiceWithSomeoneElse(e) => e.0,
+        check::UserOnlyInError::InVoiceWithSomeoneElse(e) => e.0.channel_id(),
         check::UserOnlyInError::Cache(e) => return e.into(),
     };
-    let title = track.track().info.corrected_title().into();
+    let title = track.data().info.corrected_title().into();
     let requester = track.requester();
 
     NotUsersTrackError {
@@ -319,17 +329,45 @@ fn impl_users_track(
     .into()
 }
 
-pub fn users_track(
+pub fn track_is_users(
+    track: &QueueItem,
     position: NonZeroUsize,
     in_voice_with_user: InVoiceWithUserResult,
-    queue: &lavalink::Queue,
-    ctx: &impl AuthorIdAware,
 ) -> Result<(), check::UsersTrackError> {
-    if let Err(e) = in_voice_with_user.only() {
-        let track = &queue[position.get() - 1];
-        if track.requester() != ctx.author_id() {
-            return Err(impl_users_track(position, track, e));
+    let author_id = in_voice_with_user.in_voice.author_id;
+    if let Err(user_only_in) = in_voice_with_user.only() {
+        if track.requester() != author_id {
+            return Err(impl_users_track(track, position, user_only_in));
         }
+    }
+
+    Ok(())
+}
+
+pub fn current_track_is_users(
+    current_track: &CurrentTrack,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    track_is_users(
+        current_track.track,
+        current_track.position,
+        in_voice_with_user,
+    )
+}
+
+pub fn all_users_track(
+    queue: &lavalink::Queue,
+    positions: impl Iterator<Item = NonZeroUsize>,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    let author_id = in_voice_with_user.in_voice.author_id;
+    if let (Some((position, track)), Err(user_only_in)) = (
+        positions
+            .map(|p| (p, &queue[p]))
+            .find(|(_, t)| t.requester() != author_id),
+        in_voice_with_user.only(),
+    ) {
+        return Err(impl_users_track(track, position, user_only_in));
     }
 
     Ok(())
@@ -721,10 +759,11 @@ async fn handle_poll(
             if is_user_dj(ctx) {
                 connection.dispatch(Event::AlternateVoteDjCast);
 
-                Err(check::AnotherPollOngoingError {
+                return Err(check::AnotherPollOngoingError {
                     message: message.clone(),
                     alternate_vote: Some(AlternateVoteResponse::DjCasted),
-                })?;
+                }
+                .into());
             }
             connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
 
@@ -739,25 +778,29 @@ async fn handle_poll(
             .await?
             {
                 if let Event::AlternateVoteCastedAlready(casted) = event {
-                    Err(check::AnotherPollOngoingError {
+                    return Err(check::AnotherPollOngoingError {
                         message: message.clone(),
                         alternate_vote: Some(AlternateVoteResponse::CastedAlready(casted)),
-                    })?;
+                    }
+                    .into());
                 }
-                Err(check::AnotherPollOngoingError {
+                return Err(check::AnotherPollOngoingError {
                     message: message.clone(),
                     alternate_vote: Some(AlternateVoteResponse::CastDenied),
-                })?;
+                }
+                .into());
             }
-            Err(check::AnotherPollOngoingError {
+            return Err(check::AnotherPollOngoingError {
                 message: message.clone(),
                 alternate_vote: Some(AlternateVoteResponse::Casted),
-            })?;
+            }
+            .into());
         }
-        Err(check::AnotherPollOngoingError {
+        return Err(check::AnotherPollOngoingError {
             message,
             alternate_vote: None,
-        })?;
+        }
+        .into());
     }
 
     drop(connection);
@@ -768,12 +811,14 @@ async fn handle_poll(
         PollResolution::UnanimousLoss => Err(check::PollLossError {
             source: error,
             kind: check::PollLossErrorKind::UnanimousLoss,
-        })?,
+        }
+        .into()),
         PollResolution::TimedOut => Err(check::PollLossError {
             source: error,
             kind: check::PollLossErrorKind::TimedOut,
-        })?,
-        PollResolution::Voided(e) => Err(check::PollVoidedError(e))?,
+        }
+        .into()),
+        PollResolution::Voided(e) => Err(check::PollVoidedError(e).into()),
         PollResolution::SupersededWinViaDj => {
             traced::tokio_spawn(send_superseded_win_notice(
                 ctx.interaction_token().to_owned(),
@@ -784,7 +829,8 @@ async fn handle_poll(
         PollResolution::SupersededLossViaDj => Err(check::PollLossError {
             source: error,
             kind: check::PollLossErrorKind::SupersededLossViaDj,
-        })?,
+        }
+        .into()),
     }
 }
 

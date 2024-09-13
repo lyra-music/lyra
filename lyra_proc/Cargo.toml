@@ -1,6 +1,6 @@
 [package]
 name = "lyra_proc"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,10 +12,11 @@ proc-macro = true
 unsafe_code = "forbid"
 
 [lints.clippy]
-enum_glob_use = "deny"
-pedantic = "deny"
-nursery = "deny"
-unwrap_used = "deny"
+enum_glob_use = "forbid"
+unwrap_used = "forbid"
+try_err = "forbid"
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
 
 [dependencies]
 syn = "2"

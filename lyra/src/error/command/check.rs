@@ -2,8 +2,12 @@ use thiserror::Error;
 
 use crate::error::{
     self, Cache as CacheError, InVoiceWithoutUser as InVoiceWithoutUserError, NotInVoice,
-    NotUsersTrack as NotUsersTrackError, QueueNotSeekable as QueueNotSeekableError,
+    NotUsersTrack as NotUsersTrackError, PrettyErrorDisplay, PrettyInVoiceWithSomeoneElseDisplayer,
+    PrettyNotUsersTrackDisplayer, PrettyQueueNotSeekableDisplayer,
+    QueueNotSeekable as QueueNotSeekableError,
 };
+
+use super::require::UnsuppressedError;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -17,13 +21,6 @@ pub enum AccessCalculatorBuildError {
 pub enum UserAllowedError {
     AccessCalculatorBuild(#[from] AccessCalculatorBuildError),
     UserNotAllowed(#[from] error::UserNotAllowed),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum InVoiceWithSomeoneElseError {
-    Cache(#[from] CacheError),
-    InVoiceWithoutSomeoneElse(#[from] error::InVoiceWithoutSomeoneElse),
 }
 
 #[derive(Error, Debug)]
@@ -46,13 +43,6 @@ pub enum InVoiceWithUserOnlyError {
     NotInVoice(#[from] NotInVoice),
     InVoiceWithoutUser(#[from] InVoiceWithoutUserError),
     UserOnlyIn(#[from] UserOnlyInError),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum NotSuppressedError {
-    Cache(#[from] CacheError),
-    Suppressed(#[from] error::Suppressed),
 }
 
 #[derive(Error, Debug)]
@@ -93,12 +83,38 @@ impl From<QueueSeekableError> for PollResolvableError {
     }
 }
 
-impl crate::error::EPrint for PollResolvableError {
-    fn eprint(&self) -> String {
+impl<'a> PrettyErrorDisplay<'a> for PollResolvableError {
+    type Displayer = PrettyPollResolvableErrorDisplayer<'a>;
+
+    fn pretty_display(&'a self) -> Self::Displayer {
         match self {
-            Self::InVoiceWithSomeoneElse(e) => e.eprint(),
-            Self::QueueNotSeekable(e) => e.eprint(),
-            Self::NotUsersTrack(e) => e.eprint(),
+            Self::InVoiceWithSomeoneElse(e) => {
+                PrettyPollResolvableErrorDisplayer::InVoiceWithSomeoneElse(
+                    PrettyInVoiceWithSomeoneElseDisplayer(e),
+                )
+            }
+            Self::QueueNotSeekable(_) => PrettyPollResolvableErrorDisplayer::QueueNotSeekable(
+                PrettyQueueNotSeekableDisplayer,
+            ),
+            Self::NotUsersTrack(e) => {
+                PrettyPollResolvableErrorDisplayer::NotUsersTrack(PrettyNotUsersTrackDisplayer(e))
+            }
+        }
+    }
+}
+
+pub enum PrettyPollResolvableErrorDisplayer<'a> {
+    InVoiceWithSomeoneElse(PrettyInVoiceWithSomeoneElseDisplayer<'a>),
+    NotUsersTrack(PrettyNotUsersTrackDisplayer<'a>),
+    QueueNotSeekable(PrettyQueueNotSeekableDisplayer),
+}
+
+impl<'a> std::fmt::Display for PrettyPollResolvableErrorDisplayer<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PrettyPollResolvableErrorDisplayer::InVoiceWithSomeoneElse(e) => e.fmt(f),
+            PrettyPollResolvableErrorDisplayer::NotUsersTrack(e) => e.fmt(f),
+            PrettyPollResolvableErrorDisplayer::QueueNotSeekable(e) => e.fmt(f),
         }
     }
 }
@@ -122,16 +138,33 @@ pub enum AlternateVoteResponse {
 #[error("poll was voided")]
 pub struct PollVoidedError(pub crate::command::poll::VoidingEvent);
 
-impl crate::error::EPrint for PollVoidedError {
-    fn eprint(&self) -> String {
+impl<'a> PrettyErrorDisplay<'a> for PollVoidedError {
+    type Displayer = PrettyVoidedErrorDisplayer;
+
+    fn pretty_display(&'a self) -> Self::Displayer {
         match self.0 {
             crate::command::poll::VoidingEvent::QueueClear => {
-                String::from("the queue had been cleared")
+                PrettyVoidedErrorDisplayer::QueueClear
             }
             crate::command::poll::VoidingEvent::QueueRepeat => {
-                String::from("the queue had been set to repeat in another manner")
+                PrettyVoidedErrorDisplayer::QueueRepeat
             }
         }
+    }
+}
+
+pub enum PrettyVoidedErrorDisplayer {
+    QueueClear,
+    QueueRepeat,
+}
+
+impl std::fmt::Display for PrettyVoidedErrorDisplayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let data = match self {
+            Self::QueueClear => "the queue had been cleared",
+            Self::QueueRepeat => "the queue had been set to repeat in another manner",
+        };
+        f.write_str(data)
     }
 }
 
@@ -181,7 +214,7 @@ pub enum HandleInVoiceWithSomeoneElseError {
 pub enum RunError {
     NotInVoice(#[from] NotInVoice),
     QueueEmpty(#[from] error::QueueEmpty),
-    NotSuppressed(#[from] NotSuppressedError),
+    NotSuppressed(#[from] UnsuppressedError),
     NotPlaying(#[from] error::NotPlaying),
     InVoiceWithoutUser(#[from] InVoiceWithoutUserError),
     HandleInVoiceWithSomeoneElse(#[from] HandleInVoiceWithSomeoneElseError),

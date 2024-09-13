@@ -1,5 +1,5 @@
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
-use lyra_ext::time::unix::unix_time;
+use lyra_ext::unix_time;
 use rand::{distributions::Alphanumeric, Rng};
 use twilight_gateway::Event;
 use twilight_model::{
@@ -36,16 +36,17 @@ use crate::{
     },
     error::{
         command::{
-            check::NotSuppressedError,
+            require::UnsuppressedError,
             util::{
-                AutoJoinOrCheckInVoiceWithUserError, AutoJoinSuppressedError, ConfirmationError,
+                AutoJoinOrCheckInVoiceWithUserError, AutoJoinSuppressedError,
                 HandleSuppressedAutoJoinError, PromptForConfirmationError,
             },
         },
-        Suppressed as SuppressedError,
+        ConfirmationTimedOut, Suppressed as SuppressedError,
     },
     gateway::GuildIdAware,
-    lavalink::{DelegateMethods, LavalinkAware},
+    lavalink::DelegateMethods,
+    LavalinkAware,
 };
 
 pub trait MessageLinkAware {
@@ -132,7 +133,8 @@ pub trait AvatarUrlAware {
         let avatar = self.avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
-        format!("{}/avatars/{}/{}.{}", CDN_URL, self.id(), avatar, ext).into()
+        let formatted = format!("{}/avatars/{}/{}.{}", CDN_URL, self.id(), avatar, ext);
+        Some(formatted)
     }
 }
 
@@ -152,15 +154,15 @@ pub trait GuildAvatarUrlAware {
         let avatar = self.avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
-        format!(
+        let formatted = format!(
             "{}/guilds/{}/users/{}/avatars/{}.{}",
             CDN_URL,
             guild_id,
             self.id(),
             avatar,
             ext,
-        )
-        .into()
+        );
+        Some(formatted)
     }
 }
 
@@ -207,14 +209,14 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
 ) -> Result<(), AutoJoinOrCheckInVoiceWithUserError> {
     if let Ok(in_voice) = require::in_voice(ctx) {
         let in_voice = in_voice.and_unsuppressed()?;
-        check::in_voice_with_user(in_voice)?;
+        check::user_in(in_voice)?;
         return Ok(());
     }
 
     match auto_join(ctx).await {
-        Err(e) => Err(e.unflatten_into_auto_join_attempt())?,
+        Err(e) => Err(e.unflatten_into_auto_join_attempt().into()),
         Ok(state) => {
-            let Err(NotSuppressedError::Suppressed(suppressed)) = {
+            let Err(UnsuppressedError::Suppressed(suppressed)) = {
                 // SAFETY: as `auto_join` was called and ran successfully,
                 //         there must now be an active voice connection.
                 unsafe { InVoice::new(state, ctx) }
@@ -234,7 +236,7 @@ async fn handle_suppressed_auto_join(
 ) -> Result<(), HandleSuppressedAutoJoinError> {
     let bot_user_id = ctx.bot().user_id();
     match error {
-        SuppressedError::Muted => Err(AutoJoinSuppressedError::Muted)?,
+        SuppressedError::Muted => Err(AutoJoinSuppressedError::Muted.into()),
         SuppressedError::NotSpeaker => {
             let bot = ctx.bot_owned();
             let wait_for_speaker =
@@ -262,15 +264,14 @@ async fn handle_suppressed_auto_join(
                 ?ctx
             );
             let requested_to_speak_message = requested_to_speak.model().await?;
-            let wait_for_speaker = tokio::time::timeout(
-                *r#const::misc::wait_for_bot_events_timeout(),
-                wait_for_speaker,
-            );
+            let wait_for_speaker =
+                tokio::time::timeout(r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, wait_for_speaker);
 
             if wait_for_speaker.await.is_err() {
-                Err(AutoJoinSuppressedError::StillNotSpeaker {
+                return Err(AutoJoinSuppressedError::StillNotSpeaker {
                     last_followup_id: requested_to_speak_message.id,
-                })?;
+                }
+                .into());
             }
             Ok(())
         }
@@ -279,7 +280,7 @@ async fn handle_suppressed_auto_join(
 
 pub async fn prompt_for_confirmation(
     mut ctx: GuildCtx<impl CommandDataAware + RespondViaModal>,
-) -> Result<GuildModalCtx, PromptForConfirmationError> {
+) -> Result<(GuildModalCtx, bool), PromptForConfirmationError> {
     let text_input = TextInput {
         custom_id: String::new(),
         label: String::from("This is a destructive command. Are you sure?"),
@@ -320,31 +321,28 @@ pub async fn prompt_for_confirmation(
         });
 
     let wait_for_modal_submit = tokio::time::timeout(
-        *r#const::misc::destructive_command_confirmation_timeout(),
+        r#const::misc::DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT,
         wait_for_modal_submit,
     )
     .await;
 
-    let modal_ctx = match wait_for_modal_submit {
+    let ctx_and_confirmed = match wait_for_modal_submit {
         Ok(Ok(Event::InteractionCreate(interaction))) => {
             let ctx = ctx.into_modal_interaction(interaction);
-            if ctx.submit_data().components[0].components[0]
+            let confirmed = ctx.submit_data().components[0].components[0]
                 .value
                 .as_ref()
-                .is_some_and(|s| s == "YES")
-            {
-                Err(ConfirmationError::Cancelled)?;
-            }
-            ctx
+                .is_some_and(|s| s == "YES");
+            (ctx, confirmed)
         }
         // SAFETY: the future has been filtered to only match modal submit interaction
         //         so this branch is unreachable
         Ok(Ok(_)) => unsafe { std::hint::unreachable_unchecked() },
-        Ok(Err(e)) => Err(e)?,
-        Err(_) => Err(ConfirmationError::TimedOut)?,
+        Ok(Err(e)) => return Err(e.into()),
+        Err(_) => return Err(ConfirmationTimedOut.into()),
     };
 
-    Ok(modal_ctx)
+    Ok(ctx_and_confirmed)
 }
 
 pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<PlayerContext> {
@@ -353,7 +351,7 @@ pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<Pla
 
     let player = match lavalink.get_player_context(guild_id) {
         Some(player) => player,
-        None => lavalink.new_player(guild_id).await?,
+        None => lavalink.new_player(guild_id, ctx.channel_id()).await?,
     };
 
     Ok(player)

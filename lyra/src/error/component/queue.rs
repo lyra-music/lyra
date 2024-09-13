@@ -19,22 +19,12 @@ pub mod play {
     #[derive(thiserror::Error, Debug)]
     #[error("playing failed: {:?}", .0)]
     pub enum Error {
-        CheckNotSuppressed(#[from] crate::error::command::check::NotSuppressedError),
+        RequireUnsuppressed(#[from] crate::error::command::require::UnsuppressedError),
         Respond(#[from] crate::error::command::RespondError),
-        Followup(#[from] crate::error::command::FollowupError),
+        RespondOrFollowup(#[from] crate::error::command::RespondOrFollowupError),
         AutoJoinOrCheckInVoiceWithUser(
             #[from] crate::error::command::util::AutoJoinOrCheckInVoiceWithUserError,
         ),
-        Lavalink(#[from] lavalink_rs::error::LavalinkError),
-    }
-}
-
-pub mod remove {
-    use thiserror::Error;
-
-    #[derive(Error, Debug)]
-    #[error(transparent)]
-    pub enum WithAdvanceLockAndStoppedError {
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
 }
@@ -44,7 +34,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum RemoveTracksError {
     #[error(transparent)]
-    TryWithAdvanceLock(#[from] remove::WithAdvanceLockAndStoppedError),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
     #[error(transparent)]
     Respond(#[from] crate::error::command::RespondError),
     #[error(transparent)]

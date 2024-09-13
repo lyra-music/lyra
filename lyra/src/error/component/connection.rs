@@ -26,6 +26,7 @@ pub mod join {
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
         TwilightHttp(#[from] twilight_http::Error),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -62,9 +63,9 @@ pub mod join {
     #[error(transparent)]
     pub enum HandleResponseError {
         Cache(#[from] crate::error::Cache),
-        Respond(#[from] crate::error::command::RespondError),
         DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
         Followup(#[from] crate::error::command::FollowupError),
+        RespondOrFollowup(#[from] crate::error::command::RespondOrFollowupError),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -125,6 +126,7 @@ pub mod join {
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
         TwilightHttp(#[from] twilight_http::Error),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -150,9 +152,9 @@ pub mod join {
                 HandleResponseError::Cache(e) => {
                     Self::Other(ResidualError::HandleResponse(HandleResponseError::Cache(e)))
                 }
-                HandleResponseError::Respond(e) => Self::Other(ResidualError::HandleResponse(
-                    HandleResponseError::Respond(e),
-                )),
+                HandleResponseError::RespondOrFollowup(e) => Self::Other(
+                    ResidualError::HandleResponse(HandleResponseError::RespondOrFollowup(e)),
+                ),
                 HandleResponseError::DeserializeBody(e) => Self::Other(
                     ResidualError::HandleResponse(HandleResponseError::DeserializeBody(e)),
                 ),
@@ -203,6 +205,13 @@ pub mod join {
                         ResidualImplConnectToError::Lavalink(e),
                     )),
                 )),
+                ImplConnectToError::UnrecognisedConnection(e) => {
+                    Self::Other(ResidualError::ImplJoin(ResidualImplJoinError::ConnectTo(
+                        ResidualConnectToError::ImplConnectTo(
+                            ResidualImplConnectToError::UnrecognisedConnection(e),
+                        ),
+                    )))
+                }
                 ImplConnectToError::CheckUserAllowed(e) => Self::from_check_user_allowed(e),
             }
         }
@@ -266,6 +275,7 @@ pub mod leave {
         CheckUserOnlyIn(#[from] crate::error::command::check::UserOnlyInError),
         PreDisconnectCleanup(#[from] PreDisconnectCleanupError),
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
 
     impl Error {
@@ -284,6 +294,9 @@ pub mod leave {
                 Self::GatewaySend(e) => {
                     NotInVoiceMatchedError::Other(ResidualError::GatewaySend(e))
                 }
+                Self::UnrecognisedConnection(e) => {
+                    NotInVoiceMatchedError::Other(ResidualError::UnrecognisedConnection(e))
+                }
             }
         }
     }
@@ -300,6 +313,7 @@ pub mod leave {
         CheckUserOnlyIn(#[from] crate::error::command::check::UserOnlyInError),
         PreDisconnectCleanupError(#[from] PreDisconnectCleanupError),
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
 }
 
@@ -323,6 +337,7 @@ pub enum HandleVoiceStateUpdateError {
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     MatchStateChannelID(#[from] MatchStateChannelIdError),
     PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 
 #[derive(Error, Debug)]
@@ -331,4 +346,5 @@ pub enum MatchStateChannelIdError {
     Http(#[from] twilight_http::Error),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Cache(#[from] crate::error::Cache),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }

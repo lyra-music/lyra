@@ -12,9 +12,7 @@ use lavalink_rs::{
 use linkify::{LinkFinder, LinkKind};
 use lyra_ext::{
     as_grapheme::AsGrapheme,
-    pretty::{
-        duration_display::PrettyDurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator,
-    },
+    pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 use twilight_interactions::command::{
     AutocompleteValue, CommandModel, CommandOption, CreateCommand, CreateOption,
@@ -28,7 +26,7 @@ use twilight_util::builder::command::CommandBuilder;
 
 use crate::{
     command::{
-        macros::{bad, crit, out_or_fol, what},
+        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol, what_or_fol},
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
         require, util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
@@ -42,10 +40,8 @@ use crate::{
         CommandResult, LoadFailed as LoadFailedError,
     },
     gateway::GuildIdAware,
-    lavalink::{
-        CorrectPlaylistInfo, CorrectTrackInfo, LavalinkAware, UnwrappedPlayerData,
-        UnwrappedPlayerInfoUri,
-    },
+    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedData, UnwrappedPlayerInfoUri},
+    LavalinkAware,
 };
 
 struct LoadTrackContext {
@@ -54,10 +50,10 @@ struct LoadTrackContext {
 }
 
 impl LoadTrackContext {
-    fn new_via(ctx: &(impl GuildIdAware + LavalinkAware)) -> Self {
+    fn new_via(cx: &(impl GuildIdAware + LavalinkAware)) -> Self {
         Self {
-            guild_id: ctx.guild_id(),
-            lavalink: ctx.lavalink().clone_inner(),
+            guild_id: cx.guild_id(),
+            lavalink: cx.lavalink().clone_inner(),
         }
     }
 }
@@ -240,7 +236,7 @@ impl BotAutocomplete for Autocomplete {
             })
             .map(|q| {
                 let source = self.source.unwrap_or_default();
-                (!regex::url().is_match(&q))
+                (!regex::URL.is_match(&q))
                     .then(|| format!("{}{}", source.value(), q).into_boxed_str())
                     .unwrap_or_else(|| q.into_boxed_str())
             })
@@ -315,7 +311,7 @@ impl BotAutocomplete for Autocomplete {
 
                 choices
             }
-            TrackLoadType::Error => Err(LoadFailedError(query))?,
+            TrackLoadType::Error => return Err(LoadFailedError(query).into()),
             TrackLoadType::Empty => Vec::new(),
         };
 
@@ -327,6 +323,7 @@ async fn play(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
+    ctx.defer().await?;
     let load_ctx = LoadTrackContext::new_via(ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
@@ -388,10 +385,11 @@ async fn play(
 
             let total_tracks = Vec::from(results);
             // SAFETY: at least one tracks must be loaded, so this unwrap is safe
-            let first_track = unsafe { total_tracks.first().cloned().unwrap_unchecked() };
+            let first_track = unsafe { total_tracks.first().unwrap_unchecked() };
 
             let player = util::auto_new_player(ctx).await?;
 
+            player.play(first_track).await?;
             player
                 .data_unwrapped()
                 .write()
@@ -399,20 +397,18 @@ async fn play(
                 .queue_mut()
                 .enqueue(total_tracks, ctx.author_id());
 
-            player.play(&first_track).await?;
-
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    crit!(format!("Failed to load tracks for query: `{}`", query), ctx);
+                    crit_or_fol!(format!("Failed to load tracks for query: `{}`", query), ctx);
                 }
                 QueryError::NoMatches(query) => {
-                    what!(format!("No matches found for query: `{}`", query), ctx);
+                    what_or_fol!(format!("No matches found for query: `{}`", query), ctx);
                 }
                 QueryError::SearchResult(query) => {
-                    bad!(
+                    bad_or_fol!(
                         format!(
                             "Given query is not a URL: `{}`. Try using the command's autocomplete to search for tracks.",
                             query
@@ -421,7 +417,7 @@ async fn play(
                     );
                 }
             },
-            LoadTrackProcessManyError::Lavalink(e) => Err(e)?,
+            LoadTrackProcessManyError::Lavalink(e) => Err(e.into()),
         },
     }
 }

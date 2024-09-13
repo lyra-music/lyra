@@ -2,16 +2,16 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 
 use crate::{
     command::{
-        check,
+        check::{self, ResolveWithPoll, StartPoll},
         macros::out_or_upd,
         model::BotSlashCommand,
         poll::Topic,
-        require::{self, PartialInVoice},
-        SlashCtx,
+        require, SlashCtx,
     },
     error::CommandResult,
     gateway::GuildIdAware,
-    lavalink::{self, DelegateMethods, LavalinkAware},
+    lavalink::{DelegateMethods, Event, RepeatMode as LavalinkRepeatMode},
+    LavalinkAware,
 };
 
 #[derive(CommandOption, CreateOption)]
@@ -24,7 +24,7 @@ enum RepeatMode {
     Track,
 }
 
-impl From<RepeatMode> for lavalink::RepeatMode {
+impl From<RepeatMode> for LavalinkRepeatMode {
     fn from(value: RepeatMode) -> Self {
         match value {
             RepeatMode::Off => Self::Off,
@@ -51,30 +51,31 @@ impl BotSlashCommand for Repeat {
                 mode.into()
             } else {
                 let mode = match ctx.lavalink().get_player_data(guild_id) {
-                    Some(data) => data.write().await.queue().repeat_mode(),
-                    None => lavalink::RepeatMode::Off,
+                    Some(data) => data.read().await.queue().repeat_mode(),
+                    None => LavalinkRepeatMode::Off,
                 };
                 mode.next()
             }
         };
 
         let in_voice = require::in_voice(&ctx)?;
-        let in_voice_cacheless = PartialInVoice::from(&in_voice);
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
-        check::in_voice_with_user(in_voice)?
-            .only_else_poll(Topic::Repeat(mode))?
-            .start(&mut ctx)
+        let player = require::player(&ctx)?;
+        let data = player.data();
+
+        let data_r = data.read().await;
+        require::queue_not_empty(&data_r)?;
+        drop(data_r);
+
+        check::user_in(in_voice)?
+            .only()
+            .or_else_try_resolve_with(Topic::Repeat(mode))?
+            .and_then_start(&mut ctx)
             .await?;
 
         ctx.lavalink()
-            .connection_from(&in_voice_cacheless)
-            .dispatch(lavalink::Event::QueueRepeat);
-        player
-            .data()
-            .write()
-            .await
-            .queue_mut()
-            .set_repeat_mode(mode);
+            .try_get_connection(guild_id)?
+            .dispatch(Event::QueueRepeat);
+        data.write().await.queue_mut().set_repeat_mode(mode);
 
         let txt = &format!("{} {}", mode.emoji(), mode);
         out_or_upd!(txt, ctx);

@@ -5,7 +5,7 @@ const TWELFTH_ROOT_OF_TWO: f64 = 1.059_463_094_359_295_3;
 #[derive(Clone)]
 pub struct Pitch {
     multiplier: f64,
-    half_tone_shifts: i32,
+    half_tone_shifts: i64,
 }
 
 impl Pitch {
@@ -30,7 +30,9 @@ impl Pitch {
 
     #[inline]
     pub fn get(&self) -> f64 {
-        self.multiplier * TWELFTH_ROOT_OF_TWO.powi(self.half_tone_shifts)
+        #[allow(clippy::cast_possible_truncation)]
+        let half_ton_shifts_i32 = self.half_tone_shifts as i32;
+        self.multiplier * TWELFTH_ROOT_OF_TWO.powi(half_ton_shifts_i32)
     }
 
     #[inline]
@@ -42,7 +44,7 @@ impl Pitch {
     }
 
     pub fn shift(&mut self, half_tones: NonZeroI64) {
-        self.half_tone_shifts += half_tones.get() as i32;
+        self.half_tone_shifts += half_tones.get();
     }
 
     #[inline]

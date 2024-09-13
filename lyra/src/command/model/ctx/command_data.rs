@@ -1,5 +1,6 @@
 use std::{hint::unreachable_unchecked, marker::PhantomData, sync::Arc};
 
+use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_model::{
     application::interaction::application_command::{
@@ -13,21 +14,20 @@ use crate::{
     core::model::OwnedBotState,
 };
 
-use super::{
-    autocomplete::AutocompleteMarker, AppCtxKind, AppCtxMarker, Ctx, CtxKind, CtxLocation,
-};
+use super::{autocomplete::Marker, AppCtxKind, AppCtxMarker, Ctx, Kind, Location};
 
-pub trait CommandDataAware: CtxKind {}
-impl<T: AppCtxKind> CommandDataAware for AppCtxMarker<T> {}
-impl CommandDataAware for AutocompleteMarker {}
+pub trait Aware: Kind {}
+impl<T: AppCtxKind> Aware for AppCtxMarker<T> {}
+impl Aware for Marker {}
 
-impl<T: CommandDataAware> Ctx<T> {
+impl<T: Aware> Ctx<T> {
     pub fn from_partial_data(
         inner: Box<InteractionCreate>,
         data: &CommandData,
         bot: OwnedBotState,
         latency: Latency,
         sender: MessageSender,
+        acknowledgement: oneshot::Sender<()>,
     ) -> Self {
         Self {
             data: Some(PartialInteractionData::Command(PartialCommandData::new(
@@ -38,13 +38,14 @@ impl<T: CommandDataAware> Ctx<T> {
             latency,
             sender,
             acknowledged: false,
+            acknowledgement: Some(acknowledgement),
             kind: PhantomData::<fn(T) -> T>,
             location: PhantomData,
         }
     }
 }
 
-impl<T: CommandDataAware, U: CtxLocation> Ctx<T, U> {
+impl<T: Aware, U: Location> Ctx<T, U> {
     pub fn command_data(&self) -> &PartialCommandData {
         // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
         //         so `self.data` is present
@@ -93,9 +94,5 @@ impl<T: CommandDataAware, U: CtxLocation> Ctx<T, U> {
         )
         .join(" ")
         .into()
-    }
-
-    pub fn command_mention_full(&self) -> Box<str> {
-        format!("</{}:{}>", self.command_name_full(), self.command_data().id).into()
     }
 }

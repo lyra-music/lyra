@@ -7,19 +7,18 @@ use twilight_util::builder::InteractionResponseDataBuilder;
 use crate::{core::model::MessageResponse, error::command::FollowupError};
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, CtxKind, CtxLocation, ModalMarker,
-    RespondResult,
+    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, Kind, Location, ModalMarker, RespondResult,
+    UnitRespondResult,
 };
 
 type MessageRespondResult = RespondResult<MessageResponse>;
-type MessageFollowupResult = Result<MessageResponse, FollowupError>;
 
-pub trait RespondViaMessage: CtxKind {}
-impl<T: AppCtxKind> RespondViaMessage for AppCtxMarker<T> {}
-impl RespondViaMessage for ModalMarker {}
-impl RespondViaMessage for ComponentMarker {}
+pub trait RespondVia: Kind {}
+impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
+impl RespondVia for ModalMarker {}
+impl RespondVia for ComponentMarker {}
 
-impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
+impl<T: RespondVia, U: Location> Ctx<T, U> {
     fn base_response_data_builder() -> InteractionResponseDataBuilder {
         InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
     }
@@ -33,20 +32,7 @@ impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
         Ok(response?)
     }
 
-    pub async fn respond(&mut self, content: impl Into<String> + Send) -> MessageRespondResult {
-        let data = Self::base_response_data_builder().content(content).build();
-        self.respond_with(Some(data)).await
-    }
-
-    pub async fn update_no_components_embeds(&mut self, content: &str) -> MessageFollowupResult {
-        Ok(self
-            .interface()
-            .await?
-            .update_no_components_embeds(content)
-            .await?)
-    }
-
-    pub async fn respond_embeds_only(
+    pub async fn respond_embeds(
         &mut self,
         embeds: impl IntoIterator<Item = Embed> + Send,
     ) -> MessageRespondResult {
@@ -66,7 +52,33 @@ impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
         self.respond_with(Some(data)).await
     }
 
-    pub async fn ephem(&mut self, content: impl Into<String> + Send) -> MessageRespondResult {
+    pub async fn defer(&mut self) -> UnitRespondResult {
+        self.acknowledge();
+        Ok(self.interface().await?.defer().await?)
+    }
+}
+
+impl<T: RespondVia, U: Location> crate::core::model::AcknowledgementAware for Ctx<T, U> {
+    type FollowupError = FollowupError;
+    type RespondError = crate::error::command::RespondError;
+    type RespondOrFollowupError = crate::error::command::RespondOrFollowupError;
+
+    fn acknowledged(&self) -> bool {
+        self.acknowledged
+    }
+
+    async fn respond(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        let data = Self::base_response_data_builder().content(content).build();
+        self.respond_with(Some(data)).await
+    }
+
+    async fn respond_ephemeral(
+        &mut self,
+        content: impl Into<String> + Send,
+    ) -> MessageRespondResult {
         let data = Self::base_response_data_builder()
             .content(content)
             .flags(MessageFlags::EPHEMERAL)
@@ -74,11 +86,28 @@ impl<T: RespondViaMessage, U: CtxLocation> Ctx<T, U> {
         self.respond_with(Some(data)).await
     }
 
-    pub async fn followup(&self, content: &str) -> MessageFollowupResult {
+    async fn update(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::RespondError> {
+        Ok(self
+            .interface()
+            .await?
+            .update_no_components_embeds(content)
+            .await?)
+    }
+
+    async fn followup(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError> {
         Ok(self.interface().await?.followup(content).await?)
     }
 
-    pub async fn followup_ephem(&self, content: &str) -> MessageFollowupResult {
-        Ok(self.interface().await?.followup_ephem(content).await?)
+    async fn followup_ephemeral(
+        &self,
+        content: impl Into<String> + Send,
+    ) -> Result<MessageResponse, Self::FollowupError> {
+        Ok(self.interface().await?.followup_ephemeral(content).await?)
     }
 }

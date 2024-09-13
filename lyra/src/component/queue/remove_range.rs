@@ -3,6 +3,7 @@ use std::{
     num::{IntErrorKind, NonZeroUsize},
 };
 
+use lyra_ext::num::usize_to_i64_truncating;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -16,7 +17,7 @@ use crate::{
     component::queue::Remove,
     core::model::{CacheAware, InteractionClient},
     error::{command::AutocompleteResult, CommandResult},
-    lavalink::PlayerAware,
+    LavalinkAndGuildIdAware,
 };
 
 enum RemoveRangeAutocompleteOptionsType {
@@ -31,11 +32,12 @@ struct RemoveRangeAutocompleteOptions {
     kind: RemoveRangeAutocompleteOptionsType,
 }
 
+#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
-    ctx: &(impl CacheAware + PlayerAware + Sync),
+    cx: &(impl CacheAware + LavalinkAndGuildIdAware + Sync),
 ) -> Vec<CommandOptionChoice> {
-    let Ok(player) = require::player(ctx) else {
+    let Ok(player) = require::player(cx) else {
         return Vec::new();
     };
     let data = player.data();
@@ -44,10 +46,7 @@ async fn generate_remove_range_autocomplete_choices(
         return Vec::new();
     };
 
-    let queue_iter = queue
-        .iter()
-        .enumerate()
-        .filter_map(|(i, t)| NonZeroUsize::new(i + 1).map(|i| (i, t)));
+    let queue_iter = queue.iter_positions_and_items();
 
     let excluded = match options.kind {
         RemoveRangeAutocompleteOptionsType::StartFocused
@@ -71,9 +70,9 @@ async fn generate_remove_range_autocomplete_choices(
     };
 
     match options.focused.parse::<i64>() {
-        Ok(input) => super::generate_position_choices_from_input(
-            input, queue_len, queue_iter, &excluded, ctx,
-        ),
+        Ok(input) => {
+            super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
+        }
         Err(e) if matches!(e.kind(), IntErrorKind::Empty) => match options.kind {
             RemoveRangeAutocompleteOptionsType::StartFocused
             | RemoveRangeAutocompleteOptionsType::StartFocusedEndCompleted(_) => {
@@ -82,13 +81,13 @@ async fn generate_remove_range_autocomplete_choices(
                     queue_len,
                     queue_iter,
                     &excluded,
-                    ctx,
+                    cx,
                 )
             }
             RemoveRangeAutocompleteOptionsType::EndFocused
             | RemoveRangeAutocompleteOptionsType::EndFocusedStartCompleted(_) => {
                 super::generate_position_choices_reversed(
-                    queue_len, queue_len, queue_iter, &excluded, ctx,
+                    queue_len, queue_len, queue_iter, &excluded, cx,
                 )
             }
         },
@@ -96,7 +95,7 @@ async fn generate_remove_range_autocomplete_choices(
             &options.focused,
             queue_iter,
             &excluded,
-            ctx,
+            cx,
         ),
     }
 }
@@ -155,15 +154,14 @@ pub struct RemoveRange {
 impl BotSlashCommand for RemoveRange {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let in_voice_with_user =
-            check::in_voice_with_user(require::in_voice(&ctx)?.and_unsuppressed()?)?;
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
+        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
+        let player = require::player(&ctx)?;
 
         let data = player.data();
         let data_r = data.read().await;
-        let queue = data_r.queue();
-        let queue_len = queue.len();
+        let queue = require::queue_not_empty(&data_r)?;
 
+        let queue_len = queue.len();
         if queue_len == 1 {
             let remove = InteractionClient::mention_command::<Remove>();
 
@@ -173,10 +171,11 @@ impl BotSlashCommand for RemoveRange {
             );
         }
 
-        super::validate_input_positions(&[self.start, self.end], queue_len)?;
+        super::validate_input_position(self.start, queue_len)?;
+        super::validate_input_position(self.end, queue_len)?;
 
         if self.end <= self.start {
-            let message = if self.end == queue_len as i64 {
+            let message = if self.end == usize_to_i64_truncating(queue_len) {
                 format!(
                     "Invalid starting position: `{}`; Starting position must be from `1` to `{}`.",
                     self.start,
@@ -194,8 +193,10 @@ impl BotSlashCommand for RemoveRange {
             bad!(message, ctx);
         }
 
-        let positions = (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p as usize));
-        check::all_users_track(positions, in_voice_with_user, queue, &ctx)?;
+        #[allow(clippy::cast_possible_truncation)]
+        let positions =
+            (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p.unsigned_abs() as usize));
+        check::all_users_track(queue, positions, in_voice_with_user)?;
 
         drop(data_r);
         Ok(super::remove_range(self.start, self.end, &mut ctx, &player).await?)

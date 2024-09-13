@@ -15,9 +15,8 @@ use sqlx::{
 };
 use tokio::task::JoinHandle;
 use twilight_gateway::{
-    error::{ReceiveMessageErrorType, StartRecommendedError},
-    CloseFrame, Config as ShardConfig, ConfigBuilder, Event, EventTypeFlags, Intents,
-    MessageSender, Shard, StreamExt,
+    error::StartRecommendedError, CloseFrame, Config as ShardConfig, ConfigBuilder, Event,
+    EventTypeFlags, Intents, MessageSender, Shard, StreamExt,
 };
 use twilight_http::{client::ClientBuilder, Client};
 use twilight_model::{
@@ -29,7 +28,11 @@ use twilight_model::{
     id::{marker::UserMarker, Id},
 };
 
-use crate::core::r#const::metadata::banner;
+use crate::{
+    core::r#const::metadata::BANNER,
+    lavalink::{handlers, ClientData},
+    LavalinkAware,
+};
 
 use super::{
     core::{
@@ -38,7 +41,7 @@ use super::{
     },
     error::runner::{StartError, WaitForSignalError, WaitUntilShutdownError},
     gateway,
-    lavalink::{self, DelegateMethods, LavalinkAware},
+    lavalink::DelegateMethods,
 };
 use super::{gateway::LastCachedStates, lavalink::Lavalink};
 
@@ -52,11 +55,12 @@ const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
-fn build_http_client() -> Client {
+fn build_http_client() -> Arc<Client> {
     ClientBuilder::default()
         .default_allowed_mentions(AllowedMentions::default())
         .token(CONFIG.token.to_owned())
         .build()
+        .into()
 }
 
 fn build_shard_config() -> ShardConfig {
@@ -67,7 +71,7 @@ fn build_shard_config() -> ShardConfig {
                 UpdatePresencePayload::new(
                     [Activity::from(MinimalActivity {
                         kind: ActivityType::Listening,
-                        name: "/play".into(),
+                        name: String::from("/play"),
                         url: None,
                     })],
                     false,
@@ -93,7 +97,8 @@ pub async fn start() -> Result<(), StartError> {
     let http = build_http_client();
 
     let user_id = http.current_user().await?.model().await?.id;
-    let lavalink = build_lavalink_client(user_id).await;
+    let data = ClientData::new(http.clone(), db.clone());
+    let lavalink = build_lavalink_client(user_id, data).await;
 
     let shards = build_and_split_shards(&http).await?;
     let shards_len = shards.len();
@@ -107,7 +112,7 @@ pub async fn start() -> Result<(), StartError> {
         tasks.push(tokio::spawn(handle_gateway_events(shard, bot.clone())));
     }
 
-    println!("{}", banner());
+    println!("{}", *BANNER);
     Ok(wait_until_shutdown(senders, tasks).await?)
 }
 
@@ -122,17 +127,18 @@ async fn build_and_split_shards(
 }
 
 #[tracing::instrument(skip_all, name = "lavalink")]
-async fn build_lavalink_client(user_id: Id<UserMarker>) -> Lavalink {
-    let events = lavalink::handlers();
+async fn build_lavalink_client(user_id: Id<UserMarker>, data: ClientData) -> Lavalink {
+    let events = handlers();
 
     let nodes = Vec::from([lavalink_rs::node::NodeBuilder {
-        hostname: (*CONFIG.lavalink_host).to_string(),
-        password: (*CONFIG.lavalink_pwd).to_string(),
+        hostname: String::from(CONFIG.lavalink_host),
+        password: String::from(CONFIG.lavalink_pwd),
         user_id: user_id.into(),
         ..Default::default()
     }]);
 
-    let client = LavalinkClient::new(events, nodes, NodeDistributionStrategy::new()).await;
+    let strategy = NodeDistributionStrategy::new();
+    let client = LavalinkClient::new_with_data(events, nodes, strategy, data.into()).await;
     client.into()
 }
 
@@ -142,12 +148,6 @@ async fn handle_gateway_events(mut shard: Shard, bot: Arc<BotState>) {
         let event = match item {
             Ok(Event::GatewayClose(_)) if SHUTDOWN.load(Ordering::Relaxed) => break,
             Ok(event) => event,
-            Err(source)
-                if SHUTDOWN.load(Ordering::Relaxed)
-                    && matches!(source.kind(), ReceiveMessageErrorType::WebSocket) =>
-            {
-                break
-            }
             Err(source) => {
                 tracing::warn!(?source, "error receiving event");
 

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, OnceLock},
+};
 
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_model::application::{
@@ -15,6 +18,7 @@ use crate::{
         config::Config,
         connection::{Join, Leave},
         misc::Ping,
+        playback::{Back, Jump, JumpAutocomplete, PlayPause, Restart, Seek, Skip},
         queue::{
             AddToQueue, Clear, FairQueue, Move, MoveAutocomplete, Play, PlayAutocomplete, PlayFile,
             Remove, RemoveAutocomplete, RemoveRange, RemoveRangeAutocomplete, Repeat, Shuffle,
@@ -37,36 +41,29 @@ macro_rules! declare_slash_commands {
             }
         }
 
-        fn slash_commands_map() -> &'static SlashCommandMap {
-            static SLASH_COMMANDS_MAP: OnceLock<SlashCommandMap> = OnceLock::new();
-            SLASH_COMMANDS_MAP.get_or_init(|| {
-                ::paste::paste! {
-                    SlashCommandMap {
-                        $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
-                    }
+        static SLASH_COMMANDS_MAP: LazyLock<SlashCommandMap> = LazyLock::new(|| {
+            ::paste::paste! {
+                SlashCommandMap {
+                    $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
                 }
-            })
-        }
+            }
+        });
 
         type SlashCommands = [Command; count!($($raw_cmd)*)];
 
-        pub fn slash_commands() -> &'static SlashCommands {
-            static SLASH_COMMANDS: OnceLock<SlashCommands> = OnceLock::new();
-            SLASH_COMMANDS.get_or_init(|| {
-                let map = slash_commands_map();
-                ::paste::paste! {
-                    [$(map.[<_ $raw_cmd:snake>].clone(),)*]
-                }
-            })
-        }
+        pub static SLASH_COMMANDS: LazyLock<SlashCommands> = LazyLock::new(|| {
+            ::paste::paste! {
+                [$(SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(),)*]
+            }
+        });
 
-        pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<Box<str>, Command>> = OnceLock::new();
+        pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
 
         $(
             impl CommandInfoAware for $raw_cmd {
                 fn name() -> &'static str {
                     ::paste::paste! {
-                        &slash_commands_map().[<_ $raw_cmd:snake>].name
+                        &SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].name
                     }
                 }
             }
@@ -100,34 +97,27 @@ macro_rules! declare_message_commands {
             }
         }
 
-        fn message_commands_map() -> &'static MessageCommandMap {
-            static MESSAGE_COMMANDS_MAP: OnceLock<MessageCommandMap> = OnceLock::new();
-            MESSAGE_COMMANDS_MAP.get_or_init(|| {
-                ::paste::paste! {
-                    MessageCommandMap {
-                        $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
-                    }
+        static MESSAGE_COMMANDS_MAP: LazyLock<MessageCommandMap> = LazyLock::new(|| {
+            ::paste::paste! {
+                MessageCommandMap {
+                    $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
                 }
-            })
-        }
+            }
+        });
 
         type MessageCommands = [Command; count!($($raw_cmd)*)];
 
-        pub fn message_commands() -> &'static MessageCommands {
-            static MESSAGE_COMMANDS: OnceLock<MessageCommands> = OnceLock::new();
-            MESSAGE_COMMANDS.get_or_init(|| {
-                let map = message_commands_map();
-                ::paste::paste! {
-                    [$(map.[<_ $raw_cmd:snake>].clone(),)*]
-                }
-            })
-        }
+        pub static MESSAGE_COMMANDS: LazyLock<MessageCommands> = LazyLock::new(|| {
+            ::paste::paste! {
+                [$(MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(),)*]
+            }
+        });
 
         $(
             impl CommandInfoAware for $raw_cmd {
                 fn name() -> &'static str {
                     ::paste::paste! {
-                        &message_commands_map().[<_ $raw_cmd:snake>].name
+                        &MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].name
                     }
                 }
             }
@@ -191,6 +181,12 @@ declare_slash_commands![
     Filter,
     Speed,
     Equaliser,
+    PlayPause,
+    Seek,
+    Restart,
+    Jump,
+    Skip,
+    Back,
 ];
 declare_message_commands![AddToQueue,];
 
@@ -199,4 +195,5 @@ declare_autocomplete![
     Remove => RemoveAutocomplete,
     RemoveRange => RemoveRangeAutocomplete,
     Move => MoveAutocomplete,
+    Jump => JumpAutocomplete,
 ];

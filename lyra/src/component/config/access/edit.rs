@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
+use lyra_ext::num::u64_to_i64_truncating;
 use sqlx::{postgres::PgQueryResult, Pool, Postgres};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{
@@ -47,8 +48,7 @@ fn add_access<T: AccessCategoryMarker>(
 
     join_set.spawn(async move {
         sqlx::query(&format!(
-            "--sql
-            INSERT INTO {column}
+            "INSERT INTO {column}
                 SELECT ch_new.guild, ch_new.id
                 FROM (VALUES {values_clause}) AS ch_new (guild, id)
             WHERE NOT EXISTS
@@ -76,8 +76,7 @@ fn remove_access<T: AccessCategoryMarker>(
 
     join_set.spawn(async move {
         sqlx::query(&format!(
-            "--sql
-            DELETE FROM {column}
+            "DELETE FROM {column}
             WHERE guild = $1 AND ({where_clause});
             ",
         ))
@@ -182,7 +181,7 @@ impl BotSlashCommand for MemberRole {
         let input_mentionables_len = input_mentionables.values().fold(0, |acc, v| acc + v.len());
 
         let database = ctx.db();
-        let guild_id = ctx.guild_id().get() as i64;
+        let guild_id = u64_to_i64_truncating(ctx.guild_id().get());
         let mut set = JoinSet::new();
         match self.action {
             EditAction::Add => {
@@ -263,7 +262,6 @@ pub struct Channel {
     target_5: Option<InteractionChannel>,
 }
 
-#[allow(clippy::too_many_lines)]
 impl BotSlashCommand for Channel {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
@@ -299,7 +297,7 @@ impl BotSlashCommand for Channel {
         let input_channels_len = input_channels.values().fold(0, |acc, v| acc + v.len());
 
         let database = ctx.db();
-        let guild_id = ctx.guild_id().get() as i64;
+        let guild_id = u64_to_i64_truncating(ctx.guild_id().get());
         let mut set = JoinSet::new();
         match self.action {
             EditAction::Add => {

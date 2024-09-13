@@ -51,12 +51,14 @@
                 act
                 sqlx-cli
                 pgcli
+                cargo-edit
               ];
 
               # https://devenv.sh/scripts/
               # scripts.hello.exec = "";
 
               enterShell = ''
+                ./scripts/get-lavalink
               '';
 
               # https://devenv.sh/tests/

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use futures::TryFutureExt;
 use twilight_model::gateway::payload::incoming::VoiceStateUpdate;
 
 use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
@@ -8,12 +9,13 @@ use twilight_http::Client;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 
-use crate::component::{connection, tuning};
-use crate::core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware};
-use crate::error::gateway::ProcessResult;
 use crate::{
+    component::{connection, playback, tuning},
+    core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
+    error::gateway::{ProcessError, ProcessResult},
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{Lavalink, LavalinkAware},
+    lavalink::Lavalink,
+    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 use super::{LastCachedStates, Process};
@@ -92,11 +94,21 @@ impl GuildIdAware for Context {
     }
 }
 
+impl LavalinkAndGuildIdAware for Context {}
+
 impl Process for Context {
     async fn process(self) -> ProcessResult {
-        connection::handle_voice_state_update(&self).await?;
-        tuning::handle_voice_state_update(&self).await?;
+        let connection_changed = match self.get_connection() {
+            Some(connection) => connection.changed().await,
+            None => false,
+        };
 
+        tokio::try_join![
+            connection::handle_voice_state_update(&self, connection_changed)
+                .map_err(ProcessError::from),
+            playback::handle_voice_state_update(&self, connection_changed).map_err(Into::into),
+            tuning::handle_voice_state_update(&self).map_err(Into::into),
+        ]?;
         Ok(())
     }
 }

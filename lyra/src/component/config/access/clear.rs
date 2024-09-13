@@ -1,4 +1,4 @@
-use lyra_ext::pretty::flags_display::PrettyFlagsDisplay;
+use lyra_ext::{num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
@@ -6,7 +6,7 @@ use super::AccessCategory;
 use crate::{
     command::{
         check,
-        macros::{out, sus},
+        macros::{note, out, sus},
         model::BotSlashCommand,
         require,
         util::prompt_for_confirmation,
@@ -36,20 +36,20 @@ impl BotSlashCommand for Clear {
         let mut set = JoinSet::new();
         category_flags.iter_as_columns().for_each(|c| {
             let db = ctx.db().clone();
-            let g = ctx.guild_id().get() as i64;
+            let g = u64_to_i64_truncating(ctx.guild_id().get());
 
             set.spawn(async move {
-                sqlx::query(&format!(
-                    "--sql
-                DELETE FROM {c} WHERE guild = $1;"
-                ))
-                .bind(g)
-                .execute(&db)
-                .await
+                sqlx::query(&format!("DELETE FROM {c} WHERE guild = $1;"))
+                    .bind(g)
+                    .execute(&db)
+                    .await
             });
         });
 
-        let mut ctx = prompt_for_confirmation(ctx).await?;
+        let (mut ctx, confirmed) = prompt_for_confirmation(ctx).await?;
+        if !confirmed {
+            note!("Cancelled executing this command", ctx);
+        }
 
         let mut rows_affected = 0;
         while let Some(res) = set.join_next().await {

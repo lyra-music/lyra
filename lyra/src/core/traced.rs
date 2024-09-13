@@ -1,13 +1,11 @@
-use std::{error::Error, fmt::Debug, future::Future};
+use std::{error::Error, future::Future};
 
 use tokio::task::JoinHandle;
 use tracing::Instrument;
 
-pub fn tokio_spawn<E, F>(fut: F) -> JoinHandle<()>
-where
-    E: Error + Debug,
-    F: Future<Output = Result<(), E>> + Send + 'static,
-{
+pub fn tokio_spawn(
+    fut: impl Future<Output = Result<(), impl Error>> + Send + 'static,
+) -> JoinHandle<()> {
     tokio::spawn(
         async move {
             if let Err(error) = fut.await {

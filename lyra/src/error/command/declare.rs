@@ -14,13 +14,13 @@ pub enum CommandExecuteError {
     UnknownCommand(PartialCommandData),
 }
 
-pub enum FlattenedUntilUserNotAllowedCommandExecuteError<'a> {
-    Sqlx(&'a sqlx::Error),
-    TaskJoin(&'a tokio::task::JoinError),
-    UserNotAllowed(&'a crate::error::UserNotAllowed),
-    InteractionParse(&'a twilight_interactions::error::ParseError),
-    UnknownCommand(&'a PartialCommandData),
-    Command(&'a super::Error),
+pub enum FlattenedUntilUserNotAllowedCommandExecuteError {
+    Sqlx,
+    TaskJoin,
+    UserNotAllowed,
+    InteractionParse,
+    UnknownCommand,
+    Command,
 }
 
 pub use FlattenedUntilUserNotAllowedCommandExecuteError as Fuunacee;
@@ -30,14 +30,14 @@ impl CommandExecuteError {
         match self {
             Self::CheckUserAllowed(e) => match e {
                 super::check::UserAllowedError::AccessCalculatorBuild(e) => match e {
-                    super::check::AccessCalculatorBuildError::Sqlx(e) => Fuunacee::Sqlx(e),
-                    super::check::AccessCalculatorBuildError::TaskJoin(e) => Fuunacee::TaskJoin(e),
+                    super::check::AccessCalculatorBuildError::Sqlx(_) => Fuunacee::Sqlx,
+                    super::check::AccessCalculatorBuildError::TaskJoin(_) => Fuunacee::TaskJoin,
                 },
-                super::check::UserAllowedError::UserNotAllowed(e) => Fuunacee::UserNotAllowed(e),
+                super::check::UserAllowedError::UserNotAllowed(_) => Fuunacee::UserNotAllowed,
             },
-            Self::InteractionParse(e) => Fuunacee::InteractionParse(e),
-            Self::UnknownCommand(c) => Fuunacee::UnknownCommand(c),
-            Self::Command(e) => Fuunacee::Command(e),
+            Self::InteractionParse(_) => Fuunacee::InteractionParse,
+            Self::UnknownCommand(_) => Fuunacee::UnknownCommand,
+            Self::Command(_) => Fuunacee::Command,
         }
     }
 }

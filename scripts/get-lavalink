@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+LAVALINK_DIR="$PWD/lavalink"
+
+URL="https://github.com/lavalink-devs/Lavalink/releases/download/4.0.7/Lavalink.jar"
+FILE="${LAVALINK_DIR}/Lavalink.jar"
+if [ -f $FILE ]; then
+  echo "File $FILE exists."
+else
+  curl -o $FILE -L $URL
+fi
+

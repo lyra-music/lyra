@@ -6,15 +6,7 @@ use twilight_model::id::{marker::MessageMarker, Id};
 pub enum PromptForConfirmationError {
     StandbyCanceled(#[from] twilight_standby::future::Canceled),
     Respond(#[from] super::RespondError),
-    Confirmation(#[from] ConfirmationError),
-}
-
-#[derive(Error, Debug)]
-pub enum ConfirmationError {
-    #[error("confirmation cancelled")]
-    Cancelled,
-    #[error("confirmation timed out")]
-    TimedOut,
+    ConfirmationTimedout(#[from] crate::error::ConfirmationTimedOut),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -122,6 +114,11 @@ impl AutoJoinAttemptError {
                     ),
                 ))
             }
+            crate::error::component::connection::join::ImplConnectToError::UnrecognisedConnection(_) => {
+                // SAFETY: if an auto-join was performed, then the `require::in_voice(_)` call was unsuccessful,
+                // which is impossible as this error will only be raised if there is an unrecognised connection found.
+                unsafe { std::hint::unreachable_unchecked() }
+            },
             crate::error::component::connection::join::ImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed(e)
             }
@@ -168,7 +165,7 @@ impl crate::error::component::connection::join::AutoJoinError {
 #[error(transparent)]
 pub enum AutoJoinOrCheckInVoiceWithUserError {
     InVoiceWithoutUser(#[from] crate::error::InVoiceWithoutUser),
-    CheckNotSuppressed(#[from] super::check::NotSuppressedError),
+    RequireUnsuppressed(#[from] super::require::UnsuppressedError),
     AutoJoinAttempt(#[from] AutoJoinAttemptError),
     HandleSuppressedAutoJoin(#[from] HandleSuppressedAutoJoinError),
 }

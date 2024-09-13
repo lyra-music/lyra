@@ -21,10 +21,12 @@ impl BotSlashCommand for FairQueue {
         let mut ctx = require::guild(ctx)?;
         check::user_is_dj(&ctx)?;
         let _ = require::in_voice(&ctx)?.and_with_someone_else()?;
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
+        let data = require::player(&ctx)?.data();
 
-        let data = player.data();
-        let indexer_type = data.read().await.queue().indexer_type();
+        let data_r = data.read().await;
+        let queue = require::queue_not_empty(&data_r)?;
+        let indexer_type = queue.indexer_type();
+        drop(data_r);
 
         match indexer_type {
             IndexerType::Fair => {

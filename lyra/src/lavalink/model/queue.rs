@@ -1,17 +1,11 @@
-use std::{
-    collections::VecDeque,
-    num::NonZeroUsize,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::{collections::VecDeque, num::NonZeroUsize};
 
-use futures::Future;
-use lavalink_rs::{model::track::TrackData, player_context::PlayerContext};
+use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
+use tokio::sync::Notify;
 use twilight_model::id::{marker::UserMarker, Id};
 
-use crate::error::component::queue::remove::WithAdvanceLockAndStoppedError;
-
-use super::queue_indexer::{IndexerType, QueueIndexer};
+use super::queue_indexer::{Indexer, IndexerType};
 
 #[derive(Hash, Copy, Clone)]
 pub enum RepeatMode {
@@ -31,7 +25,7 @@ impl RepeatMode {
 
     pub const fn emoji(&self) -> &str {
         match self {
-            Self::Off => "**` 🡲 `**",
+            Self::Off => "➡️",
             Self::All => "🔁",
             Self::Track => "🔂",
         }
@@ -66,11 +60,11 @@ impl Item {
         self.requester
     }
 
-    pub const fn track(&self) -> &TrackData {
+    pub const fn data(&self) -> &TrackData {
         &self.track
     }
 
-    pub fn into_track(self) -> TrackData {
+    pub fn into_data(self) -> TrackData {
         self.track
     }
 }
@@ -78,55 +72,45 @@ impl Item {
 pub struct Queue {
     inner: VecDeque<Item>,
     index: usize,
-    indexer: QueueIndexer,
+    indexer: Indexer,
     repeat_mode: RepeatMode,
-    advance_lock: AtomicBool,
-    current_track_started: u64,
+    advance_lock: Notify,
 }
 
 impl Queue {
     pub(super) const fn new() -> Self {
         Self {
             inner: VecDeque::new(),
-            indexer: QueueIndexer::Standard,
+            indexer: Indexer::Standard,
             index: 0,
             repeat_mode: RepeatMode::Off,
-            advance_lock: AtomicBool::new(false),
-            current_track_started: 0,
+            advance_lock: Notify::const_new(),
         }
     }
 
-    pub fn position(&self) -> NonZeroUsize {
-        let d = usize::from(self.current().is_some() || self.index == 0);
+    fn position_from(&self, current: Option<&Item>) -> NonZeroUsize {
+        let d = usize::from(current.is_some() || self.index == 0);
         // SAFETY: `self.index + d` is non-zero
         unsafe { NonZeroUsize::new_unchecked(self.index + d) }
     }
 
-    pub const fn index(&self) -> &usize {
-        &self.index
+    pub fn position(&self) -> NonZeroUsize {
+        self.position_from(self.current())
+    }
+
+    pub const fn index(&self) -> usize {
+        self.index
     }
 
     pub fn index_mut(&mut self) -> &mut usize {
         &mut self.index
     }
 
-    pub fn advance_locked(&self) -> bool {
-        self.advance_lock.load(Ordering::SeqCst)
-    }
-
-    pub fn advance_lock(&self) {
-        self.advance_lock.store(true, Ordering::SeqCst);
-    }
-
-    pub fn advance_unlock(&self) {
-        self.advance_lock.store(false, Ordering::Relaxed);
-    }
-
     pub fn current_index(&self) -> Option<usize> {
         match self.indexer {
-            QueueIndexer::Standard => Some(self.index),
-            QueueIndexer::Fair(ref indexer) => indexer.current(self.index),
-            QueueIndexer::Shuffled(ref indexer) => indexer.current(self.index),
+            Indexer::Standard => Some(self.index),
+            Indexer::Fair(ref indexer) => indexer.current(self.index),
+            Indexer::Shuffled(ref indexer) => indexer.current(self.index),
         }
     }
 
@@ -134,16 +118,17 @@ impl Queue {
         self.inner.get(self.current_index()?)
     }
 
-    pub fn current_and_index(&self) -> Option<(&Item, usize)> {
-        self.current_index()
-            .and_then(|i| Some((self.inner.get(i)?, i)))
+    pub fn current_and_position(&self) -> (Option<&Item>, NonZeroUsize) {
+        let current = self.current();
+        let position = self.position_from(current);
+        (current, position)
     }
 
     pub fn enqueue(&mut self, tracks: Vec<TrackData>, requester: Id<UserMarker>) {
         match self.indexer {
-            QueueIndexer::Fair(ref mut indexer) => indexer.enqueue(tracks.len(), requester),
-            QueueIndexer::Shuffled(ref mut indexer) => indexer.enqueue(tracks.len(), self.index),
-            QueueIndexer::Standard => {}
+            Indexer::Fair(ref mut indexer) => indexer.enqueue(tracks.len(), requester),
+            Indexer::Shuffled(ref mut indexer) => indexer.enqueue(tracks.len(), self.index),
+            Indexer::Standard => {}
         }
         let queues = tracks.into_par_iter().map(|t| Item::new(t, requester));
         self.inner.par_extend(queues);
@@ -190,7 +175,7 @@ impl Queue {
         self.repeat_mode = mode;
     }
 
-    pub fn adjust_repeat_mode(&mut self) {
+    pub fn downgrade_repeat_mode(&mut self) {
         if let RepeatMode::All | RepeatMode::Track = self.repeat_mode {
             self.repeat_mode = if self.len() > 1 {
                 RepeatMode::All
@@ -207,16 +192,16 @@ impl Queue {
     pub fn set_indexer_type(&mut self, kind: IndexerType) {
         match (self.indexer.kind(), kind) {
             (IndexerType::Fair | IndexerType::Shuffled, IndexerType::Standard) => {
-                self.indexer = QueueIndexer::Standard;
+                self.indexer = Indexer::Standard;
             }
             (IndexerType::Standard | IndexerType::Shuffled, IndexerType::Fair) => {
-                self.indexer = QueueIndexer::Fair(super::queue_indexer::FairIndexer::new(
+                self.indexer = Indexer::Fair(super::queue_indexer::FairIndexer::new(
                     self.inner.iter(),
                     self.index,
                 ));
             }
             (IndexerType::Standard | IndexerType::Fair, IndexerType::Shuffled) => {
-                self.indexer = QueueIndexer::Shuffled(super::queue_indexer::ShuffledIndexer::new(
+                self.indexer = Indexer::Shuffled(super::queue_indexer::ShuffledIndexer::new(
                     self.len(),
                     self.index,
                 ));
@@ -237,30 +222,37 @@ impl Queue {
         }
     }
 
-    pub async fn stop_with_advance_lock(
-        &self,
-        player: &PlayerContext,
-    ) -> Result<(), WithAdvanceLockAndStoppedError> {
-        self.with_advance_lock_and_stopped(player, |_| async { Ok(()) })
-            .await
+    pub fn recede(&mut self) {
+        match self.repeat_mode {
+            RepeatMode::Off => {
+                self.index = self.index.saturating_sub(1);
+            }
+            RepeatMode::All => {
+                let len = self.len();
+                self.index = ((self.index + len).saturating_sub(1)) % len;
+            }
+            RepeatMode::Track => {}
+        }
     }
 
-    pub async fn with_advance_lock_and_stopped<'a, 'b, F>(
-        &self,
-        player: &'a PlayerContext,
-        f: impl FnOnce(&'b PlayerContext) -> F + Send,
-    ) -> Result<(), WithAdvanceLockAndStoppedError>
-    where
-        F: Future<Output = Result<(), WithAdvanceLockAndStoppedError>> + Send,
-        'a: 'b,
-    {
-        self.advance_lock();
-
-        player.stop_now().await?;
-        f(player).await?;
-        Ok(())
+    pub fn acquire_advance_lock(&self) {
+        tracing::trace!("acquired queue advance lock");
+        self.advance_lock.notify_one();
     }
 
+    pub async fn not_advance_locked(&self) -> bool {
+        let future = self.advance_lock.notified();
+        let duration = crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT;
+        tokio::time::timeout(duration, future).await.is_err()
+    }
+
+    pub fn iter_positions_and_items(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (NonZeroUsize, &Item)> + Clone {
+        self.iter()
+            .enumerate()
+            .filter_map(|(i, t)| NonZeroUsize::new(i + 1).map(|i| (i, t)))
+    }
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
@@ -292,5 +284,13 @@ impl std::ops::Index<usize> for Queue {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.inner[index]
+    }
+}
+
+impl std::ops::Index<NonZeroUsize> for Queue {
+    type Output = Item;
+
+    fn index(&self, index: NonZeroUsize) -> &Self::Output {
+        &self.inner[index.get() - 1]
     }
 }

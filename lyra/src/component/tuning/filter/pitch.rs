@@ -11,7 +11,7 @@ use lavalink_rs::{
 use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::{command::require::Player, lavalink::Pitch as PitchModel};
+use crate::{command::require::PlayerInterface, lavalink::Pitch as PitchModel};
 
 enum Tier {
     Default,
@@ -40,7 +40,7 @@ impl PitchModel {
 }
 
 async fn shift_pitch(
-    player: &Player,
+    player: &PlayerInterface,
     half_tones: NonZeroI64,
 ) -> LavalinkResult<(PitchModel, PitchModel)> {
     let old_filter = player.info().await?.filters.unwrap_or_default();

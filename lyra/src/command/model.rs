@@ -10,21 +10,22 @@ use twilight_model::{
     channel::Channel,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, CommandMarker, GenericMarker, UserMarker},
+        marker::{ChannelMarker, GenericMarker, UserMarker},
         Id,
     },
-    user::User,
+    user::User as TwilightUser,
 };
 
 use crate::error::{command::AutocompleteResult, CommandResult};
 
 pub use self::ctx::{
-    AutocompleteCtx, CommandDataAware, Ctx, CtxKind, GuildCtx, GuildModalCtx, MessageCtx,
-    RespondViaMessage, RespondViaModal, SlashCtx, UserCtx, WeakGuildCtx,
+    Autocomplete as AutocompleteCtx, CommandDataAware, Ctx, Guild as GuildCtx,
+    GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx,
+    RespondViaMessage, RespondViaModal, Slash as SlashCtx, User,
 };
 
 pub trait NonPingInteraction {
-    unsafe fn author_unchecked(&self) -> &User;
+    unsafe fn author_unchecked(&self) -> &TwilightUser;
     unsafe fn author_id_unchecked(&self) -> Id<UserMarker> {
         // SAFETY: interaction type is not `Ping`, so an author exists
         let author = unsafe { self.author_unchecked() };
@@ -39,7 +40,7 @@ pub trait NonPingInteraction {
 }
 
 impl NonPingInteraction for Interaction {
-    unsafe fn author_unchecked(&self) -> &User {
+    unsafe fn author_unchecked(&self) -> &TwilightUser {
         // SAFETY: interaction type is not `Ping`, so an author exists
         unsafe { self.author().unwrap_unchecked() }
     }
@@ -69,7 +70,6 @@ impl GuildInteraction for Interaction {
 
 #[derive(Debug)]
 pub struct PartialCommandData {
-    pub id: Id<CommandMarker>,
     pub name: Arc<str>,
     pub target_id: Option<Id<GenericMarker>>,
     pub resolved: Option<InteractionDataResolved>,
@@ -79,7 +79,6 @@ pub struct PartialCommandData {
 impl PartialCommandData {
     pub fn new(data: &CommandData) -> Self {
         Self {
-            id: data.id,
             name: data.name.to_string().into(),
             target_id: data.target_id,
             resolved: data.resolved.clone(),
@@ -103,7 +102,7 @@ pub trait BotSlashCommand: CommandInfoAware {
 }
 
 pub trait BotUserCommand: CommandInfoAware {
-    async fn run(ctx: UserCtx) -> CommandResult;
+    async fn run(ctx: User) -> CommandResult;
 }
 
 pub trait BotMessageCommand: CommandInfoAware {

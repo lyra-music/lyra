@@ -8,7 +8,7 @@ use crate::{
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 /// Decrease the playback volume
@@ -23,15 +23,16 @@ pub struct Down {
 impl BotSlashCommand for Down {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let (in_voice, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let guild_id = ctx.guild_id();
         let data = player.data();
         let old_percent = data.read().await.volume();
 
+        #[allow(clippy::cast_possible_truncation)]
         let maybe_new_percent = old_percent
             .get()
-            .checked_sub(self.percent.unwrap_or(10) as u16)
+            .checked_sub(self.percent.unwrap_or(10).unsigned_abs() as u16)
             .and_then(NonZeroU16::new);
 
         let emoji = super::volume_emoji(maybe_new_percent);
@@ -44,7 +45,7 @@ impl BotSlashCommand for Down {
                 super::clipping_warning(new_percent),
             )
         } else {
-            ctx.lavalink().connection_mut_from(&in_voice).mute = true;
+            ctx.lavalink().try_get_connection_mut(guild_id)?.mute = true;
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(true)

@@ -3,7 +3,7 @@ mod leave;
 
 pub use join::{auto as auto_join, Join};
 pub use leave::Leave;
-use lyra_ext::time::{rfc3339::rfc3339_time, unix::unix_time};
+use lyra_ext::{iso8601_time, unix_time};
 
 use std::sync::Arc;
 
@@ -18,6 +18,7 @@ use twilight_model::id::{
 
 use self::join::JoinedChannel;
 use crate::{
+    command::require,
     component::connection::{
         join::JoinedChannelType,
         leave::{disconnect, pre_disconnect_cleanup, LeaveResponse},
@@ -34,15 +35,16 @@ use crate::{
         },
     },
     gateway::{voice, GuildIdAware, SenderAware},
-    lavalink::{self, LavalinkAware},
+    lavalink::Lavalink,
+    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
-fn users_in_voice(ctx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
-    ctx.cache()
+pub fn users_in_voice(cx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
+    cx.cache()
         .voice_channel_states(channel_id)
         .map_or(Some(0), |voice_states| {
             let mut users = voice_states
-                .map(|v| ctx.cache().user(v.user_id()))
+                .map(|v| cx.cache().user(v.user_id()))
                 .collect::<Option<Vec<_>>>()?;
             users.retain(|u| !u.bot);
             Some(users.len())
@@ -56,11 +58,11 @@ struct InactivityTimeoutContext {
 }
 
 impl InactivityTimeoutContext {
-    fn new_via(ctx: &(impl OwnedBotStateAware + SenderAware + GuildIdAware)) -> Self {
+    fn new_via(cx: &(impl OwnedBotStateAware + SenderAware + GuildIdAware)) -> Self {
         Self {
-            inner: ctx.bot_owned(),
-            sender: ctx.sender().clone(),
-            guild_id: ctx.guild_id(),
+            inner: cx.bot_owned(),
+            sender: cx.sender().clone(),
+            guild_id: cx.guild_id(),
         }
     }
 }
@@ -77,8 +79,8 @@ impl CacheAware for InactivityTimeoutContext {
     }
 }
 
-impl lavalink::LavalinkAware for InactivityTimeoutContext {
-    fn lavalink(&self) -> &lavalink::Lavalink {
+impl LavalinkAware for InactivityTimeoutContext {
+    fn lavalink(&self) -> &Lavalink {
         self.inner.lavalink()
     }
 }
@@ -95,6 +97,8 @@ impl GuildIdAware for InactivityTimeoutContext {
     }
 }
 
+impl LavalinkAndGuildIdAware for InactivityTimeoutContext {}
+
 async fn start_inactivity_timeout(
     ctx: InactivityTimeoutContext,
     channel_id: Id<ChannelMarker>,
@@ -108,13 +112,13 @@ async fn start_inactivity_timeout(
     );
 
     for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(*const_connection::inactivity_timeout_poll_interval()).await;
+        tokio::time::sleep(const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
         if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
             return Ok(());
         }
     }
 
-    let Some(connection) = ctx.lavalink().get_connection(guild_id) else {
+    let Some(connection) = ctx.get_connection() else {
         return Ok(());
     };
     connection.notify_change();
@@ -138,24 +142,25 @@ async fn start_inactivity_timeout(
 #[tracing::instrument(skip_all, name = "voice_state_update")]
 pub async fn handle_voice_state_update(
     ctx: &voice::Context,
+    connection_changed: bool,
 ) -> Result<(), HandleVoiceStateUpdateError> {
     let state = &ctx.inner;
     let maybe_old_state = ctx.old_voice_state();
 
     let guild_id = ctx.guild_id();
-    let lavalink = ctx.lavalink();
 
     tracing::trace!("handling voice state update");
     let (connected_channel_id, text_channel_id) = {
-        let Some(connection) = lavalink.get_connection(guild_id) else {
+        let Some(connection) = ctx.get_connection() else {
+            tracing::trace!("no active connection");
             return Ok(());
         };
 
-        if connection.changed().await {
-            tracing::trace!("connection changed");
+        if connection_changed {
+            tracing::trace!("received connection change notification");
             return Ok(());
         }
-        tracing::trace!("connection forced");
+        tracing::trace!("no connection change notification");
 
         (connection.channel_id, connection.text_channel_id)
     };
@@ -167,6 +172,14 @@ pub async fn handle_voice_state_update(
                 && state.channel_id != Some(old_channel_id)
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
+                if let Ok(player) = require::player(ctx) {
+                    player.set_pause(true).await?;
+                    ctx.http()
+                        .create_message(text_channel_id)
+                        .content("⚡▶ Paused `(Bot is not used by anyone)`")
+                        .await?;
+                };
+
                 traced::tokio_spawn(start_inactivity_timeout(
                     InactivityTimeoutContext::new_via(ctx),
                     connected_channel_id,
@@ -225,17 +238,20 @@ async fn match_state_channel_id(
                 empty: voice_is_empty,
             };
 
+            if let Ok(player) = require::player(ctx) {
+                player.update_voice_channel(voice_is_empty).await?;
+            }
             let forcefully_moved_notice = if voice_is_empty {
                 format!(
                     "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",
                     unix_time().as_secs() + u64::from(const_connection::INACTIVITY_TIMEOUT_SECS)
                 )
             } else {
-                "`(Bot was forcefully moved)`".into()
+                String::from("`(Bot was forcefully moved)`")
             };
 
             let stage_emoji = match joined.kind {
-                JoinedChannelType::Stage => "🎭".into(),
+                JoinedChannelType::Stage => String::from("🎭"),
                 JoinedChannelType::Voice => String::new(),
             };
 
@@ -253,12 +269,16 @@ async fn match_state_channel_id(
                 ))
                 .await?;
 
+            if let Some(mut connection) = ctx.get_connection_mut() {
+                connection.channel_id = channel_id;
+            }
+
             if matches!(joined.kind, JoinedChannelType::Stage) {
                 ctx.bot()
                     .http()
                     .update_current_user_voice_state(guild_id)
                     .channel_id(channel_id)
-                    .request_to_speak_timestamp(&rfc3339_time())
+                    .request_to_speak_timestamp(&iso8601_time())
                     .await?;
             }
 

@@ -14,6 +14,7 @@ impl From<EqualiserPreset> for SetEqualiser {
         let gains = value.gains();
         Self(core::array::from_fn(|i| {
             lavalink_rs::model::player::Equalizer {
+                #[allow(clippy::cast_possible_truncation)]
                 band: i as u8,
                 gain: gains[i],
             }

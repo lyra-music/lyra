@@ -15,7 +15,7 @@ use twilight_model::{
     application::interaction::{Interaction, InteractionData},
     channel::message::{
         component::{ActionRow, Button, ButtonStyle},
-        Component, Embed, ReactionType,
+        Component, Embed, EmojiReactionType,
     },
     guild::Permissions,
     id::{
@@ -41,7 +41,8 @@ use crate::{
         Cache as CacheError,
     },
     gateway::GuildIdAware,
-    lavalink::{Event, EventRecvResult, LavalinkAware},
+    lavalink::{Event, EventRecvResult},
+    LavalinkAware,
 };
 
 use super::{
@@ -279,22 +280,24 @@ fn generate_upvote_button_id_and_row() -> (String, Component) {
     let upvote_button = Component::Button(Button {
         custom_id: Some(upvote_button_id.clone()),
         disabled: false,
-        emoji: Some(ReactionType::Unicode {
+        emoji: Some(EmojiReactionType::Unicode {
             name: String::from("➕"),
         }),
         label: None,
         style: ButtonStyle::Primary,
         url: None,
+        sku_id: None,
     });
     let downvote_button = Component::Button(Button {
         custom_id: Some(downvote_button_id),
         disabled: false,
-        emoji: Some(ReactionType::Unicode {
+        emoji: Some(EmojiReactionType::Unicode {
             name: String::from("➖"),
         }),
         label: None,
         style: ButtonStyle::Danger,
         url: None,
+        sku_id: None,
     });
     let row = Component::ActionRow(ActionRow {
         components: vec![upvote_button, downvote_button],
@@ -373,10 +376,10 @@ impl EmbedUpdate<'_> {
     }
 }
 
-fn calculate_vote_ratios_and_votes(
+fn calculate_votes_and_ratios(
     votes: &HashMap<Id<UserMarker>, Vote>,
     threshold: usize,
-) -> ((usize, usize), (f32, f32, f32)) {
+) -> ((usize, usize), (f64, f64, f64)) {
     let total_votes = votes.len();
     let upvotes = votes
         .values()
@@ -385,9 +388,18 @@ fn calculate_vote_ratios_and_votes(
         .count();
     let downvotes = total_votes - upvotes;
     let votes_left = threshold - total_votes;
-    let upvote_ratio = upvotes as f32 / threshold as f32;
-    let downvote_ratio = downvotes as f32 / threshold as f32;
-    let votes_left_ratio = votes_left as f32 / threshold as f32;
+
+    #[allow(clippy::cast_precision_loss)]
+    let (threshold_f64, upvotes_f64, downvotes_f64, votes_left_f64) = (
+        threshold as f64,
+        upvotes as f64,
+        downvotes as f64,
+        votes_left as f64,
+    );
+
+    let upvote_ratio = upvotes_f64 / threshold_f64;
+    let downvote_ratio = downvotes_f64 / threshold_f64;
+    let votes_left_ratio = votes_left_f64 / threshold_f64;
 
     (
         (upvotes, downvotes),
@@ -398,8 +410,8 @@ fn calculate_vote_ratios_and_votes(
 fn calculate_vote_ratios(
     votes: &HashMap<Id<UserMarker>, Vote>,
     threshold: usize,
-) -> (f32, f32, f32) {
-    calculate_vote_ratios_and_votes(votes, threshold).1
+) -> (f64, f64, f64) {
+    calculate_votes_and_ratios(votes, threshold).1
 }
 
 fn generate_embed_colour(
@@ -411,11 +423,16 @@ fn generate_embed_colour(
     let mut z_mix = [0.0; mixbox::LATENT_SIZE];
     for (i, z) in z_mix.iter_mut().enumerate() {
         *z = votes_left_ratio.mul_add(
-            latent.base[i],
-            upvote_ratio.mul_add(latent.upvote[i], downvote_ratio * latent.downvote[i]),
+            f64::from(latent.base[i]),
+            upvote_ratio.mul_add(
+                f64::from(latent.upvote[i]),
+                downvote_ratio * f64::from(latent.downvote[i]),
+            ),
         );
     }
-    mixbox::latent_to_rgb(&z_mix)
+
+    #[allow(clippy::cast_possible_truncation)]
+    mixbox::latent_to_rgb(&z_mix.map(|f| f as f32))
 }
 
 async fn update_embed(
@@ -447,7 +464,12 @@ pub async fn start(
 
     let users_in_voice = get_users_in_voice(ctx, in_voice)?;
     let votes = HashMap::from([(ctx.author_id(), Vote(true))]);
-    let threshold = ((users_in_voice.len() + 1) as f64 / 2.).round() as usize;
+
+    #[allow(clippy::cast_precision_loss)]
+    let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;
+
+    #[allow(clippy::cast_possible_truncation)]
+    let threshold = ((users_in_voice_plus_1 / 2.).round() as isize).unsigned_abs();
 
     let embed = generate_embed(
         topic,
@@ -504,7 +526,7 @@ fn calculate_vote_resolution(
     threshold: usize,
 ) -> Option<Resolution> {
     let res = votes.values().copied().map(Vote::value).sum::<isize>();
-    if res.max(0) as usize == threshold {
+    if res.unsigned_abs() == threshold {
         if res.is_positive() {
             return Some(Resolution::UnanimousWin);
         }
@@ -515,11 +537,16 @@ fn calculate_vote_resolution(
 
 fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: usize) -> String {
     let ((upvotes, downvotes), (upvote_ratio, downvote_ratio, _)) =
-        calculate_vote_ratios_and_votes(votes, threshold);
-    let ratio_bar_size = RATIO_BAR_SIZE as f32;
+        calculate_votes_and_ratios(votes, threshold);
 
-    let upvote_char_n = (upvote_ratio * ratio_bar_size) as usize;
-    let downvote_char_n = (downvote_ratio * ratio_bar_size) as usize;
+    #[allow(clippy::cast_precision_loss)]
+    let ratio_bar_size = RATIO_BAR_SIZE as f64;
+
+    #[allow(clippy::cast_possible_truncation)]
+    let (upvote_char_n, downvote_char_n) = (
+        ((upvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
+        ((downvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
+    );
     let votes_left_char_n = RATIO_BAR_SIZE - upvote_char_n - downvote_char_n;
 
     format!(
@@ -630,7 +657,7 @@ async fn wait_for_votes(
                 PollAction::Void(e) => return Ok(Resolution::Voided(e)),
             },
             Ok(Ok(None)) => {}
-            Ok(Err(e)) => Err(e)?,
+            Ok(Err(e)) => return Err(e.into()),
             Err(_) => return Ok(Resolution::TimedOut),
         }
     }

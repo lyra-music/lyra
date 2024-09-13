@@ -29,16 +29,16 @@ pub struct LastCachedStates {
 impl LastCachedStates {
     pub fn new(cache: &InMemoryCache, event: &Event) -> Self {
         let voice_state = match event {
-            Event::VoiceStateUpdate(event) => cache
-                .voice_state(
-                    event.user_id,
-                    // SAFETY: this bot cannot join DM voice calls,
-                    //         meaning all voice states will be from a guild voice channel,
-                    //         so `e.guild_id` is present
-                    unsafe { event.guild_id.unwrap_unchecked() },
-                )
-                .as_deref()
-                .cloned(),
+            Event::VoiceStateUpdate(event) => {
+                // SAFETY: this bot cannot join DM voice calls,
+                //         meaning all voice states will be from a guild voice channel,
+                //         so `e.guild_id` is present
+                let guild_id = unsafe { event.guild_id.unwrap_unchecked() };
+                cache
+                    .voice_state(event.user_id, guild_id)
+                    .as_deref()
+                    .cloned()
+            }
             _ => None,
         };
 

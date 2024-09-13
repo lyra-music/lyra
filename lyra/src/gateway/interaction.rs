@@ -1,5 +1,6 @@
 use std::{hint::unreachable_unchecked, sync::Arc};
 
+use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
 use twilight_model::{
@@ -13,8 +14,12 @@ use twilight_model::{
 use super::model::Process;
 use crate::{
     command::{
-        macros::{bad, cant, caut, crit, err, hid, nope, note, out_upd, sus, sus_fol},
+        macros::{
+            bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
+            note, out_upd, sus, sus_fol,
+        },
         model::NonPingInteraction,
+        require,
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },
@@ -24,7 +29,7 @@ use crate::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
-        r#const::exit_code::{DUBIOUS, FORBIDDEN, WARNING},
+        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
     },
     error::{
         command::{
@@ -32,14 +37,15 @@ use crate::{
                 AlternateVoteResponse, AnotherPollOngoingError, PollLossError, PollLossErrorKind,
             },
             declare::{CommandExecuteError, Fuunacee},
-            util::{AutoJoinSuppressedError, ConfirmationError},
-            Error as CommandError, Fe, RespondError,
+            util::AutoJoinSuppressedError,
+            Error as CommandError, Fe,
         },
-        gateway::{MatchConfirmationError, ProcessError, ProcessResult},
-        AutoJoinAttemptFailed as AutoJoinAttemptFailedError, EPrint,
-        PositionOutOfRange as PositionOutOfRangeError, Suppressed as SuppressedError,
+        gateway::{ProcessError, ProcessResult},
+        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
+        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
+        Suppressed as SuppressedError,
     },
-    lavalink::LavalinkAware,
+    LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -76,7 +82,9 @@ impl Process for Context {
             }
             // SAFETY: `self.inner.kind` is `MessageComponent`, so this is safe
             InteractionType::MessageComponent => unsafe { self.process_as_component() }.await,
-            InteractionType::ModalSubmit | InteractionType::Ping => Ok(()), // ignored
+            // SAFETY: `self.inner.kind` is `ModalSubmit`, so this is safe
+            InteractionType::ModalSubmit => unsafe { self.process_as_modal() }.await,
+            InteractionType::Ping => Ok(()), // ignored
             _ => unimplemented!(),
         }
     }
@@ -97,6 +105,7 @@ impl Context {
         let inner_guild_id = self.inner.guild_id;
         // SAFETY: interaction type is not `Ping`, so `channel` is present
         let channel_id = unsafe { self.inner.channel_id_unchecked() };
+        let (tx, mut rx) = oneshot::channel::<()>();
 
         let result = match data.kind {
             CommandType::ChatInput => {
@@ -106,11 +115,11 @@ impl Context {
                     bot.clone(),
                     self.latency,
                     self.sender,
+                    tx,
                 )
                 .execute(*data)
                 .await
             }
-            CommandType::User => todo!(),
             CommandType::Message => {
                 MessageCtx::from_partial_data(
                     self.inner,
@@ -118,18 +127,22 @@ impl Context {
                     bot.clone(),
                     self.latency,
                     self.sender,
+                    tx,
                 )
                 .execute(*data)
                 .await
             }
+            CommandType::User => todo!(),
             _ => unimplemented!(),
         };
 
         if let Some(guild_id) = inner_guild_id {
-            if let Some(mut connection) = bot.lavalink().get_connection_mut(guild_id) {
-                if connection.text_channel_id != channel_id {
-                    connection.text_channel_id = channel_id;
-                }
+            let lavalink = bot.lavalink();
+            if let Some(mut connection) = lavalink.get_connection_mut(guild_id) {
+                connection.text_channel_id = channel_id;
+            }
+            if let Ok(player) = require::player(&(lavalink, guild_id)) {
+                player.data().write().await.set_text_channel_id(channel_id);
             }
         }
 
@@ -137,17 +150,18 @@ impl Context {
             return Ok(());
         };
 
+        let acknowledged = rx.try_recv().is_ok();
         match source.flatten_until_user_not_allowed_as() {
-            Fuunacee::UserNotAllowed(_) => {
+            Fuunacee::UserNotAllowed => {
                 nope!("You are not allowed to use commands in this context.", i);
             }
-            Fuunacee::Command(_) => {
+            Fuunacee::Command => {
                 let CommandExecuteError::Command(error) = source else {
                     // SAFETY: `source.flatten_until_user_not_allowed_as()` is `Fuunacee::Command(_)`,
                     //         so the unflattened source error must be `CommandExecuteError::Command(_)`
                     unsafe { unreachable_unchecked() }
                 };
-                match_error(error, name, i).await
+                match_error(error, name, acknowledged, i).await
             }
             _ => {
                 crit!(format!(
@@ -160,17 +174,20 @@ impl Context {
 
     async unsafe fn process_as_autocomplete(mut self) -> ProcessResult {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY:
+            // SAFETY: interaction is of type `ApplicationCommandAutocomplete`,
+            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
             unsafe { unreachable_unchecked() }
         };
 
         let name = data.name.clone().into();
+        let (tx, _) = oneshot::channel::<()>();
         let Err(source) = <AutocompleteCtx>::from_partial_data(
             self.inner,
             &data,
             self.bot,
             self.latency,
             self.sender,
+            tx,
         )
         .execute(*data)
         .await
@@ -182,8 +199,27 @@ impl Context {
     }
 
     #[allow(clippy::unused_async)]
-    async unsafe fn process_as_component(self) -> ProcessResult {
+    async unsafe fn process_as_component(mut self) -> ProcessResult {
+        let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
+            // SAFETY: interaction is of type `MessageComponent`,
+            //         so `self.inner.data.take()` will always be `InteractionData::MessageComponent(_)`
+            unsafe { unreachable_unchecked() }
+        };
+        tracing::trace!(?data);
         // TODO: implement controller
+
+        Ok(())
+    }
+
+    #[allow(clippy::unused_async)]
+    async unsafe fn process_as_modal(mut self) -> ProcessResult {
+        let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
+            // SAFETY: interaction is of type `ModalSubmit`,
+            //         so `self.inner.data.take()` will always be `InteractionData::ModalSubmit(_)`
+            unsafe { unreachable_unchecked() }
+        };
+        tracing::trace!(?data);
+
         Ok(())
     }
 }
@@ -191,24 +227,28 @@ impl Context {
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
+    acknowledged: bool,
     i: InteractionInterface<'_>,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
-        Fe::Cache(_) => {
+        Fe::Cache => {
             tracing::warn!("cache error: {:#?}", error);
 
-            crit!("Something isn't working at the moment, try again later.", i);
+            crit_or_fol!(
+                "Something isn't working at the moment, try again later.",
+                (i, acknowledged)
+            );
         }
-        Fe::UserNotDj(_) => {
+        Fe::UserNotDj => {
             nope!("You need to be a ***DJ*** to do that.", i);
         }
-        Fe::UserNotAccessManager(_) => {
+        Fe::UserNotAccessManager => {
             nope!("You need to be an ***Access Manager*** to do that.", i);
         }
         // Fe::UserNotPlaylistManager(_) => {
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
         // }
-        Fe::NotInVoice(_) => {
+        Fe::NotInVoice => {
             let join = InteractionClient::mention_command::<Join>();
             let play = InteractionClient::mention_command::<Play>();
             caut!(
@@ -220,48 +260,65 @@ async fn match_error(
             );
         }
         Fe::InVoiceWithoutUser(e) => {
-            nope!(
+            nope_or_fol!(
                 format!(
                     "You are not with the bot in {}; You need to be a ***DJ*** to do that.",
                     e.0.mention(),
                 ),
-                i
+                (i, acknowledged)
             );
         }
         Fe::InVoiceWithSomeoneElse(e) => {
-            nope!(e.eprint(), i);
+            nope!(e.pretty_display(), i);
         }
         Fe::InVoiceWithoutSomeoneElse(e) => {
             bad!(format!("Not enough people are in {}.", e.0.mention()), i);
         }
-        Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
+        Fe::Suppressed(e) => Ok(match_suppressed(e, (i, acknowledged)).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
-        Fe::Stopped(_) => todo!(),
-        Fe::NotPlaying(_) => todo!(),
-        Fe::Paused(_) => todo!(),
-        Fe::QueueNotSeekable(e) => {
-            nope!(e.eprint(), i);
+        Fe::AutoJoinAttemptFailed(e) => {
+            Ok(match_autojoin_attempt_failed(e, (i, acknowledged)).await?)
         }
-        Fe::QueueEmpty(_) => {
+        Fe::Stopped => todo!(),
+        Fe::NotPlaying => {
+            bad!("Currently not playing anything.", i);
+        }
+        Fe::Paused => {
+            bad!("Currently paused.", i);
+        }
+        Fe::QueueNotSeekable(e) => {
+            nope!(e.pretty_display(), i);
+        }
+        Fe::QueueEmpty => {
             bad!("The queue is currently empty.", i);
         }
         Fe::PositionOutOfRange(e) => Ok(match_position_out_of_range(e, i).await?),
         Fe::NotUsersTrack(e) => {
-            nope!(e.eprint(), i);
+            nope!(e.pretty_display(), i);
         }
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
         Fe::PollVoided(e) => {
             out_upd!(
-                format!("{WARNING} This poll has been voided as: {}.", e.eprint()),
+                format!(
+                    "{WARNING} This poll has been voided as: {}.",
+                    e.pretty_display()
+                ),
                 i
             );
         }
-        Fe::Confirmation(e) => Ok(match_confirmation(e, i).await?),
-        Fe::NoPlayer(_) => {
+        Fe::ConfirmationTimedOut => {
+            sus_fol!("Confirmation timed out.", i);
+        }
+        Fe::NoPlayer => {
             let play = InteractionClient::mention_command::<Play>();
             caut!(format!("Not yet played anything. Use {} first.", play), i);
+        }
+        Fe::UnrecognisedConnection => {
+            crit!(
+                "The bot wasn't disconnected properly last session. Please wait for it to automatically leave the voice channel, then try again.",
+                i
+            );
         }
         _ => {
             err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?i);
@@ -275,14 +332,14 @@ async fn match_error(
 
 async fn match_suppressed(
     error: &SuppressedError,
-    i: InteractionInterface<'_>,
-) -> UnitRespondResult {
+    mut ia: (InteractionInterface<'_>, bool),
+) -> UnitFollowupResult {
     match error {
         SuppressedError::Muted => {
-            bad!("Currently server muted.", i);
+            bad_or_fol!("Currently server muted.", ia);
         }
         SuppressedError::NotSpeaker => {
-            bad!("Not currently a speaker in this stage channel.", i);
+            bad_or_fol!("Not currently a speaker in this stage channel.", ia);
         }
     }
 }
@@ -309,33 +366,33 @@ async fn match_autojoin_suppressed(
 
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
-    i: InteractionInterface<'_>,
-) -> Result<(), RespondError> {
+    mut ia: (InteractionInterface<'_>, bool),
+) -> UnitFollowupResult {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
-            bad!(
+            bad_or_fol!(
                 format!(
                     "Please join a voice channel, or use {} to connect to a channel.",
                     join
                 ),
-                i
+                ia
             );
         }
         AutoJoinAttemptFailedError::UserNotAllowed(_) => {
-            nope!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", i);
+            nope_or_fol!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", ia);
         }
         AutoJoinAttemptFailedError::Forbidden(e) => {
-            cant!(
+            cant_or_fol!(
                 format!(
                     "Attempting to join {} failed due to insufficient permissions.",
                     e.0.mention()
                 ),
-                i
+                ia
             );
         }
         AutoJoinAttemptFailedError::UserNotStageManager(_) => {
-            nope!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", i);
+            nope_or_fol!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", ia);
         }
     }
 }
@@ -361,20 +418,6 @@ async fn match_position_out_of_range(
     };
 
     bad!(message, i);
-}
-
-async fn match_confirmation(
-    error: &ConfirmationError,
-    i: InteractionInterface<'_>,
-) -> Result<(), MatchConfirmationError> {
-    match error {
-        ConfirmationError::Cancelled => {
-            note!("Cancelled executing this command.", i);
-        }
-        ConfirmationError::TimedOut => {
-            sus_fol!("Confirmation timed out.", i);
-        }
-    }
 }
 
 async fn match_another_poll_ongoing(
@@ -417,5 +460,8 @@ async fn match_poll_loss(error: &PollLossError, i: InteractionInterface<'_>) -> 
         PollLossErrorKind::SupersededLossViaDj => "The poll was superseded to lose by a DJ: ",
     };
 
-    out_upd!(format!("{FORBIDDEN} {source_txt}{}", source.eprint()), i);
+    out_upd!(
+        format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
+        i
+    );
 }

@@ -19,12 +19,14 @@ pub struct Shuffle;
 impl BotSlashCommand for Shuffle {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        check::in_voice_with_user(require::in_voice(&ctx)?)?.only()?;
-        let player = require::player(&ctx)?.and_queue_not_empty().await?;
-
+        check::user_in(require::in_voice(&ctx)?)?.only()?;
+        let player = require::player(&ctx)?;
         let data = player.data();
+
         let data_r = data.read().await;
-        let indexer_type = data_r.queue().indexer_type();
+        let queue = require::queue_not_empty(&data_r)?;
+        let indexer_type = queue.indexer_type();
+        drop(data_r);
 
         match indexer_type {
             IndexerType::Shuffled => {

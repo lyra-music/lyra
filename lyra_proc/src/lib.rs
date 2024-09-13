@@ -11,7 +11,14 @@ use proc_macro::TokenStream;
 pub fn bot_command_group(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
 
-    command::impl_lyra_command_group(&input)
+    command::impl_bot_command_group(&input)
+}
+
+#[proc_macro_derive(BotAutocompleteGroup)]
+pub fn bot_autocomplete_group(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    command::impl_bot_autocomplete_group(&input)
 }
 
 #[proc_macro]

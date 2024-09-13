@@ -5,7 +5,6 @@ pub mod gateway;
 pub mod lavalink;
 pub mod runner;
 
-pub use command::Error as CommandError;
 pub use command::Result as CommandResult;
 
 use thiserror::Error;
@@ -15,8 +14,11 @@ use twilight_model::id::{
     Id,
 };
 
-pub trait EPrint: std::error::Error + std::fmt::Debug {
-    fn eprint(&self) -> String;
+use crate::command::require::PartialInVoice;
+
+pub trait PrettyErrorDisplay<'a> {
+    type Displayer: std::fmt::Display;
+    fn pretty_display(&'a self) -> Self::Displayer;
 }
 
 #[derive(Error, Debug)]
@@ -66,14 +68,25 @@ pub struct InVoiceAlready(pub Id<ChannelMarker>);
 pub struct InVoiceWithoutUser(pub Id<ChannelMarker>);
 
 #[derive(Error, Debug)]
-#[error("bot is already in voice and someone else also is: {}", .0)]
-pub struct InVoiceWithSomeoneElse(pub Id<ChannelMarker>);
+#[error("bot is already in voice and someone else also is: {}", .0.channel_id())]
+pub struct InVoiceWithSomeoneElse(pub PartialInVoice);
 
-impl EPrint for InVoiceWithSomeoneElse {
-    fn eprint(&self) -> String {
-        format!(
+impl<'a> PrettyErrorDisplay<'a> for InVoiceWithSomeoneElse {
+    type Displayer = PrettyInVoiceWithSomeoneElseDisplayer<'a>;
+
+    fn pretty_display(&'a self) -> Self::Displayer {
+        PrettyInVoiceWithSomeoneElseDisplayer(self)
+    }
+}
+
+pub struct PrettyInVoiceWithSomeoneElseDisplayer<'a>(&'a InVoiceWithSomeoneElse);
+
+impl std::fmt::Display for PrettyInVoiceWithSomeoneElseDisplayer<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
             "There are someone else in {}; You need to be a ***DJ*** to do that.",
-            self.0.mention(),
+            self.0 .0.channel_id().mention(),
         )
     }
 }
@@ -107,8 +120,18 @@ pub struct NotPlaying;
 #[error("queue is not seekable")]
 pub struct QueueNotSeekable;
 
-impl EPrint for QueueNotSeekable {
-    fn eprint(&self) -> String {
+impl<'a> PrettyErrorDisplay<'a> for QueueNotSeekable {
+    type Displayer = PrettyQueueNotSeekableDisplayer;
+
+    fn pretty_display(&'a self) -> Self::Displayer {
+        PrettyQueueNotSeekableDisplayer
+    }
+}
+
+pub struct PrettyQueueNotSeekableDisplayer;
+
+impl std::fmt::Display for PrettyQueueNotSeekableDisplayer {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -122,14 +145,26 @@ pub struct NotUsersTrack {
     pub channel_id: Id<ChannelMarker>,
 }
 
-impl EPrint for NotUsersTrack {
-    fn eprint(&self) -> String {
-        format!(
+impl<'a> PrettyErrorDisplay<'a> for NotUsersTrack {
+    type Displayer = PrettyNotUsersTrackDisplayer<'a>;
+
+    fn pretty_display(&'a self) -> Self::Displayer {
+        PrettyNotUsersTrackDisplayer(self)
+    }
+}
+
+pub struct PrettyNotUsersTrackDisplayer<'a>(&'a NotUsersTrack);
+
+impl std::fmt::Display for PrettyNotUsersTrackDisplayer<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner = self.0;
+        write!(
+            f,
             "`{}` (`#{}`) was requested by {} and you're not the only person in {}; You'll need to be a ***DJ*** to do that.",
-            self.title,
-            self.position,
-            self.requester.mention(),
-            self.channel_id.mention(),
+            inner.title,
+            inner.position,
+            inner.requester.mention(),
+            inner.channel_id.mention(),
         )
     }
 }
@@ -164,7 +199,7 @@ pub struct PrettifiedTimestampParse;
 
 #[derive(Error, Debug)]
 #[error("error running the bot starter: {}", .0)]
-pub enum RunError {
+pub enum Run {
     ColorEyre(#[from] color_eyre::Report),
     Dotenvy(#[from] dotenvy::Error),
     StartError(#[from] runner::StartError),
@@ -173,3 +208,11 @@ pub enum RunError {
 #[derive(Error, Debug)]
 #[error("not in a guild")]
 pub struct NotInGuild;
+
+#[derive(Error, Debug)]
+#[error("confirmation timed out")]
+pub struct ConfirmationTimedOut;
+
+#[derive(Error, Debug)]
+#[error("unrecognised voice connection")]
+pub struct UnrecognisedConnection;

@@ -1,3 +1,4 @@
+mod emoji;
 mod interaction;
 
 use std::{
@@ -10,25 +11,25 @@ use std::{
 
 use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
+use tokio::sync::OnceCell;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::ShardId;
 use twilight_http::Client;
 use twilight_model::{
-    guild::Permissions,
-    id::{marker::UserMarker, Id},
-    oauth::Application,
+    guild::{Emoji, Permissions},
+    id::{
+        marker::{ApplicationMarker, UserMarker},
+        Id,
+    },
     user::CurrentUser,
 };
 use twilight_standby::Standby;
 
-use crate::{
-    error::core::DeserializeBodyFromHttpError,
-    lavalink::{self, Lavalink},
-};
+use crate::{error::core::DeserializeBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
 
 pub use self::interaction::{
-    Client as InteractionClient, Interface as InteractionInterface, MessageResponse,
-    UnitFollowupResult, UnitRespondResult,
+    AcknowledgementAware, Client as InteractionClient, Interface as InteractionInterface,
+    MessageResponse, UnitFollowupResult, UnitRespondResult,
 };
 
 pub struct Config {
@@ -130,15 +131,17 @@ pub trait HttpAware {
 
 pub struct BotState {
     cache: InMemoryCache,
-    http: Client,
+    http: Arc<Client>,
     standby: Standby,
     lavalink: Lavalink,
     db: Pool<Postgres>,
     info: BotInfo,
+    application_id: OnceCell<Id<ApplicationMarker>>,
+    application_emojis: OnceCell<&'static [Emoji]>,
 }
 
 impl BotState {
-    pub fn new(db: Pool<Postgres>, http: Client, lavalink: Lavalink) -> Self {
+    pub fn new(db: Pool<Postgres>, http: Arc<Client>, lavalink: Lavalink) -> Self {
         let info = BotInfo {
             started: Instant::now(),
             guild_counter: GuildCounter::new(),
@@ -151,6 +154,8 @@ impl BotState {
             lavalink,
             db,
             info,
+            application_id: OnceCell::new(),
+            application_emojis: OnceCell::new(),
         }
     }
 
@@ -166,13 +171,33 @@ impl BotState {
         &self.info
     }
 
-    async fn app(&self) -> Result<Application, DeserializeBodyFromHttpError> {
-        Ok(self.http.current_user_application().await?.model().await?)
+    pub async fn application_id(
+        &self,
+    ) -> Result<Id<ApplicationMarker>, DeserializeBodyFromHttpError> {
+        self.application_id
+            .get_or_try_init(|| async {
+                let application = self.http.current_user_application().await?.model().await?;
+                Ok(application.id)
+            })
+            .await
+            .copied()
+    }
+
+    pub async fn application_emojis(
+        &self,
+    ) -> Result<&'static [Emoji], DeserializeBodyFromHttpError> {
+        self.application_emojis
+            .get_or_try_init(|| async {
+                let application_id = self.application_id().await?;
+                let req = self.http.get_application_emojis(application_id);
+                Ok(&*req.await?.models().await?.leak())
+            })
+            .await
+            .copied()
     }
 
     pub async fn interaction(&self) -> Result<InteractionClient, DeserializeBodyFromHttpError> {
-        let client = self.http.interaction(self.app().await?.id);
-
+        let client = self.http.interaction(self.application_id().await?);
         Ok(InteractionClient::new(client))
     }
 
@@ -188,7 +213,7 @@ impl BotState {
     }
 }
 
-impl lavalink::LavalinkAware for BotState {
+impl LavalinkAware for BotState {
     fn lavalink(&self) -> &Lavalink {
         &self.lavalink
     }

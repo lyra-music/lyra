@@ -34,12 +34,10 @@ impl Connection {
     }
 
     pub async fn changed(&self) -> bool {
-        tokio::time::timeout(
-            *r#const::connection::connection_changed_timeout(),
-            self.change.notified(),
-        )
-        .await
-        .is_ok()
+        tracing::trace!("waiting for connection change notification");
+        let duration = r#const::connection::CHANGED_TIMEOUT;
+        let future = self.change.notified();
+        tokio::time::timeout(duration, future).await.is_ok()
     }
 
     pub const fn poll(&self) -> Option<&Poll> {
@@ -95,12 +93,12 @@ pub enum Event {
 
 pub type EventRecvResult<T> = Result<T, broadcast::error::RecvError>;
 
-#[allow(clippy::needless_pass_by_ref_mut)]
+#[allow(clippy::needless_pass_by_ref_mut)] // false positive
 pub async fn wait_for_with(
     rx: &mut broadcast::Receiver<Event>,
     predicate: impl Fn(&Event) -> bool + Send + Sync,
 ) -> EventRecvResult<Option<Event>> {
-    let event = tokio::time::timeout(*r#const::misc::wait_for_bot_events_timeout(), async {
+    let event = tokio::time::timeout(r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, async {
         loop {
             let event = rx.recv().await?;
             if predicate(&event) {

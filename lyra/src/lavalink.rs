@@ -6,10 +6,10 @@ mod track;
 
 pub use self::{
     model::{
-        wait_for_with, ClientAware as LavalinkAware, Connection, CorrectPlaylistInfo,
-        CorrectTrackInfo, DelegateMethods, Event, EventRecvResult, IndexerType, Lavalink, Pitch,
-        PlayerAware, PlayerDataRwLockArc, Queue, QueueItem, RepeatMode, UnwrappedPlayerData,
-        UnwrappedPlayerInfoUri,
+        wait_for_with, ClientAndGuildIdAware, ClientAware, ClientData, Connection,
+        CorrectPlaylistInfo, CorrectTrackInfo, DelegateMethods, Event, EventRecvResult,
+        IndexerType, Lavalink, OwnedPlayerData, Pitch, PlayerDataRead, PlayerDataWrite, Queue,
+        QueueItem, RepeatMode, UnwrappedData, UnwrappedPlayerInfoUri,
     },
     process::handlers,
 };

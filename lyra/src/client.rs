@@ -7,7 +7,7 @@ fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
 }
 
 #[tracing::instrument(err)]
-pub async fn run() -> Result<(), super::error::RunError> {
+pub async fn run() -> Result<(), super::error::Run> {
     color_eyre::install()?;
     dotenvy::dotenv()?;
 
@@ -15,8 +15,7 @@ pub async fn run() -> Result<(), super::error::RunError> {
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
-                .from_env_lossy(), // .add_directive(parse_directive("lyra=trace")),
-                                   // .add_directive(parse_directive("lavalink_rs=trace")),
+                .from_env_lossy(),
         )
         .init();
 

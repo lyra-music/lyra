@@ -1,6 +1,7 @@
 pub mod check;
 pub mod declare;
 pub mod poll;
+pub mod require;
 pub mod util;
 
 #[derive(thiserror::Error, Debug)]
@@ -18,6 +19,13 @@ pub enum FollowupError {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[error("creating a response or followup failed: {}", 0)]
+pub enum RespondOrFollowupError {
+    Respond(#[from] RespondError),
+    Followup(#[from] FollowupError),
+}
+
+#[derive(thiserror::Error, Debug)]
 #[error("command failed: {}", .0)]
 pub enum Error {
     UserNotAccessManager(#[from] super::UserNotAccessManager),
@@ -27,10 +35,10 @@ pub enum Error {
     NotInVoice(#[from] super::NotInVoice),
     InVoiceWithoutUser(#[from] super::InVoiceWithoutUser),
     QueueEmpty(#[from] super::QueueEmpty),
-    CheckNotSuppressed(#[from] check::NotSuppressedError),
+    RequireUnsuppressed(#[from] require::UnsuppressedError),
     CheckUsersTrack(#[from] check::UsersTrackError),
     UserNotDj(#[from] super::UserNotDj),
-    InVoiceWithSomeoneElse(#[from] check::InVoiceWithSomeoneElseError),
+    RequireInVoiceWithSomeoneElse(#[from] require::InVoiceWithSomeoneElseError),
     PositionOutOfRange(#[from] super::PositionOutOfRange),
     CheckRun(#[from] check::RunError),
     Respond(#[from] RespondError),
@@ -38,9 +46,6 @@ pub enum Error {
     PromptForConfirmation(#[from] util::PromptForConfirmationError),
     Join(#[from] super::component::connection::join::ResidualError),
     Leave(#[from] super::component::connection::leave::ResidualError),
-    WithAdvanceLockAndStopped(
-        #[from] super::component::queue::remove::WithAdvanceLockAndStoppedError,
-    ),
     Play(#[from] super::component::queue::play::Error),
     DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
     RemoveTracks(#[from] super::component::queue::RemoveTracksError),
@@ -51,109 +56,111 @@ pub enum Error {
     CheckUserOnlyIn(#[from] check::UserOnlyInError),
     Cache(#[from] super::Cache),
     HandlePoll(#[from] check::HandlePollError),
+    NotPlaying(#[from] super::NotPlaying),
+    Paused(#[from] super::Paused),
+    UnrecognisedConnection(#[from] super::UnrecognisedConnection),
 }
 
 pub enum FlattenedError<'a> {
-    UserNotAccessManager(&'a super::UserNotAccessManager),
-    Sqlx(&'a sqlx::Error),
-    TaskJoin(&'a tokio::task::JoinError),
-    EmbedValidation(&'a twilight_validate::embed::EmbedValidationError),
-    NotInVoice(&'a super::NotInVoice),
     InVoiceWithoutUser(&'a super::InVoiceWithoutUser),
-    QueueEmpty(&'a super::QueueEmpty),
-    PositionOutOfRange(&'a super::PositionOutOfRange),
-    Cache(&'a super::Cache),
     Suppressed(&'a super::Suppressed),
     NotUsersTrack(&'a super::NotUsersTrack),
-    UserNotDj(&'a super::UserNotDj),
     InVoiceWithoutSomeoneElse(&'a super::InVoiceWithoutSomeoneElse),
-    NotPlaying(&'a super::NotPlaying),
-    Paused(&'a super::Paused),
-    Stopped(&'a super::Stopped),
     InVoiceWithSomeoneElse(&'a super::InVoiceWithSomeoneElse),
     QueueNotSeekable(&'a super::QueueNotSeekable),
     AnotherPollOngoing(&'a check::AnotherPollOngoingError),
-    TwilightHttp(&'a twilight_http::Error),
-    DeserializeBody(&'a twilight_http::response::DeserializeBodyError),
-    EventSend(&'a tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
-    EventRecv(&'a tokio::sync::broadcast::error::RecvError),
-    ImageSourceUrl(&'a twilight_util::builder::embed::image_source::ImageSourceUrlError),
-    MessageValidation(&'a twilight_validate::message::MessageValidationError),
+    PositionOutOfRange(&'a super::PositionOutOfRange),
     PollLoss(&'a check::PollLossError),
     PollVoided(&'a check::PollVoidedError),
-    StandbyCanceled(&'a twilight_standby::future::Canceled),
-    Confirmation(&'a util::ConfirmationError),
-    GatewaySend(&'a twilight_gateway::error::ChannelError),
     AutoJoinSuppressed(&'a util::AutoJoinSuppressedError),
     AutoJoinAttemptFailed(&'a super::AutoJoinAttemptFailed),
-    Lavalink(&'a lavalink_rs::error::LavalinkError),
-    NoPlayer(&'a super::lavalink::NoPlayerError),
-    NotInGuild(&'a super::NotInGuild),
+    UserNotAccessManager,
+    Sqlx,
+    TaskJoin,
+    EmbedValidation,
+    NotInVoice,
+    QueueEmpty,
+    Cache,
+    UserNotDj,
+    NotPlaying,
+    Paused,
+    Stopped,
+    TwilightHttp,
+    DeserializeBody,
+    EventSend,
+    EventRecv,
+    ImageSourceUrl,
+    MessageValidation,
+    StandbyCanceled,
+    ConfirmationTimedOut,
+    GatewaySend,
+    Lavalink,
+    NoPlayer,
+    NotInGuild,
+    UnrecognisedConnection,
 }
 
 pub use FlattenedError as Fe;
 
 impl<'a> Fe<'a> {
-    const fn from_core_followup_error(error: &'a super::core::FollowupError) -> Fe<'a> {
+    const fn from_core_followup_error(error: &'a super::core::FollowupError) -> Self {
         match error {
-            super::core::FollowupError::TwilightHttp(e) => Self::TwilightHttp(e),
-            super::core::FollowupError::MessageValidation(e) => Self::MessageValidation(e),
+            super::core::FollowupError::TwilightHttp(_) => Self::TwilightHttp,
+            super::core::FollowupError::MessageValidation(_) => Self::MessageValidation,
         }
     }
 
-    const fn from_check_not_suppressed_error(error: &'a check::NotSuppressedError) -> Fe<'a> {
+    const fn from_require_unsuppressed_error(error: &'a require::UnsuppressedError) -> Self {
         match error {
-            check::NotSuppressedError::Cache(e) => Self::Cache(e),
-            check::NotSuppressedError::Suppressed(e) => Self::Suppressed(e),
+            require::UnsuppressedError::Cache(_) => Self::Cache,
+            require::UnsuppressedError::Suppressed(e) => Self::Suppressed(e),
         }
     }
 
     const fn from_deserialize_body_from_http_error(
         error: &'a super::core::DeserializeBodyFromHttpError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            super::core::DeserializeBodyFromHttpError::TwilightHttp(e) => Self::TwilightHttp(e),
-            super::core::DeserializeBodyFromHttpError::DeserializeBody(e) => {
-                Self::DeserializeBody(e)
-            }
+            super::core::DeserializeBodyFromHttpError::TwilightHttp(_) => Self::TwilightHttp,
+            super::core::DeserializeBodyFromHttpError::DeserializeBody(_) => Self::DeserializeBody,
         }
     }
 
-    const fn from_users_track_error(error: &'a check::UsersTrackError) -> Fe<'a> {
+    const fn from_users_track_error(error: &'a check::UsersTrackError) -> Self {
         match error {
-            check::UsersTrackError::Cache(e) => Self::Cache(e),
+            check::UsersTrackError::Cache(_) => Self::Cache,
             check::UsersTrackError::NotUsersTrack(e) => Self::NotUsersTrack(e),
         }
     }
 
-    const fn from_in_voice_with_someone_else_error(
-        error: &'a check::InVoiceWithSomeoneElseError,
+    const fn from_require_in_voice_with_someone_else_error(
+        error: &'a require::InVoiceWithSomeoneElseError,
     ) -> Self {
         match error {
-            check::InVoiceWithSomeoneElseError::Cache(e) => Self::Cache(e),
-            check::InVoiceWithSomeoneElseError::InVoiceWithoutSomeoneElse(e) => {
+            require::InVoiceWithSomeoneElseError::Cache(_) => Self::Cache,
+            require::InVoiceWithSomeoneElseError::InVoiceWithoutSomeoneElse(e) => {
                 Self::InVoiceWithoutSomeoneElse(e)
             }
         }
     }
 
-    const fn from_run(error: &'a check::RunError) -> Fe<'a> {
+    const fn from_run(error: &'a check::RunError) -> Self {
         match error {
-            check::RunError::NotInVoice(e) => Self::NotInVoice(e),
-            check::RunError::QueueEmpty(e) => Self::QueueEmpty(e),
-            check::RunError::NotPlaying(e) => Self::NotPlaying(e),
+            check::RunError::NotInVoice(_) => Self::NotInVoice,
+            check::RunError::QueueEmpty(_) => Self::QueueEmpty,
+            check::RunError::NotPlaying(_) => Self::NotPlaying,
+            check::RunError::Cache(_) => Self::Cache,
+            check::RunError::Paused(_) => Self::Paused,
+            check::RunError::Stopped(_) => Self::Stopped,
             check::RunError::InVoiceWithoutUser(e) => Self::InVoiceWithoutUser(e),
-            check::RunError::Cache(e) => Self::Cache(e),
-            check::RunError::Paused(e) => Self::Paused(e),
-            check::RunError::Stopped(e) => Self::Stopped(e),
-            check::RunError::NotSuppressed(e) => Self::from_check_not_suppressed_error(e),
+            check::RunError::NotSuppressed(e) => Self::from_require_unsuppressed_error(e),
             check::RunError::HandleInVoiceWithSomeoneElse(e) => {
                 Self::from_handle_in_voice_with_someone_else_error(e)
             }
         }
     }
 
-    const fn from_vote_resolvable(error: &'a check::PollResolvableError) -> Fe<'a> {
+    const fn from_vote_resolvable(error: &'a check::PollResolvableError) -> Self {
         match error {
             check::PollResolvableError::InVoiceWithSomeoneElse(e) => {
                 Self::InVoiceWithSomeoneElse(e)
@@ -163,26 +170,26 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_update_embed(error: &'a poll::UpdateEmbedError) -> Fe<'a> {
+    const fn from_update_embed(error: &'a poll::UpdateEmbedError) -> Self {
         match error {
-            poll::UpdateEmbedError::Http(e) => Self::TwilightHttp(e),
-            poll::UpdateEmbedError::EmbedValidation(e) => Self::EmbedValidation(e),
-            poll::UpdateEmbedError::MessageValidation(e) => Self::MessageValidation(e),
+            poll::UpdateEmbedError::Http(_) => Self::TwilightHttp,
+            poll::UpdateEmbedError::EmbedValidation(_) => Self::EmbedValidation,
+            poll::UpdateEmbedError::MessageValidation(_) => Self::MessageValidation,
             poll::UpdateEmbedError::Followup(e) => Self::from_core_followup_error(e),
         }
     }
 
-    const fn from_generate_embed(error: &'a poll::GenerateEmbedError) -> Fe<'a> {
+    const fn from_generate_embed(error: &'a poll::GenerateEmbedError) -> Self {
         match error {
-            poll::GenerateEmbedError::ImageSourceUrl(e) => Self::ImageSourceUrl(e),
-            poll::GenerateEmbedError::EmbedValidation(e) => Self::EmbedValidation(e),
+            poll::GenerateEmbedError::ImageSourceUrl(_) => Self::ImageSourceUrl,
+            poll::GenerateEmbedError::EmbedValidation(_) => Self::EmbedValidation,
         }
     }
 
-    const fn from_wait_for_votes(error: &'a poll::WaitForVotesError) -> Fe<'a> {
+    const fn from_wait_for_votes(error: &'a poll::WaitForVotesError) -> Self {
         match error {
-            poll::WaitForVotesError::TwilightHttp(e) => Self::TwilightHttp(e),
-            poll::WaitForVotesError::EventRecv(e) => Self::EventRecv(e),
+            poll::WaitForVotesError::TwilightHttp(_) => Self::TwilightHttp,
+            poll::WaitForVotesError::EventRecv(_) => Self::EventRecv,
             poll::WaitForVotesError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
@@ -190,23 +197,23 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_start_poll(error: &'a poll::StartPollError) -> Fe<'a> {
+    const fn from_start_poll(error: &'a poll::StartPollError) -> Self {
         match error {
-            poll::StartPollError::Cache(e) => Self::Cache(e),
-            poll::StartPollError::DeserializeBody(e) => Self::DeserializeBody(e),
+            poll::StartPollError::Cache(_) => Self::Cache,
+            poll::StartPollError::DeserializeBody(_) => Self::DeserializeBody,
             poll::StartPollError::Respond(e) => Self::from_respond(e),
             poll::StartPollError::GenerateEmbed(e) => Self::from_generate_embed(e),
             poll::StartPollError::WaitForVotes(e) => Self::from_wait_for_votes(e),
         }
     }
 
-    const fn from_handle_poll(error: &'a check::HandlePollError) -> Fe<'a> {
+    const fn from_handle_poll(error: &'a check::HandlePollError) -> Self {
         match error {
+            check::HandlePollError::EventRecv(_) => Self::EventRecv,
+            check::HandlePollError::EventSend(_) => Self::EventSend,
             check::HandlePollError::AnotherPollOngoing(e) => Self::AnotherPollOngoing(e),
-            check::HandlePollError::EventSend(e) => Self::EventSend(e),
             check::HandlePollError::PollLoss(e) => Self::PollLoss(e),
             check::HandlePollError::PollVoided(e) => Self::PollVoided(e),
-            check::HandlePollError::EventRecv(e) => Self::EventRecv(e),
             check::HandlePollError::StartPoll(e) => Self::from_start_poll(e),
             check::HandlePollError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
@@ -216,7 +223,7 @@ impl<'a> Fe<'a> {
 
     const fn from_handle_in_voice_with_someone_else_error(
         error: &'a check::HandleInVoiceWithSomeoneElseError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             check::HandleInVoiceWithSomeoneElseError::PollResolvable(e) => {
                 Self::from_vote_resolvable(e)
@@ -225,16 +232,16 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_respond(error: &'a RespondError) -> Fe<'a> {
+    const fn from_respond(error: &'a RespondError) -> Self {
         match error {
-            RespondError::TwilightHttp(e) => Self::TwilightHttp(e),
+            RespondError::TwilightHttp(_) => Self::TwilightHttp,
             RespondError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
         }
     }
 
-    const fn from_followup(error: &'a FollowupError) -> Fe<'a> {
+    const fn from_followup(error: &'a FollowupError) -> Self {
         match error {
             FollowupError::DeserializeBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
@@ -243,31 +250,38 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_prompt_for_confirmation(error: &'a util::PromptForConfirmationError) -> Fe<'a> {
+    const fn from_respond_or_followup(error: &'a RespondOrFollowupError) -> Self {
         match error {
-            util::PromptForConfirmationError::StandbyCanceled(e) => Self::StandbyCanceled(e),
-            util::PromptForConfirmationError::Confirmation(e) => Self::Confirmation(e),
+            RespondOrFollowupError::Respond(e) => Self::from_respond(e),
+            RespondOrFollowupError::Followup(e) => Self::from_followup(e),
+        }
+    }
+
+    const fn from_prompt_for_confirmation(error: &'a util::PromptForConfirmationError) -> Self {
+        match error {
+            util::PromptForConfirmationError::StandbyCanceled(_) => Self::StandbyCanceled,
+            util::PromptForConfirmationError::ConfirmationTimedout(_) => Self::ConfirmationTimedOut,
             util::PromptForConfirmationError::Respond(e) => Self::from_respond(e),
         }
     }
 
-    const fn from_access_calculator_build(error: &'a check::AccessCalculatorBuildError) -> Fe<'a> {
+    const fn from_access_calculator_build(error: &'a check::AccessCalculatorBuildError) -> Self {
         match error {
-            check::AccessCalculatorBuildError::Sqlx(e) => Self::Sqlx(e),
-            check::AccessCalculatorBuildError::TaskJoin(e) => Self::TaskJoin(e),
+            check::AccessCalculatorBuildError::Sqlx(_) => Self::Sqlx,
+            check::AccessCalculatorBuildError::TaskJoin(_) => Self::TaskJoin,
         }
     }
 
-    const fn from_check_user_only_in(error: &'a check::UserOnlyInError) -> Fe<'a> {
+    const fn from_check_user_only_in(error: &'a check::UserOnlyInError) -> Self {
         match error {
-            check::UserOnlyInError::Cache(e) => Self::Cache(e),
+            check::UserOnlyInError::Cache(_) => Self::Cache,
             check::UserOnlyInError::InVoiceWithSomeoneElse(e) => Self::InVoiceWithSomeoneElse(e),
         }
     }
 
     const fn from_check_user_allowed_residual(
         error: &'a super::component::connection::join::ResidualUserAllowedError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             super::component::connection::join::ResidualUserAllowedError::AccessCalculatorBuild(
                 e,
@@ -277,20 +291,21 @@ impl<'a> Fe<'a> {
 
     const fn from_impl_connect_to_residual(
         error: &'a super::component::connection::join::ResidualImplConnectToError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            super::component::connection::join::ResidualImplConnectToError::Cache(e) => {
-                Self::Cache(e)
+            super::component::connection::join::ResidualImplConnectToError::Cache(_) => Self::Cache,
+            super::component::connection::join::ResidualImplConnectToError::GatewaySend(_) => {
+                Self::GatewaySend
             }
-            super::component::connection::join::ResidualImplConnectToError::GatewaySend(e) => {
-                Self::GatewaySend(e)
+            super::component::connection::join::ResidualImplConnectToError::TwilightHttp(_) => {
+                Self::TwilightHttp
             }
-            super::component::connection::join::ResidualImplConnectToError::TwilightHttp(e) => {
-                Self::TwilightHttp(e)
+            super::component::connection::join::ResidualImplConnectToError::Lavalink(_) => {
+                Self::Lavalink
             }
-            super::component::connection::join::ResidualImplConnectToError::Lavalink(e) => {
-                Self::Lavalink(e)
-            }
+            super::component::connection::join::ResidualImplConnectToError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            },
             super::component::connection::join::ResidualImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed_residual(e)
             }
@@ -299,7 +314,7 @@ impl<'a> Fe<'a> {
 
     const fn from_connect_to_residual(
         error: &'a super::component::connection::join::ResidualConnectToError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             super::component::connection::join::ResidualConnectToError::CheckUserOnlyIn(e) => {
                 Self::from_check_user_only_in(e)
@@ -312,17 +327,17 @@ impl<'a> Fe<'a> {
 
     const fn from_get_users_voice_channel_residual(
         error: &'a super::component::connection::join::ResidualGetUsersVoiceChannelError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            super::component::connection::join::ResidualGetUsersVoiceChannelError::Cache(e) => {
-                Self::Cache(e)
+            super::component::connection::join::ResidualGetUsersVoiceChannelError::Cache(_) => {
+                Self::Cache
             }
         }
     }
 
     const fn from_impl_join_residual(
         error: &'a super::component::connection::join::ResidualImplJoinError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             super::component::connection::join::ResidualImplJoinError::GetUsersVoiceChannel(e) => {
                 Self::from_get_users_voice_channel_residual(e)
@@ -335,14 +350,14 @@ impl<'a> Fe<'a> {
 
     const fn from_handle_response(
         error: &'a super::component::connection::join::HandleResponseError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            super::component::connection::join::HandleResponseError::Cache(e) => Self::Cache(e),
-            super::component::connection::join::HandleResponseError::DeserializeBody(e) => {
-                Self::DeserializeBody(e)
+            super::component::connection::join::HandleResponseError::Cache(_) => Self::Cache,
+            super::component::connection::join::HandleResponseError::DeserializeBody(_) => {
+                Self::DeserializeBody
             }
-            super::component::connection::join::HandleResponseError::Respond(e) => {
-                Self::from_respond(e)
+            super::component::connection::join::HandleResponseError::RespondOrFollowup(e) => {
+                Self::from_respond_or_followup(e)
             }
             super::component::connection::join::HandleResponseError::Followup(e) => {
                 Self::from_followup(e)
@@ -352,7 +367,7 @@ impl<'a> Fe<'a> {
 
     const fn from_join_residual(
         error: &'a super::component::connection::join::ResidualError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             super::component::connection::join::ResidualError::ImplJoin(e) => {
                 Self::from_impl_join_residual(e)
@@ -365,26 +380,27 @@ impl<'a> Fe<'a> {
 
     const fn from_pre_disconnect_cleanup(
         error: &'a super::component::connection::leave::PreDisconnectCleanupError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            super::component::connection::leave::PreDisconnectCleanupError::EventSend(e) => {
-                Self::EventSend(e)
+            super::component::connection::leave::PreDisconnectCleanupError::EventSend(_) => {
+                Self::EventSend
             }
-            super::component::connection::leave::PreDisconnectCleanupError::Lavalink(e) => {
-                Self::Lavalink(e)
+            super::component::connection::leave::PreDisconnectCleanupError::Lavalink(_) => {
+                Self::Lavalink
             }
         }
     }
 
     const fn from_leave_residual(
         error: &'a super::component::connection::leave::ResidualError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
+            super::component::connection::leave::ResidualError::GatewaySend(_) => Self::GatewaySend,
+            super::component::connection::leave::ResidualError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            }
             super::component::connection::leave::ResidualError::InVoiceWithoutUser(e) => {
                 Self::InVoiceWithoutUser(e)
-            }
-            super::component::connection::leave::ResidualError::GatewaySend(e) => {
-                Self::GatewaySend(e)
             }
             super::component::connection::leave::ResidualError::CheckUserOnlyIn(e) => {
                 Self::from_check_user_only_in(e)
@@ -395,21 +411,11 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_with_advance_lock_and_stopped(
-        error: &'a super::component::queue::remove::WithAdvanceLockAndStoppedError,
-    ) -> Fe<'a> {
-        match error {
-            super::component::queue::remove::WithAdvanceLockAndStoppedError::Lavalink(e) => {
-                Self::Lavalink(e)
-            }
-        }
-    }
-
     const fn from_handle_suppressed_auto_join(
         error: &'a util::HandleSuppressedAutoJoinError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
-            util::HandleSuppressedAutoJoinError::DeserializeBody(e) => Self::DeserializeBody(e),
+            util::HandleSuppressedAutoJoinError::DeserializeBody(_) => Self::DeserializeBody,
             util::HandleSuppressedAutoJoinError::FollowUp(e) => Self::from_followup(e),
             util::HandleSuppressedAutoJoinError::AutoJoinSuppressed(e) => {
                 Self::AutoJoinSuppressed(e)
@@ -421,7 +427,7 @@ impl<'a> Fe<'a> {
         error: &'a util::ResidualGetUsersVoiceChannelError,
     ) -> Self {
         match error {
-            util::ResidualGetUsersVoiceChannelError::Cache(e) => Self::Cache(e),
+            util::ResidualGetUsersVoiceChannelError::Cache(_) => Self::Cache,
         }
     }
 
@@ -435,10 +441,10 @@ impl<'a> Fe<'a> {
 
     const fn from_impl_connect_to_residual_2(error: &'a util::ResidualImplConnectToError) -> Self {
         match error {
-            util::ResidualImplConnectToError::Lavalink(e) => Self::Lavalink(e),
-            util::ResidualImplConnectToError::Cache(e) => Self::Cache(e),
-            util::ResidualImplConnectToError::GatewaySend(e) => Self::GatewaySend(e),
-            util::ResidualImplConnectToError::TwilightHttp(e) => Self::TwilightHttp(e),
+            util::ResidualImplConnectToError::Lavalink(_) => Self::Lavalink,
+            util::ResidualImplConnectToError::Cache(_) => Self::Cache,
+            util::ResidualImplConnectToError::GatewaySend(_) => Self::GatewaySend,
+            util::ResidualImplConnectToError::TwilightHttp(_) => Self::TwilightHttp,
             util::ResidualImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed_residual_2(e)
             }
@@ -464,7 +470,7 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_auto_join_attempt(error: &'a util::AutoJoinAttemptError) -> Fe<'a> {
+    const fn from_auto_join_attempt(error: &'a util::AutoJoinAttemptError) -> Self {
         match error {
             util::AutoJoinAttemptError::Failed(e) => Self::AutoJoinAttemptFailed(e),
             util::AutoJoinAttemptError::ImplAutoJoin(e) => Self::from_impl_auto_join_residual(e),
@@ -474,13 +480,13 @@ impl<'a> Fe<'a> {
 
     const fn from_auto_join_or_check_in_voice_with_user(
         error: &'a util::AutoJoinOrCheckInVoiceWithUserError,
-    ) -> Fe<'a> {
+    ) -> Self {
         match error {
             util::AutoJoinOrCheckInVoiceWithUserError::InVoiceWithoutUser(e) => {
                 Self::InVoiceWithoutUser(e)
             }
-            util::AutoJoinOrCheckInVoiceWithUserError::CheckNotSuppressed(e) => {
-                Self::from_check_not_suppressed_error(e)
+            util::AutoJoinOrCheckInVoiceWithUserError::RequireUnsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
             }
             util::AutoJoinOrCheckInVoiceWithUserError::HandleSuppressedAutoJoin(e) => {
                 Self::from_handle_suppressed_auto_join(e)
@@ -491,25 +497,25 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_play(error: &'a super::component::queue::play::Error) -> Fe<'a> {
+    const fn from_play(error: &'a super::component::queue::play::Error) -> Self {
         match error {
-            super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
-            super::component::queue::play::Error::CheckNotSuppressed(e) => {
-                Self::from_check_not_suppressed_error(e)
+            super::component::queue::play::Error::Lavalink(_) => Self::Lavalink,
+            super::component::queue::play::Error::RequireUnsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
             }
             super::component::queue::play::Error::Respond(e) => Self::from_respond(e),
-            super::component::queue::play::Error::Followup(e) => Self::from_followup(e),
+            super::component::queue::play::Error::RespondOrFollowup(e) => {
+                Self::from_respond_or_followup(e)
+            }
             super::component::queue::play::Error::AutoJoinOrCheckInVoiceWithUser(e) => {
                 Self::from_auto_join_or_check_in_voice_with_user(e)
             }
         }
     }
 
-    const fn from_remove_tracks(error: &'a super::component::queue::RemoveTracksError) -> Fe<'a> {
+    const fn from_remove_tracks(error: &'a super::component::queue::RemoveTracksError) -> Self {
         match error {
-            super::component::queue::RemoveTracksError::TryWithAdvanceLock(e) => {
-                Self::from_with_advance_lock_and_stopped(e)
-            }
+            super::component::queue::RemoveTracksError::Lavalink(_) => Self::Lavalink,
             super::component::queue::RemoveTracksError::Respond(e) => Self::from_respond(e),
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
             super::component::queue::RemoveTracksError::DeserializeBodyFromHttp(e) => {
@@ -522,30 +528,34 @@ impl<'a> Fe<'a> {
 impl Error {
     pub const fn flatten_as(&self) -> Fe<'_> {
         match self {
-            Self::UserNotAccessManager(e) => Fe::UserNotAccessManager(e),
-            Self::Sqlx(e) => Fe::Sqlx(e),
-            Self::TaskJoin(e) => Fe::TaskJoin(e),
-            Self::EmbedValidation(e) => Fe::EmbedValidation(e),
-            Self::NotInVoice(e) => Fe::NotInVoice(e),
-            Self::InVoiceWithoutUser(e) => Fe::InVoiceWithoutUser(e),
-            Self::QueueEmpty(e) => Fe::QueueEmpty(e),
+            Self::UserNotAccessManager(_) => Fe::UserNotAccessManager,
+            Self::Sqlx(_) => Fe::Sqlx,
+            Self::TaskJoin(_) => Fe::TaskJoin,
+            Self::EmbedValidation(_) => Fe::EmbedValidation,
+            Self::NotInVoice(_) => Fe::NotInVoice,
+            Self::QueueEmpty(_) => Fe::QueueEmpty,
+            Self::UserNotDj(_) => Fe::UserNotDj,
+            Self::TwilightHttp(_) => Fe::TwilightHttp,
+            Self::Lavalink(_) => Fe::Lavalink,
+            Self::NoPlayer(_) => Fe::NoPlayer,
+            Self::NotInGuild(_) => Fe::NotInGuild,
+            Self::Cache(_) => Fe::Cache,
+            Self::NotPlaying(_) => Fe::NotPlaying,
+            Self::Paused(_) => Fe::Paused,
+            Self::UnrecognisedConnection(_) => Fe::UnrecognisedConnection,
             Self::PositionOutOfRange(e) => Fe::PositionOutOfRange(e),
-            Self::UserNotDj(e) => Fe::UserNotDj(e),
-            Self::TwilightHttp(e) => Fe::TwilightHttp(e),
-            Self::Lavalink(e) => Fe::Lavalink(e),
-            Self::NoPlayer(e) => Fe::NoPlayer(e),
-            Self::NotInGuild(e) => Fe::NotInGuild(e),
-            Self::Cache(e) => Fe::Cache(e),
-            Self::CheckNotSuppressed(e) => Fe::from_check_not_suppressed_error(e),
+            Self::InVoiceWithoutUser(e) => Fe::InVoiceWithoutUser(e),
+            Self::RequireUnsuppressed(e) => Fe::from_require_unsuppressed_error(e),
             Self::CheckUsersTrack(e) => Fe::from_users_track_error(e),
-            Self::InVoiceWithSomeoneElse(e) => Fe::from_in_voice_with_someone_else_error(e),
+            Self::RequireInVoiceWithSomeoneElse(e) => {
+                Fe::from_require_in_voice_with_someone_else_error(e)
+            }
             Self::CheckRun(e) => Fe::from_run(e),
             Self::Respond(e) => Fe::from_respond(e),
             Self::Followup(e) => Fe::from_followup(e),
             Self::PromptForConfirmation(e) => Fe::from_prompt_for_confirmation(e),
             Self::Join(e) => Fe::from_join_residual(e),
             Self::Leave(e) => Fe::from_leave_residual(e),
-            Self::WithAdvanceLockAndStopped(e) => Fe::from_with_advance_lock_and_stopped(e),
             Self::Play(e) => Fe::from_play(e),
             Self::DeserializeBodyFromHttp(e) => Fe::from_deserialize_body_from_http_error(e),
             Self::RemoveTracks(e) => Fe::from_remove_tracks(e),

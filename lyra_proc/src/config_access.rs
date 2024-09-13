@@ -20,18 +20,12 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
         })
         .map(|c| format!("{c}_access"));
 
-    let access_queries = column_names.clone().map(|t| {
-        format!(
-            r"--sql
-            SELECT id FROM {t} WHERE guild = $1;
-            ",
-        )
-    });
+    let access_queries = column_names
+        .clone()
+        .map(|t| format!("SELECT id FROM {t} WHERE guild = $1;",));
 
     let mode_queries = format!(
-        r"--sql
-        SELECT {} FROM guild_configs WHERE id = $1
-        ",
+        "SELECT {} FROM guild_configs WHERE id = $1",
         column_names.clone().join(", ")
     );
 
