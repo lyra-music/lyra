@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"

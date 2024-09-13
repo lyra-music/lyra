@@ -1286,7 +1286,7 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
 name = "lyra"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -1332,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "lyra_ext"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "bitflags 2.6.0",
  "const-str",
@@ -1350,7 +1350,7 @@ dependencies = [
 
 [[package]]
 name = "lyra_proc"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "heck",
  "itertools",

@@ -1,6 +1,6 @@
 [package]
 name = "lyra_ext"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 
 [lints.rust]
