@@ -15,7 +15,7 @@ use twilight_model::{
     application::interaction::{Interaction, InteractionData},
     channel::message::{
         component::{ActionRow, Button, ButtonStyle},
-        Component, Embed, ReactionType,
+        Component, Embed, EmojiReactionType,
     },
     guild::Permissions,
     id::{
@@ -280,22 +280,24 @@ fn generate_upvote_button_id_and_row() -> (String, Component) {
     let upvote_button = Component::Button(Button {
         custom_id: Some(upvote_button_id.clone()),
         disabled: false,
-        emoji: Some(ReactionType::Unicode {
+        emoji: Some(EmojiReactionType::Unicode {
             name: String::from("➕"),
         }),
         label: None,
         style: ButtonStyle::Primary,
         url: None,
+        sku_id: None,
     });
     let downvote_button = Component::Button(Button {
         custom_id: Some(downvote_button_id),
         disabled: false,
-        emoji: Some(ReactionType::Unicode {
+        emoji: Some(EmojiReactionType::Unicode {
             name: String::from("➖"),
         }),
         label: None,
         style: ButtonStyle::Danger,
         url: None,
+        sku_id: None,
     });
     let row = Component::ActionRow(ActionRow {
         components: vec![upvote_button, downvote_button],

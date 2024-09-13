@@ -9,6 +9,7 @@ pub struct NoPlayerError;
 pub enum ProcessError {
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
     TwilightHttp(#[from] twilight_http::Error),
+    Sqlx(#[from] sqlx::Error),
 }
 
 pub type ProcessResult = Result<(), ProcessError>;

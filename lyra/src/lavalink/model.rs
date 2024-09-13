@@ -13,6 +13,7 @@ use lavalink_rs::{
     player_context::PlayerContext,
 };
 use lyra_ext::time::track_timestamp::TrackTimestamp;
+use sqlx::{Pool, Postgres};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use twilight_http::Client;
 use twilight_model::id::{
@@ -474,6 +475,7 @@ impl GetConnection for PartialInVoice {}
 
 pub struct ClientData {
     http: Arc<Client>,
+    db: Pool<Postgres>,
 }
 
 impl HttpAware for ClientData {
@@ -483,7 +485,11 @@ impl HttpAware for ClientData {
 }
 
 impl ClientData {
-    pub const fn new(http: Arc<Client>) -> Self {
-        Self { http }
+    pub const fn new(http: Arc<Client>, db: Pool<Postgres>) -> Self {
+        Self { http, db }
+    }
+
+    pub const fn db(&self) -> &Pool<Postgres> {
+        &self.db
     }
 }

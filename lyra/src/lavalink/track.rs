@@ -3,6 +3,7 @@ use lavalink_rs::{
     hook,
     model::events::{TrackEnd, TrackException, TrackStart, TrackStuck},
 };
+use lyra_ext::num::u64_to_i64_truncating;
 
 use crate::{
     core::model::HttpAware,
@@ -29,6 +30,21 @@ async fn impl_start(lavalink: LavalinkClient, _: String, event: &TrackStart) -> 
         .write()
         .await
         .reset_track_timestamp();
+
+    let Some(track) = player.data_unwrapped().read().await.queue().current() else {
+        return Ok(());
+    };
+
+    let rec = sqlx::query!(
+        "SELECT now_playing FROM guild_configs WHERE id = $1;",
+        u64_to_i64_truncating(guild_id.0)
+    )
+    .fetch_one(lavalink.data_unwrapped().db())
+    .await?;
+
+    if !rec.now_playing {
+        return Ok(());
+    }
 
     Ok(())
 }

@@ -57,7 +57,7 @@ macro_rules! declare_slash_commands {
             }
         });
 
-        pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<Box<str>, Command>> = OnceLock::new();
+        pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
 
         $(
             impl CommandInfoAware for $raw_cmd {

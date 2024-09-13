@@ -64,21 +64,23 @@ itertools = "0.13.0"
 rayon = "1.10.0"
 sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls"] }
 mixbox = "2.0.0"
-lavalink-rs = { version = "0.13.0", features = ["twilight16"] }
+lavalink-rs = { git = "https://github.com/lyra-music/lavalink-rs", branch = "lyra", features = [
+    "twilight16",
+] }
 aho-corasick = "1.1.3"
 
-twilight = "0.16.0-rc.1"
-twilight-cache-inmemory = { version = "0.16.0-rc.1", features = [
+twilight = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-cache-inmemory = { git = "https://github.com/lyra-music/twilight", branch = "lyra", features = [
     "permission-calculator",
 ] }
-twilight-gateway = "0.16.0-rc.1"
-twilight-http = "0.16.0-rc.1"
-twilight-model = "0.16.0-rc.1"
-twilight-standby = "0.16.0-rc.1"
-twilight-validate = "0.16.0-rc.1"
-twilight-mention = "0.16.0-rc.1"
-twilight-util = { version = "0.16.0-rc.1", features = [
+twilight-gateway = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-http = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-model = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-standby = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-validate = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-mention = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-util = { git = "https://github.com/lyra-music/twilight", branch = "lyra", features = [
     "permission-calculator",
     "builder",
 ] }
-twilight-interactions = "0.16.0-rc.1"
+twilight-interactions = { git = "https://github.com/lyra-music/twilight-interactions", branch = "lyra" }

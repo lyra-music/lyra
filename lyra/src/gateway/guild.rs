@@ -1,6 +1,9 @@
 use lyra_ext::num::u64_to_i64_truncating;
 use twilight_gateway::ShardId;
-use twilight_model::gateway::payload::incoming::{GuildCreate, GuildDelete};
+use twilight_model::{
+    gateway::payload::incoming::{GuildCreate, GuildDelete},
+    guild::Guild,
+};
 
 use super::model::Process;
 use crate::{
@@ -17,9 +20,12 @@ pub(super) struct CreateContext<'a> {
 impl CreateContext<'_> {
     async fn increment_guild_count(&self) -> Result<(), sqlx::Error> {
         /* FIXME: wait until twilight stop deserializing missing `Guild::unavailable` to false:
-            https://github.com/twilight-rs/twilight/pull/2330
+           https://github.com/twilight-rs/twilight/issues/2372
         */
-        if !self.inner.unavailable {
+        if let GuildCreate::Available(Guild {
+            unavailable: false, ..
+        }) = self.inner
+        {
             return Ok(());
         }
 
@@ -31,7 +37,7 @@ impl CreateContext<'_> {
                 NOT EXISTS (
                     SELECT 1 FROM guild_configs WHERE id = $1
                 );",
-            u64_to_i64_truncating(self.inner.id.get())
+            u64_to_i64_truncating(self.inner.id().get())
         )
         .execute(self.bot.db())
         .await?;

@@ -374,7 +374,7 @@ impl<'a> Client<'a> {
         POPULATED_COMMANDS_MAP.get_or_init(|| {
             commands
                 .into_iter()
-                .map(|c| (c.name.clone().into(), c))
+                .map(|c| (&*c.name.clone().leak(), c))
                 .collect()
         });
 

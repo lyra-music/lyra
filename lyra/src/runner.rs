@@ -15,9 +15,8 @@ use sqlx::{
 };
 use tokio::task::JoinHandle;
 use twilight_gateway::{
-    error::{ReceiveMessageErrorType, StartRecommendedError},
-    CloseFrame, Config as ShardConfig, ConfigBuilder, Event, EventTypeFlags, Intents,
-    MessageSender, Shard, StreamExt,
+    error::StartRecommendedError, CloseFrame, Config as ShardConfig, ConfigBuilder, Event,
+    EventTypeFlags, Intents, MessageSender, Shard, StreamExt,
 };
 use twilight_http::{client::ClientBuilder, Client};
 use twilight_model::{
@@ -98,7 +97,7 @@ pub async fn start() -> Result<(), StartError> {
     let http = build_http_client();
 
     let user_id = http.current_user().await?.model().await?.id;
-    let data = ClientData::new(http.clone());
+    let data = ClientData::new(http.clone(), db.clone());
     let lavalink = build_lavalink_client(user_id, data).await;
 
     let shards = build_and_split_shards(&http).await?;
@@ -149,12 +148,6 @@ async fn handle_gateway_events(mut shard: Shard, bot: Arc<BotState>) {
         let event = match item {
             Ok(Event::GatewayClose(_)) if SHUTDOWN.load(Ordering::Relaxed) => break,
             Ok(event) => event,
-            Err(source)
-                if SHUTDOWN.load(Ordering::Relaxed)
-                    && matches!(source.kind(), ReceiveMessageErrorType::WebSocket) =>
-            {
-                break
-            }
             Err(source) => {
                 tracing::warn!(?source, "error receiving event");
 

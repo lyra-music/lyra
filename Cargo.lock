@@ -67,9 +67,9 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
 name = "anyhow"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10f00e1f6e58a40e807377c75c6a7f97bf9044fab57816f2414e6f5f4499d7b8"
+checksum = "4e1496f8fb1fbf272686b8d37f523dab3e4a7443300055e74cdaa449f3114356"
 
 [[package]]
 name = "approx"
@@ -165,21 +165,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "brotli"
-version = "3.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d640d25bc63c50fb1f0b545ffd80207d2e10a4c965530809b40ba3386825c391"
-dependencies = [
- "alloc-no-stdlib",
- "alloc-stdlib",
- "brotli-decompressor",
-]
-
-[[package]]
 name = "brotli-decompressor"
-version = "2.5.1"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2e4afe60d7dd600fdd3de8d0f08c2b7ec039712e3b6137ff98b7004e82de4f"
+checksum = "9a45bd2e4095a8b518033b128020dd4a55aab1c0a381ba4404a472630f4bc362"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -835,14 +824,14 @@ dependencies = [
 
 [[package]]
 name = "getset"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e45727250e75cc04ff2846a66397da8ef2b3db8e40e0cef4df67950a07621eb9"
+checksum = "f636605b743120a8d32ed92fc27b6cde1a769f8f936c065151eb66f88ded513c"
 dependencies = [
- "proc-macro-error",
+ "proc-macro-error2",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.77",
 ]
 
 [[package]]
@@ -1051,7 +1040,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-util",
- "rustls 0.23.12",
+ "rustls 0.23.13",
  "rustls-native-certs 0.8.0",
  "rustls-pki-types",
  "tokio",
@@ -1061,9 +1050,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cde7055719c54e36e95e8719f95883f22072a48ede39db7fc17a4e1d5281e9b9"
+checksum = "da62f120a8a37763efb0cf8fdf264b884c7b8b9ac8660b900c8661030c00e6ba"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1173,8 +1162,7 @@ dependencies = [
 [[package]]
 name = "lavalink-rs"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eded9801aae30b05b30dc854b0b9a3e96f73626c4e73a7b13a2ee8c4740edb25"
+source = "git+https://github.com/lyra-music/lavalink-rs?branch=lyra#fb9498b5d54213ece85097bd608e235a7afdb98e"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -1758,27 +1746,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-error"
-version = "1.0.4"
+name = "proc-macro-error-attr2"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
 dependencies = [
- "proc-macro-error-attr",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
- "version_check",
 ]
 
 [[package]]
-name = "proc-macro-error-attr"
-version = "1.0.4"
+name = "proc-macro-error2"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
 dependencies = [
+ "proc-macro-error-attr2",
  "proc-macro2",
  "quote",
- "version_check",
+ "syn 2.0.77",
 ]
 
 [[package]]
@@ -1851,9 +1837,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a908a6e00f1fdd0dfd9c0eb08ce85126f6d8bbda50017e74bc4a4b7d4a926a4"
+checksum = "0884ad60e090bf1345b93da0a5de8923c93884cd03f40dfcfddd3b4bee661853"
 dependencies = [
  "bitflags 2.6.0",
 ]
@@ -1990,9 +1976,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.36"
+version = "0.38.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f55e80d50763938498dd5ebb18647174e0c76dc38c5505294bb224624f30f36"
+checksum = "8acb788b847c24f28525660c4d7758620a7210875711f79e7f663cc152726811"
 dependencies = [
  "bitflags 2.6.0",
  "errno",
@@ -2017,9 +2003,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.12"
+version = "0.23.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c58f8c84392efc0a126acce10fa59ff7b3d2ac06ab451a33f2741989b806b044"
+checksum = "f2dabaac7466917e566adb06783a81ca48944c6898a1b08b9374106dd671f4c8"
 dependencies = [
  "once_cell",
  "ring",
@@ -2073,9 +2059,9 @@ checksum = "fc0a2ce646f8655401bb81e7927b812614bd5d91dbc968696be50603510fcaf0"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.102.7"
+version = "0.102.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84678086bd54edf2b415183ed7a94d0efb049f1b646a33e22a36f3794be6ae56"
+checksum = "64ca1bc8749bd4cf37b5ce386cc146580777b4e8572c7b97baf22c83f444bee9"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -2397,7 +2383,7 @@ dependencies = [
  "once_cell",
  "paste",
  "percent-encoding",
- "rustls 0.23.12",
+ "rustls 0.23.13",
  "rustls-pemfile",
  "serde",
  "serde_json",
@@ -2760,7 +2746,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
 dependencies = [
- "rustls 0.23.12",
+ "rustls 0.23.13",
  "rustls-pki-types",
  "tokio",
 ]
@@ -2807,9 +2793,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-websockets"
-version = "0.5.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b069bad86dda43d908b4221fe04fe49d2ed8e0a24d319a5c6a8d250e76fe15b"
+checksum = "988c6e20955aa5043e0822cb27093ebaabb430a126cda0223824b6d65ea900c1"
 dependencies = [
  "base64 0.21.7",
  "bytes",
@@ -2992,14 +2978,12 @@ dependencies = [
 [[package]]
 name = "twilight"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f917ea79e3c1cb325a5cd060e8d3b9f6872ae124a3e1e1192c0e17b3b0a20132"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 
 [[package]]
 name = "twilight-cache-inmemory"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a997fdd14e32ebbe80ee87887720e756efed0a7dbf97bd1170eb7c9a3956378b"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags 2.6.0",
  "dashmap 5.5.3",
@@ -3011,8 +2995,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b3edd60e2b95ec0d651c475dacad8a75e4780d900f8f2ea0f4c215182d920fc"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags 2.6.0",
  "fastrand",
@@ -3032,8 +3015,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway-queue"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d30e99f204d3803b47c679214ba9e9527cfb1dd0b0deccbe821f7e4682d9a2"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "tokio",
  "tracing",
@@ -3042,10 +3024,9 @@ dependencies = [
 [[package]]
 name = "twilight-http"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a03a8133c9ae23510aa6bbe81ca7c4d5bc6fc45c52075d350fd0578b71397413"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
- "brotli",
+ "brotli-decompressor",
  "fastrand",
  "http",
  "http-body-util",
@@ -3065,8 +3046,7 @@ dependencies = [
 [[package]]
 name = "twilight-http-ratelimiting"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f814c51752ba6838d3b32e82638176de9679e9a2a084a65251b7879281bdc6"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "tokio",
  "tracing",
@@ -3075,8 +3055,7 @@ dependencies = [
 [[package]]
 name = "twilight-interactions"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc671758050eefe63e2b87f6af2fc1807ac3ac373bbafff1ae1a4cc4af6cb722"
+source = "git+https://github.com/lyra-music/twilight-interactions?branch=lyra#068a8459d4529134d4c655d6e823037e6b697d44"
 dependencies = [
  "twilight-interactions-derive",
  "twilight-model",
@@ -3085,8 +3064,7 @@ dependencies = [
 [[package]]
 name = "twilight-interactions-derive"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c07ac7c9d2d086291765ceecafcd52ce6dc33ab0ade02e06509eb416d88470"
+source = "git+https://github.com/lyra-music/twilight-interactions?branch=lyra#068a8459d4529134d4c655d6e823037e6b697d44"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3096,8 +3074,7 @@ dependencies = [
 [[package]]
 name = "twilight-mention"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dc35d15fbaf51d2a4a0ca961e746bca9a01f26f338f99d9134c15b6561b4c5b"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
 ]
@@ -3105,8 +3082,7 @@ dependencies = [
 [[package]]
 name = "twilight-model"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5eaf296e6aa8784699046bb1ceb33f3c684a59c4657c2b159eb4ec1e1ce44a49"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags 2.6.0",
  "serde",
@@ -3118,8 +3094,7 @@ dependencies = [
 [[package]]
 name = "twilight-standby"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e968572b4e0c2b0e7a05b4b31b1cbc767c7ec0df0407410045ae8c267af6e1fd"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "dashmap 5.5.3",
  "futures-core",
@@ -3131,8 +3106,7 @@ dependencies = [
 [[package]]
 name = "twilight-util"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8a5a519ea63090a9e009974bf25e8cb3be9284da7248011ed37377d4180295"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
  "twilight-validate",
@@ -3141,8 +3115,7 @@ dependencies = [
 [[package]]
 name = "twilight-validate"
 version = "0.16.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d71bf2b683421a1674080e821eef108a35cef841ed73562f835bc5cdd478b49"
+source = "git+https://github.com/lyra-music/twilight?branch=lyra#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
 ]
@@ -3176,9 +3149,9 @@ checksum = "08f95100a766bf4f8f28f90d77e0a5461bbdb219042e7679bebe79004fed8d75"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.12"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
 
 [[package]]
 name = "unicode-normalization"

@@ -1,3 +1,4 @@
+mod emoji;
 mod interaction;
 
 use std::{
@@ -10,13 +11,16 @@ use std::{
 
 use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
+use tokio::sync::OnceCell;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::ShardId;
 use twilight_http::Client;
 use twilight_model::{
-    guild::Permissions,
-    id::{marker::UserMarker, Id},
-    oauth::Application,
+    guild::{Emoji, Permissions},
+    id::{
+        marker::{ApplicationMarker, UserMarker},
+        Id,
+    },
     user::CurrentUser,
 };
 use twilight_standby::Standby;
@@ -132,6 +136,8 @@ pub struct BotState {
     lavalink: Lavalink,
     db: Pool<Postgres>,
     info: BotInfo,
+    application_id: OnceCell<Id<ApplicationMarker>>,
+    application_emojis: OnceCell<&'static [Emoji]>,
 }
 
 impl BotState {
@@ -148,6 +154,8 @@ impl BotState {
             lavalink,
             db,
             info,
+            application_id: OnceCell::new(),
+            application_emojis: OnceCell::new(),
         }
     }
 
@@ -163,13 +171,33 @@ impl BotState {
         &self.info
     }
 
-    async fn app(&self) -> Result<Application, DeserializeBodyFromHttpError> {
-        Ok(self.http.current_user_application().await?.model().await?)
+    pub async fn application_id(
+        &self,
+    ) -> Result<Id<ApplicationMarker>, DeserializeBodyFromHttpError> {
+        self.application_id
+            .get_or_try_init(|| async {
+                let application = self.http.current_user_application().await?.model().await?;
+                Ok(application.id)
+            })
+            .await
+            .copied()
+    }
+
+    pub async fn application_emojis(
+        &self,
+    ) -> Result<&'static [Emoji], DeserializeBodyFromHttpError> {
+        self.application_emojis
+            .get_or_try_init(|| async {
+                let application_id = self.application_id().await?;
+                let req = self.http.get_application_emojis(application_id);
+                Ok(&*req.await?.models().await?.leak())
+            })
+            .await
+            .copied()
     }
 
     pub async fn interaction(&self) -> Result<InteractionClient, DeserializeBodyFromHttpError> {
-        let client = self.http.interaction(self.app().await?.id);
-
+        let client = self.http.interaction(self.application_id().await?);
         Ok(InteractionClient::new(client))
     }
 
