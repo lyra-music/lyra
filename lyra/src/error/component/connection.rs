@@ -262,7 +262,7 @@ pub mod join {
 pub mod leave {
     #[derive(thiserror::Error, Debug)]
     #[error(transparent)]
-    pub enum PreDisconnectCleanupError {
+    pub enum DisconnectCleanupError {
         EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
     }
@@ -273,7 +273,7 @@ pub mod leave {
         NotInVoice(#[from] crate::error::NotInVoice),
         InVoiceWithoutUser(#[from] crate::error::InVoiceWithoutUser),
         CheckUserOnlyIn(#[from] crate::error::command::check::UserOnlyInError),
-        PreDisconnectCleanup(#[from] PreDisconnectCleanupError),
+        DisconnectCleanup(#[from] DisconnectCleanupError),
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
         UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
@@ -288,8 +288,8 @@ pub mod leave {
                 Self::CheckUserOnlyIn(e) => {
                     NotInVoiceMatchedError::Other(ResidualError::CheckUserOnlyIn(e))
                 }
-                Self::PreDisconnectCleanup(e) => {
-                    NotInVoiceMatchedError::Other(ResidualError::PreDisconnectCleanupError(e))
+                Self::DisconnectCleanup(e) => {
+                    NotInVoiceMatchedError::Other(ResidualError::DisconnectCleanupError(e))
                 }
                 Self::GatewaySend(e) => {
                     NotInVoiceMatchedError::Other(ResidualError::GatewaySend(e))
@@ -311,7 +311,7 @@ pub mod leave {
     pub enum ResidualError {
         InVoiceWithoutUser(#[from] crate::error::InVoiceWithoutUser),
         CheckUserOnlyIn(#[from] crate::error::command::check::UserOnlyInError),
-        PreDisconnectCleanupError(#[from] PreDisconnectCleanupError),
+        DisconnectCleanupError(#[from] DisconnectCleanupError),
         GatewaySend(#[from] twilight_gateway::error::ChannelError),
         UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
     }
@@ -326,7 +326,7 @@ pub enum StartInactivityTimeoutError {
     GatewaySend(#[from] twilight_gateway::error::ChannelError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Http(#[from] twilight_http::Error),
-    PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),
+    DisconnectCleanup(#[from] leave::DisconnectCleanupError),
 }
 
 #[derive(Error, Debug)]
@@ -336,7 +336,7 @@ pub enum HandleVoiceStateUpdateError {
     Http(#[from] twilight_http::Error),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     MatchStateChannelID(#[from] MatchStateChannelIdError),
-    PreDisconnectCleanup(#[from] leave::PreDisconnectCleanupError),
+    DisconnectCleanup(#[from] leave::DisconnectCleanupError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
 }
 

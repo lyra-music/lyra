@@ -126,7 +126,7 @@ async fn generate_now_playing_embed(
             .and_then(|info| info.album_name.as_ref())
             .map_or_else(String::new, |name| format!("📀 **{name}**\n"));
         format!(
-            "{}#️⃣ {} / {} ⏳ {} / {}",
+            "{}#️⃣ **{}** / {} ⏳ {} / {}",
             album_info,
             queue_position,
             queue_len,
@@ -184,7 +184,7 @@ async fn generate_now_playing_embed(
     }
     if let Some(url) = plugin_info
         .as_ref()
-        .and_then(|info| info.artist_artwork_uri.as_ref())
+        .and_then(|info| info.artist_artwork_url.as_ref())
     {
         author = author.icon_url(ImageSource::url(url)?);
     }

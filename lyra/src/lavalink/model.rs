@@ -414,15 +414,11 @@ impl Lavalink {
         self.inner.delete_player(guild_id).await
     }
 
-    pub fn iter_player_data(
-        &self,
-    ) -> impl Iterator<Item = (LavalinkGuildId, Option<OwnedPlayerData>)> + '_ {
-        self.inner.players.iter().map(|p| {
-            (
-                *p.key(),
-                p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()),
-            )
-        })
+    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + '_ {
+        self.inner
+            .players
+            .iter()
+            .filter_map(|p| p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()))
     }
 }
 

@@ -15,12 +15,13 @@ use crate::{
         model::{BotSlashCommand, CtxKind, GuildCtx},
         require, SlashCtx,
     },
+    core::model::HttpAware,
     error::{
-        component::connection::leave::{self, PreDisconnectCleanupError},
+        component::connection::leave::{self, DisconnectCleanupError},
         CommandResult,
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::Event,
+    lavalink::{delete_now_playing_message, DelegateMethods, Event, UnwrappedData},
     LavalinkAware,
 };
 
@@ -39,15 +40,18 @@ pub(super) fn disconnect(cx: &(impl SenderAware + GuildIdAware)) -> Result<(), C
     Ok(())
 }
 
-pub(super) async fn pre_disconnect_cleanup(
-    cx: &(impl GuildIdAware + LavalinkAware + Sync),
-) -> Result<(), PreDisconnectCleanupError> {
+pub(super) async fn disconnect_cleanup(
+    cx: &(impl HttpAware + GuildIdAware + LavalinkAware + Sync),
+) -> Result<(), DisconnectCleanupError> {
     let guild_id = cx.guild_id();
     let lavalink = cx.lavalink();
 
     if let Some(connection) = lavalink.get_connection(guild_id) {
         connection.dispatch(Event::QueueClear);
     };
+    if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
+        delete_now_playing_message(cx.http(), &player_ctx.data_unwrapped()).await;
+    }
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;
 
@@ -64,7 +68,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
 
     connection.notify_change();
     drop(connection);
-    pre_disconnect_cleanup(ctx).await?;
+    disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 
     let response = LeaveResponse(channel_id);

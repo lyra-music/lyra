@@ -24,7 +24,7 @@ use crate::{
     command::require,
     component::connection::{
         join::JoinedChannelType,
-        leave::{disconnect, pre_disconnect_cleanup, LeaveResponse},
+        leave::{disconnect, disconnect_cleanup, LeaveResponse},
     },
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
@@ -128,7 +128,7 @@ async fn start_inactivity_timeout(
         return Ok(());
     };
     connection.notify_change();
-    pre_disconnect_cleanup(&ctx).await?;
+    disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
     let response = LeaveResponse(channel_id);
@@ -195,7 +195,7 @@ pub async fn handle_voice_state_update(
             return Ok(());
         }
         Some(old_state) if state.channel_id.is_none() => {
-            pre_disconnect_cleanup(ctx).await?;
+            disconnect_cleanup(ctx).await?;
 
             let old_channel_id = old_state.channel_id();
             let response = LeaveResponse(old_channel_id);

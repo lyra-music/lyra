@@ -379,13 +379,13 @@ impl<'a> Fe<'a> {
     }
 
     const fn from_pre_disconnect_cleanup(
-        error: &'a super::component::connection::leave::PreDisconnectCleanupError,
+        error: &'a super::component::connection::leave::DisconnectCleanupError,
     ) -> Self {
         match error {
-            super::component::connection::leave::PreDisconnectCleanupError::EventSend(_) => {
+            super::component::connection::leave::DisconnectCleanupError::EventSend(_) => {
                 Self::EventSend
             }
-            super::component::connection::leave::PreDisconnectCleanupError::Lavalink(_) => {
+            super::component::connection::leave::DisconnectCleanupError::Lavalink(_) => {
                 Self::Lavalink
             }
         }
@@ -405,7 +405,7 @@ impl<'a> Fe<'a> {
             super::component::connection::leave::ResidualError::CheckUserOnlyIn(e) => {
                 Self::from_check_user_only_in(e)
             }
-            super::component::connection::leave::ResidualError::PreDisconnectCleanupError(e) => {
+            super::component::connection::leave::ResidualError::DisconnectCleanupError(e) => {
                 Self::from_pre_disconnect_cleanup(e)
             }
         }
