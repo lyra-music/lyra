@@ -18,11 +18,7 @@ use crate::{
     component::config::access::CalculatorBuilder,
     core::{
         model::{
-            AuthorIdAware,
-            AuthorPermissionsAware,
-            BotState,
-            // CacheAware,
-            OwnedBotStateAware,
+            AuthorIdAware, AuthorPermissionsAware, BotState, DatabaseAware, OwnedBotStateAware,
         },
         traced,
     },

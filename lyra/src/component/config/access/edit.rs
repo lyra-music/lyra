@@ -24,7 +24,7 @@ use crate::{
         model::BotSlashCommand,
         require, SlashCtx,
     },
-    core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+    core::{model::DatabaseAware, r#const::text::NO_ROWS_AFFECTED_MESSAGE},
     error::CommandResult,
     gateway::GuildIdAware,
 };

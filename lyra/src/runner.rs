@@ -14,6 +14,7 @@ use sqlx::{
     ConnectOptions,
 };
 use tokio::task::JoinHandle;
+use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::{
     error::StartRecommendedError, CloseFrame, Config as ShardConfig, ConfigBuilder, Event,
     EventTypeFlags, Intents, MessageSender, Shard, StreamExt,
@@ -96,15 +97,16 @@ pub async fn start() -> Result<(), StartError> {
 
     let http = build_http_client();
 
+    let cache = Arc::new(InMemoryCache::new());
+    let data = ClientData::new(http.clone(), cache.clone(), db.clone());
     let user_id = http.current_user().await?.model().await?.id;
-    let data = ClientData::new(http.clone(), db.clone());
     let lavalink = build_lavalink_client(user_id, data).await;
 
     let shards = build_and_split_shards(&http).await?;
     let shards_len = shards.len();
     let mut senders = Vec::with_capacity(shards_len);
     let mut tasks = Vec::with_capacity(shards_len);
-    let bot = Arc::new(BotState::new(db, http, lavalink));
+    let bot = Arc::new(BotState::new(db, http, cache, lavalink));
     bot.interaction().await?.register_global_commands().await?;
 
     for shard in shards {
@@ -113,7 +115,7 @@ pub async fn start() -> Result<(), StartError> {
     }
 
     println!("{}", *BANNER);
-    Ok(wait_until_shutdown(senders, tasks).await?)
+    Ok(wait_until_shutdown(senders, tasks, &bot).await?)
 }
 
 async fn build_and_split_shards(
@@ -206,17 +208,35 @@ async fn wait_for_signal() -> Result<(), WaitForSignalError> {
 async fn wait_until_shutdown(
     senders: Vec<MessageSender>,
     tasks: Vec<JoinHandle<()>>,
+    bot: &BotState,
 ) -> Result<(), WaitUntilShutdownError> {
     wait_for_signal().await?;
-    tracing::info!("gracefully shutting down...");
     SHUTDOWN.store(true, Ordering::Relaxed);
+    tracing::info!("gracefully shutting down...");
+
+    tracing::debug!("deleting all now playing messages...");
+    delete_now_playing_messages(bot).await?;
+
+    tracing::debug!("sending close frames to all shards...");
     for sender in senders {
         let _ = sender.close(CloseFrame::NORMAL);
     }
+
+    tracing::debug!("killing all shard gateway event handlers...");
     for jh in tasks {
         let _ = jh.await;
     }
 
     tracing::info!("shut down gracefully");
+    Ok(())
+}
+
+async fn delete_now_playing_messages(bot: &BotState) -> Result<(), sqlx::Error> {
+    for (guild_id, data) in bot.lavalink().iter_player_data() {
+        let Some(data) = data else {
+            continue;
+        };
+        crate::lavalink::delete_now_playing_message(bot, &data, guild_id).await?;
+    }
     Ok(())
 }

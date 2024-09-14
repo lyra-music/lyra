@@ -84,3 +84,5 @@ twilight-util = { git = "https://github.com/lyra-music/twilight", branch = "lyra
     "builder",
 ] }
 twilight-interactions = { git = "https://github.com/lyra-music/twilight-interactions", branch = "lyra" }
+reqwest = "0.12.7"
+moka = { version = "0.12.8", features = ["future"] }

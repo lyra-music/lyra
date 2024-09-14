@@ -385,17 +385,17 @@ async fn play(
 
             let total_tracks = Vec::from(results);
             // SAFETY: at least one tracks must be loaded, so this unwrap is safe
-            let first_track = unsafe { total_tracks.first().unwrap_unchecked() };
+            let first_track = unsafe { total_tracks.first().unwrap_unchecked() }.clone();
 
             let player = util::auto_new_player(ctx).await?;
 
-            player.play(first_track).await?;
             player
                 .data_unwrapped()
                 .write()
                 .await
                 .queue_mut()
                 .enqueue(total_tracks, ctx.author_id());
+            player.play(&first_track).await?;
 
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }

@@ -1,7 +1,12 @@
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
 use lyra_ext::unix_time;
 use rand::{distributions::Alphanumeric, Rng};
+use twilight_cache_inmemory::model::CachedMember;
 use twilight_gateway::Event;
+use twilight_mention::{
+    timestamp::{Timestamp, TimestampStyle},
+    Mention,
+};
 use twilight_model::{
     application::interaction::{InteractionData, InteractionType},
     channel::{
@@ -178,6 +183,15 @@ impl GuildAvatarUrlAware for PartialMember {
     }
 }
 
+impl GuildAvatarUrlAware for CachedMember {
+    fn id(&self) -> Id<UserMarker> {
+        self.user_id()
+    }
+    fn avatar(&self) -> Option<ImageHash> {
+        self.avatar()
+    }
+}
+
 pub trait DefaultAvatarUrlAware {
     fn id(&self) -> Id<UserMarker>;
     fn discriminator(&self) -> u16;
@@ -255,11 +269,12 @@ async fn handle_suppressed_auto_join(
                             && !e.suppress
                     });
 
+            let duration = unix_time() + r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT;
+            let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
             let requested_to_speak = note_fol!(
                 &format!(
-                    "Requested to speak. **Accept the request in <t:{}:R> to continue.**",
-                    unix_time().as_secs()
-                        + u64::from(r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS)
+                    "Requested to speak. **Accept the request in {} to continue.**",
+                    timestamp.mention()
                 ),
                 ?ctx
             );

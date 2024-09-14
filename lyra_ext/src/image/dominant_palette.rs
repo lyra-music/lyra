@@ -1,14 +1,17 @@
-use image::DynamicImage;
+use image::{DynamicImage, ImageResult};
 use kmeans_colors::Sort;
 use palette::{cast::from_component_slice, FromColor, IntoColor, Lab, Srgb, Srgba};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-pub trait DominantPalette {
-    fn dominant_palette(&self, palette_size: usize) -> Vec<Srgb<u8>>;
+pub type DominantColour = Srgb<u8>;
+pub type DominantPalette = Vec<DominantColour>;
+
+pub trait Get {
+    fn get_dominant_palette(&self, palette_size: usize) -> DominantPalette;
 }
 
-impl DominantPalette for DynamicImage {
-    fn dominant_palette(&self, palette_size: usize) -> Vec<Srgb<u8>> {
+impl Get for DynamicImage {
+    fn get_dominant_palette(&self, palette_size: usize) -> DominantPalette {
         const MAX_ITERATIONS: usize = usize::MAX;
         const RESIZE: u32 = 1 << 7;
         const RANDOM_SEED: u64 = 0;
@@ -54,11 +57,27 @@ impl DominantPalette for DynamicImage {
     }
 }
 
+/// # Errors
+/// When loading the images from bytes failed
+pub fn from_bytes(bytes: &[u8], palette_size: usize) -> ImageResult<DominantPalette> {
+    let image = image::load_from_memory(bytes)?;
+
+    Ok(image.get_dominant_palette(palette_size))
+}
+
+#[must_use]
+pub fn normalise(dominant_palette: DominantPalette) -> Vec<u32> {
+    dominant_palette
+        .into_iter()
+        .map(|c| c.into_u32::<palette::rgb::channels::Rgba>() >> 8)
+        .collect()
+}
+
 #[cfg(test)]
 mod test {
     use rstest::rstest;
 
-    use crate::image::dominant_palette::DominantPalette;
+    use crate::image::dominant_palette::Get;
 
     const TEST_RESOURCES_PATH: &str = "src/image/test";
 
@@ -89,6 +108,6 @@ mod test {
         #[case] expected: &[palette::rgb::Srgb<u8>],
     ) {
         let image = image::open(input_path).unwrap_or_else(|e| panic!("{e:#?}"));
-        assert_eq!(image.dominant_palette(input_palette_size), expected);
+        assert_eq!(image.get_dominant_palette(input_palette_size), expected);
     }
 }

@@ -24,8 +24,8 @@ use twilight_model::{
 use crate::{
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
     core::model::{
-        AuthorIdAware, AuthorPermissionsAware, BotState, BotStateAware, CacheAware, HttpAware,
-        InteractionInterface, OwnedBotState, OwnedBotStateAware,
+        AuthorIdAware, AuthorPermissionsAware, BotState, BotStateAware, CacheAware, DatabaseAware,
+        HttpAware, InteractionInterface, OwnedBotState, OwnedBotStateAware,
     },
     error::{
         command::RespondError, core::DeserializeBodyFromHttpError, Cache, CacheResult, NotInGuild,
@@ -137,10 +137,6 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         if let Some(tx) = std::mem::take(&mut self.acknowledgement) {
             let _ = tx.send(());
         }
-    }
-
-    pub fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
-        self.bot.db()
     }
 
     #[inline]
@@ -290,6 +286,12 @@ impl<T: Kind, U: Location> HttpAware for Ctx<T, U> {
 impl<T: Kind, U: Location> LavalinkAware for Ctx<T, U> {
     fn lavalink(&self) -> &Lavalink {
         self.bot.lavalink()
+    }
+}
+
+impl<T: Kind, U: Location> DatabaseAware for Ctx<T, U> {
+    fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
+        self.bot.db()
     }
 }
 

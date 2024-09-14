@@ -3,7 +3,10 @@ use std::{borrow::Cow, fmt::Display, sync::Arc};
 use lyra_ext::{iso8601_time, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
-use twilight_mention::Mention;
+use twilight_mention::{
+    timestamp::{Timestamp, TimestampStyle},
+    Mention,
+};
 use twilight_model::{
     application::interaction::InteractionChannel,
     channel::ChannelType,
@@ -28,7 +31,7 @@ use crate::{
         model::{
             AuthorIdAware, BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware,
         },
-        r#const::connection::INACTIVITY_TIMEOUT_SECS,
+        r#const::connection::INACTIVITY_TIMEOUT,
         traced,
     },
     error::{
@@ -349,9 +352,11 @@ async fn handle_response(
 
     if empty {
         let text_channel_id = ctx.channel_id();
+        let duration = unix_time() + INACTIVITY_TIMEOUT;
+        let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
         let empty_voice_notice_txt = format!(
-            "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in <t:{}:R>.",
-            unix_time().as_secs() + u64::from(INACTIVITY_TIMEOUT_SECS)
+            "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in {}.",
+            timestamp.mention()
         );
 
         traced::tokio_spawn(start_inactivity_timeout(

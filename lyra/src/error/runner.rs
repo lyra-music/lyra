@@ -23,4 +23,5 @@ pub enum WaitForSignalError {
 pub enum WaitUntilShutdownError {
     WaitForSignal(#[from] WaitForSignalError),
     Send(#[from] tokio::sync::watch::error::SendError<bool>),
+    Sqlx(#[from] sqlx::Error),
 }

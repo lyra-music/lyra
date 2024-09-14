@@ -3,6 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    core::model::DatabaseAware,
     error::CommandResult,
     gateway::GuildIdAware,
 };

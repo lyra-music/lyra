@@ -129,26 +129,35 @@ pub trait HttpAware {
     fn http(&self) -> &Client;
 }
 
+pub trait DatabaseAware {
+    fn db(&self) -> &Pool<Postgres>;
+}
+
 pub struct BotState {
-    cache: InMemoryCache,
+    cache: Arc<InMemoryCache>,
     http: Arc<Client>,
+    db: Pool<Postgres>,
     standby: Standby,
     lavalink: Lavalink,
-    db: Pool<Postgres>,
     info: BotInfo,
     application_id: OnceCell<Id<ApplicationMarker>>,
     application_emojis: OnceCell<&'static [Emoji]>,
 }
 
 impl BotState {
-    pub fn new(db: Pool<Postgres>, http: Arc<Client>, lavalink: Lavalink) -> Self {
+    pub fn new(
+        db: Pool<Postgres>,
+        http: Arc<Client>,
+        cache: Arc<InMemoryCache>,
+        lavalink: Lavalink,
+    ) -> Self {
         let info = BotInfo {
             started: Instant::now(),
             guild_counter: GuildCounter::new(),
         };
 
         Self {
-            cache: InMemoryCache::new(),
+            cache,
             http,
             standby: Standby::new(),
             lavalink,
@@ -157,10 +166,6 @@ impl BotState {
             application_id: OnceCell::new(),
             application_emojis: OnceCell::new(),
         }
-    }
-
-    pub const fn db(&self) -> &Pool<Postgres> {
-        &self.db
     }
 
     pub const fn standby(&self) -> &Standby {
@@ -234,5 +239,11 @@ impl CacheAware for Arc<BotState> {
 impl HttpAware for BotState {
     fn http(&self) -> &Client {
         &self.http
+    }
+}
+
+impl DatabaseAware for BotState {
+    fn db(&self) -> &Pool<Postgres> {
+        &self.db
     }
 }

@@ -5,7 +5,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::{
     command::{model::BotSlashCommand, require, SlashCtx},
-    core::r#const::colours::EMBED_DEFAULT,
+    core::{model::DatabaseAware, r#const::colours::EMBED_DEFAULT},
     error::CommandResult,
 };
 

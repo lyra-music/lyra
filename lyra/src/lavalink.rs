@@ -11,5 +11,7 @@ pub use self::{
         IndexerType, Lavalink, OwnedPlayerData, Pitch, PlayerDataRead, PlayerDataWrite, Queue,
         QueueItem, RepeatMode, UnwrappedData, UnwrappedPlayerInfoUri,
     },
+    plugin::lava_src::PluginInfo,
     process::handlers,
+    track::delete_now_playing_message,
 };

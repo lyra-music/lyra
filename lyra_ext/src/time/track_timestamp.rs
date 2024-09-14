@@ -80,6 +80,11 @@ impl TrackTimestamp {
         self.data.paused
     }
 
+    #[must_use]
+    pub const fn speed(&self) -> f64 {
+        self.data.speed
+    }
+
     fn apply(&mut self, op: Operation) {
         let now = Instant::now();
         let last_operation = &mut self.last_operation;
