@@ -30,7 +30,7 @@ use twilight_model::{
 };
 
 use crate::{
-    core::{model::HttpAware, r#const::metadata::BANNER},
+    core::r#const::metadata::BANNER,
     lavalink::{handlers, ClientData},
     LavalinkAware,
 };
@@ -216,7 +216,7 @@ async fn wait_until_shutdown(
 
     tracing::debug!("deleting all now playing messages...");
     for data in bot.lavalink().iter_player_data() {
-        crate::lavalink::delete_now_playing_message(bot.http(), &data).await;
+        crate::lavalink::delete_now_playing_message(bot, &data).await;
     }
 
     tracing::debug!("sending close frames to all shards...");

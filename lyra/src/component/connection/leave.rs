@@ -50,7 +50,7 @@ pub(super) async fn disconnect_cleanup(
         connection.dispatch(Event::QueueClear);
     };
     if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
-        delete_now_playing_message(cx.http(), &player_ctx.data_unwrapped()).await;
+        delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
     }
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;

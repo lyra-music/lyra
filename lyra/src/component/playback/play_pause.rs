@@ -1,8 +1,16 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{check, macros::out, model::BotSlashCommand, require, SlashCtx},
-    error::CommandResult,
+    command::{
+        check,
+        macros::out,
+        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        require,
+        util::controller_fmt,
+        SlashCtx,
+    },
+    error::{component::playback::PlayPauseError, CommandResult},
+    lavalink::OwnedPlayerData,
 };
 
 /// Toggles the playback of the current track.
@@ -20,18 +28,28 @@ impl BotSlashCommand for PlayPause {
         let data_r = data.read().await;
         let queue = require::queue_not_empty(&data_r)?;
         check::current_track_is_users(&require::current_track(queue)?, in_voice_with_user)?;
-        let pause = !data_r.paused();
-        let message = if pause {
-            "▶️ Paused"
-        } else {
-            "⏸️ Resumed"
-        };
         drop(data_r);
-
-        player
-            .set_pause_with(pause, &mut data.write().await)
-            .await?;
-
-        out!(message, ctx);
+        Ok(play_pause(player, data, &mut ctx, false).await?)
     }
+}
+
+pub async fn play_pause(
+    player: require::PlayerInterface,
+    data: OwnedPlayerData,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    via_controller: bool,
+) -> Result<(), PlayPauseError> {
+    let mut data_w = data.write().await;
+    let pause = !data_w.paused();
+
+    player.set_pause_with(pause, &mut data_w).await?;
+    drop(data_w);
+
+    let message = if pause {
+        "▶️ Paused"
+    } else {
+        "⏸️ Resumed"
+    };
+    let content = controller_fmt(ctx, via_controller, message);
+    out!(content, ctx);
 }

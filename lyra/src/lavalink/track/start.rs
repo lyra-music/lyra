@@ -10,7 +10,10 @@ use lyra_ext::{
 use twilight_cache_inmemory::{InMemoryCache, Reference};
 use twilight_mention::{timestamp::TimestampStyle, Mention};
 use twilight_model::{
-    channel::message::Embed,
+    channel::message::{
+        component::{ActionRow, Button, ButtonStyle},
+        Component, Embed,
+    },
     id::{marker::UserMarker, Id},
     user::User,
 };
@@ -20,14 +23,19 @@ use twilight_util::builder::embed::{
 
 use crate::{
     command::util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware},
-    core::model::{CacheAware, DatabaseAware, HttpAware},
+    core::{
+        emoji,
+        model::{CacheAware, DatabaseAware, HttpAware},
+        r#static::component::NOW_PLAYING_BUTTON_IDS,
+    },
     error::{
+        core::DeserialiseBodyFromHttpError,
         lavalink::{GenerateNowPlayingEmbedError, GetDominantPaletteFromUrlError, ProcessResult},
         Cache,
     },
     lavalink::{
-        model::ArtworkCache, CorrectTrackInfo, PluginInfo, QueueItem, UnwrappedData,
-        UnwrappedPlayerInfoUri,
+        model::ArtworkCache, ClientData, CorrectTrackInfo, IndexerType, PluginInfo, QueueItem,
+        RepeatMode, UnwrappedData, UnwrappedPlayerInfoUri,
     },
 };
 
@@ -84,17 +92,104 @@ pub(super) async fn impl_start(
         data_r.speed(),
     )
     .await?;
+    let components =
+        generate_now_playing_components(&lavalink_data, queue.repeat_mode(), queue.indexer_type())
+            .await?;
     let req = lavalink_data
         .http()
         .create_message(data_r.now_playing_message_channel_id())
         .content("🎵 **Now Playing**")
         .embeds(&[embed])
+        .components(&[components])
         .await?;
     let message_id = req.model().await?.id;
 
     drop(data_r);
     data.write().await.set_now_playing_message_id(message_id);
     Ok(())
+}
+
+async fn generate_now_playing_components(
+    lavalink_data: &ClientData,
+    repeat_mode: RepeatMode,
+    indexer: IndexerType,
+) -> Result<Component, DeserialiseBodyFromHttpError> {
+    let (shuffle_emoji, shuffle_disabled) = {
+        let (shuffle_emoji, shuffle_disabled) = match indexer {
+            IndexerType::Standard => (emoji::shuffle_off(lavalink_data).await, false),
+            IndexerType::Fair => (emoji::shuffle_off(lavalink_data).await, true),
+            IndexerType::Shuffled => (emoji::shuffle_on(lavalink_data).await, false),
+        };
+        (Some(shuffle_emoji?.clone()), shuffle_disabled)
+    };
+    let shuffle_button = Component::Button(Button {
+        custom_id: Some(NOW_PLAYING_BUTTON_IDS.shuffle.to_owned()),
+        disabled: shuffle_disabled,
+        emoji: shuffle_emoji,
+        style: ButtonStyle::Danger,
+        label: None,
+        url: None,
+        sku_id: None,
+    });
+
+    let previous_button = Component::Button(Button {
+        custom_id: Some(NOW_PLAYING_BUTTON_IDS.previous.to_owned()),
+        disabled: false,
+        emoji: Some(emoji::previous(lavalink_data).await?.clone()),
+        style: ButtonStyle::Secondary,
+        label: None,
+        url: None,
+        sku_id: None,
+    });
+
+    let play_pause_button = Component::Button(Button {
+        custom_id: Some(NOW_PLAYING_BUTTON_IDS.play_pause.to_owned()),
+        disabled: false,
+        emoji: Some(emoji::pause(lavalink_data).await?.clone()),
+        style: ButtonStyle::Primary,
+        label: None,
+        url: None,
+        sku_id: None,
+    });
+
+    let next_button = Component::Button(Button {
+        custom_id: Some(NOW_PLAYING_BUTTON_IDS.next.to_owned()),
+        disabled: false,
+        emoji: Some(emoji::next(lavalink_data).await?.clone()),
+        style: ButtonStyle::Secondary,
+        label: None,
+        url: None,
+        sku_id: None,
+    });
+
+    let repeat_emoji = Some(
+        match repeat_mode {
+            RepeatMode::Off => emoji::repeat_off(lavalink_data).await,
+            RepeatMode::All => emoji::repeat_all(lavalink_data).await,
+            RepeatMode::Track => emoji::repeat_track(lavalink_data).await,
+        }?
+        .clone(),
+    );
+    let repeat_button = Component::Button(Button {
+        custom_id: Some(NOW_PLAYING_BUTTON_IDS.repeat.to_owned()),
+        disabled: false,
+        emoji: repeat_emoji,
+        style: ButtonStyle::Success,
+        label: None,
+        url: None,
+        sku_id: None,
+    });
+
+    let row = Component::ActionRow(ActionRow {
+        components: vec![
+            shuffle_button,
+            previous_button,
+            play_pause_button,
+            next_button,
+            repeat_button,
+        ],
+    });
+    Ok(row)
 }
 
 async fn generate_now_playing_embed(
@@ -153,14 +248,8 @@ async fn generate_now_playing_embed(
             };
             match (requester.nick(), requester.avatar_url(twilight_guild_id)) {
                 (Some(nick), Some(url)) => (nick.to_owned(), url),
-                (Some(nick), None) => {
-                    let user = get_user()?;
-                    (nick.to_owned(), get_display_avatar(&user))
-                }
-                (None, Some(url)) => {
-                    let user = get_user()?;
-                    (get_display_name(&user), url)
-                }
+                (Some(nick), None) => (nick.to_owned(), get_display_avatar(&get_user()?)),
+                (None, Some(url)) => (get_display_name(&get_user()?), url),
                 (None, None) => {
                     let user = get_user()?;
                     (get_display_name(&user), get_display_avatar(&user))

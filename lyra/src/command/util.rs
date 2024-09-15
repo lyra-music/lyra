@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
 use lyra_ext::unix_time;
 use rand::{distributions::Alphanumeric, Rng};
@@ -216,6 +218,17 @@ impl DefaultAvatarUrlAware for User {
     fn discriminator(&self) -> u16 {
         self.discriminator
     }
+}
+
+pub fn controller_fmt<'a>(
+    ctx: &impl AuthorIdAware,
+    via_controller: bool,
+    string: &'a str,
+) -> Cow<'a, str> {
+    if via_controller {
+        return format!("{} {}", ctx.author_id().mention(), string).into();
+    }
+    string.into()
 }
 
 pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(

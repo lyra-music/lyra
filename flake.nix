@@ -52,7 +52,7 @@
                 sqlx-cli
                 pgcli
                 cargo-edit
-		openssl
+                openssl
               ];
 
               # https://devenv.sh/scripts/

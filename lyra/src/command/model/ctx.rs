@@ -1,5 +1,6 @@
 mod autocomplete;
 mod command_data;
+mod component;
 mod menu;
 mod message;
 mod modal;
@@ -28,7 +29,7 @@ use crate::{
         HttpAware, InteractionInterface, OwnedBotState, OwnedBotStateAware,
     },
     error::{
-        command::RespondError, core::DeserializeBodyFromHttpError, Cache, CacheResult, NotInGuild,
+        command::RespondError, core::DeserialiseBodyFromHttpError, Cache, CacheResult, NotInGuild,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
@@ -162,7 +163,7 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         &self.inner.token
     }
 
-    pub async fn interface(&self) -> Result<InteractionInterface, DeserializeBodyFromHttpError> {
+    pub async fn interface(&self) -> Result<InteractionInterface, DeserialiseBodyFromHttpError> {
         Ok(self.bot.interaction().await?.interfaces(&self.inner))
     }
 

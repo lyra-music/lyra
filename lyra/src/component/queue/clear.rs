@@ -10,9 +10,8 @@ use crate::{
         require,
     },
     error::CommandResult,
-    gateway::GuildIdAware,
     lavalink::Event,
-    LavalinkAware,
+    LavalinkAndGuildIdAware,
 };
 
 /// Clears the queue
@@ -24,7 +23,7 @@ impl BotSlashCommand for Clear {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice = require::in_voice(&ctx)?.and_unsuppressed()?;
-        let connection = ctx.lavalink().try_get_connection(ctx.guild_id())?;
+        let connection = ctx.try_get_connection()?;
         let in_voice_with_user = check::user_in(in_voice)?;
         let player = require::player(&ctx)?;
 

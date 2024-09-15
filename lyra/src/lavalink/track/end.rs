@@ -1,5 +1,4 @@
 use lavalink_rs::{client::LavalinkClient, model::events::TrackEnd};
-use twilight_http::Client;
 
 use crate::{
     core::model::HttpAware,
@@ -27,7 +26,7 @@ pub(super) async fn impl_end(
     };
     let data = player.data_unwrapped();
 
-    delete_now_playing_message(lavalink.data_unwrapped().http(), &data).await;
+    delete_now_playing_message(lavalink.data_unwrapped().as_ref(), &data).await;
 
     let data_r = data.read().await;
     if data_r.queue().not_advance_locked().await {
@@ -49,11 +48,11 @@ pub(super) async fn impl_end(
     Ok(())
 }
 
-pub async fn delete_now_playing_message(http: &Client, data: &PlayerData) {
+pub async fn delete_now_playing_message(cx: &(impl HttpAware + Sync), data: &PlayerData) {
     let mut data_w = data.write().await;
     if let Some(message_id) = data_w.take_now_playing_message_id() {
         let channel_id = data_w.now_playing_message_channel_id();
-        let _ = http.delete_message(channel_id, message_id).await;
+        let _ = cx.http().delete_message(channel_id, message_id).await;
         data_w.sync_now_playing_message_channel_id();
     };
     drop(data_w);

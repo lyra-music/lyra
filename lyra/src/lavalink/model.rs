@@ -58,12 +58,22 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.lavalink().get_player_context(self.guild_id())
     }
 
+    fn get_player_data(&self) -> Option<OwnedPlayerData> {
+        self.get_player().map(|player| player.data_unwrapped())
+    }
+
     fn get_connection(&self) -> Option<ConnectionRef> {
         self.lavalink().get_connection(self.guild_id())
     }
 
     fn get_connection_mut(&self) -> Option<ConnectionRefMut> {
         self.lavalink().get_connection_mut(self.guild_id())
+    }
+
+    /// # Errors
+    /// when an unrecognised connection was found
+    fn try_get_connection(&self) -> Result<ConnectionRef, UnrecognisedConnection> {
+        self.lavalink().try_get_connection(self.guild_id())
     }
 }
 

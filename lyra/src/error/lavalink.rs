@@ -11,6 +11,7 @@ pub enum ProcessError {
     TwilightHttp(#[from] twilight_http::Error),
     Sqlx(#[from] sqlx::Error),
     DeserialiseBody(#[from] twilight_http::response::DeserializeBodyError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     GenerateNowPlayingEmbed(#[from] GenerateNowPlayingEmbedError),
 }
 

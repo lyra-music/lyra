@@ -18,18 +18,22 @@ use crate::{
             bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
             note, out_upd, sus, sus_fol,
         },
-        model::NonPingInteraction,
+        model::{ComponentCtx, NonPingInteraction},
         require,
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },
-    component::{connection::Join, queue::Play},
+    component::{
+        connection::Join,
+        queue::{get_next_repeat_mode, repeat, Play},
+    },
     core::{
         model::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
         r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
+        r#static::component::NOW_PLAYING_BUTTON_IDS,
     },
     error::{
         command::{
@@ -181,7 +185,7 @@ impl Context {
 
         let name = data.name.clone().into();
         let (tx, _) = oneshot::channel::<()>();
-        let Err(source) = <AutocompleteCtx>::from_partial_data(
+        let Err(source) = AutocompleteCtx::from_partial_data(
             self.inner,
             &data,
             self.bot,
@@ -198,7 +202,6 @@ impl Context {
         Err(ProcessError::AutocompleteExecute { name, source })
     }
 
-    #[allow(clippy::unused_async)]
     async unsafe fn process_as_component(mut self) -> ProcessResult {
         let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
             // SAFETY: interaction is of type `MessageComponent`,
@@ -206,8 +209,63 @@ impl Context {
             unsafe { unreachable_unchecked() }
         };
         tracing::trace!(?data);
-        // TODO: implement controller
 
+        let ctx = ComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender);
+        let Ok(mut ctx) = require::guild(ctx) else {
+            return Ok(());
+        };
+        let Ok(player) = require::player(&ctx) else {
+            return Ok(());
+        };
+
+        let player_data = player.data();
+        let player_data_r = player_data.read().await;
+        let now_playing_message_id = player_data_r.now_playing_message_id();
+        if now_playing_message_id != Some(ctx.message().id) {
+            return Ok(());
+        }
+        let Some(current_track_title) = player_data_r
+            .queue()
+            .current()
+            .map(|item| item.data().info.title.clone())
+        else {
+            return Ok(());
+        };
+        drop(player_data_r);
+
+        match ctx.take_custom_id() {
+            id if id == NOW_PLAYING_BUTTON_IDS.shuffle => {
+                crate::component::queue::shuffle(player_data, &mut ctx, true).await?;
+            }
+            id if id == NOW_PLAYING_BUTTON_IDS.previous => {
+                crate::component::playback::back(
+                    Some(current_track_title),
+                    player,
+                    player_data,
+                    &mut ctx,
+                    true,
+                )
+                .await?;
+            }
+            id if id == NOW_PLAYING_BUTTON_IDS.play_pause => {
+                crate::component::playback::play_pause(player, player_data, &mut ctx, true).await?;
+            }
+            id if id == NOW_PLAYING_BUTTON_IDS.next => {
+                crate::component::playback::skip(
+                    &current_track_title,
+                    player,
+                    player_data,
+                    &mut ctx,
+                    true,
+                )
+                .await?;
+            }
+            id if id == NOW_PLAYING_BUTTON_IDS.repeat => {
+                let mode = get_next_repeat_mode(&ctx).await;
+                repeat(&mut ctx, player_data, mode, true).await?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 

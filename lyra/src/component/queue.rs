@@ -21,8 +21,8 @@ pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
-pub use repeat::Repeat;
-pub use shuffle::Shuffle;
+pub use repeat::{get_next_repeat_mode, repeat, Repeat};
+pub use shuffle::{shuffle, Shuffle};
 
 use std::{collections::HashSet, num::NonZeroUsize, time::Duration};
 
