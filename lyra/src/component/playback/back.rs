@@ -8,7 +8,6 @@ use crate::command::{check, macros::out, model::BotSlashCommand, require};
 pub struct Back;
 
 impl BotSlashCommand for Back {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -37,6 +36,7 @@ impl BotSlashCommand for Back {
         if txt.is_empty() {
             txt = format!("⏮️ `{}`", item.data().info.title);
         }
+        drop(data_w);
 
         out!(txt, ctx);
     }

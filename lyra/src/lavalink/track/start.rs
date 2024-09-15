@@ -31,7 +31,6 @@ use crate::{
     },
 };
 
-#[allow(clippy::significant_drop_tightening)]
 #[tracing::instrument(err, skip_all, name = "track_start")]
 pub(super) async fn impl_start(
     lavalink: LavalinkClient,
@@ -94,8 +93,7 @@ pub(super) async fn impl_start(
     let message_id = req.model().await?.id;
 
     drop(data_r);
-    let mut data_w = data.write().await;
-    data_w.set_now_playing_message_id(message_id);
+    data.write().await.set_now_playing_message_id(message_id);
     Ok(())
 }
 
@@ -137,7 +135,7 @@ async fn generate_now_playing_embed(
 
     #[allow(clippy::cast_possible_truncation)]
     let timestamp =
-        twilight_model::util::Timestamp::from_micros(lyra_ext::unix_time().as_micros() as i64)?;
+        twilight_model::util::Timestamp::from_micros(track.enqueued().as_micros() as i64)?;
 
     let footer = {
         let (requester_name, requester_avatar) = {

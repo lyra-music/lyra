@@ -19,7 +19,6 @@ pub struct Forward {
 }
 
 impl BotSlashCommand for Forward {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -62,6 +61,7 @@ impl BotSlashCommand for Forward {
         player.context.play_now(track).await?;
 
         *queue.index_mut() = new_position.get() - 1;
+        drop(data_w);
         out!(txt, ctx);
     }
 }

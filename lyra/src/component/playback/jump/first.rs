@@ -13,7 +13,6 @@ use crate::command::{
 pub struct First;
 
 impl BotSlashCommand for First {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -22,9 +21,9 @@ impl BotSlashCommand for First {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        let current_track = require::current_track(queue)?;
-        check::current_track_is_users(&current_track, in_voice_with_user)?;
-
+        if let Ok(current_track) = require::current_track(queue) {
+            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        }
         let queue_len = queue.len();
         if queue_len == 1 {
             bad!("No where else to jump to", ctx);
@@ -42,6 +41,7 @@ impl BotSlashCommand for First {
         player.context.play_now(track).await?;
 
         *queue.index_mut() = 0;
+        drop(data_w);
         out!(txt, ctx);
     }
 }

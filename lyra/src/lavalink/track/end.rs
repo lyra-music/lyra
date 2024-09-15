@@ -7,7 +7,6 @@ use crate::{
     lavalink::{model::PlayerData, CorrectTrackInfo, UnwrappedData},
 };
 
-#[allow(clippy::significant_drop_tightening)]
 #[tracing::instrument(err, skip_all, name = "track_end")]
 pub(super) async fn impl_end(
     lavalink: LavalinkClient,
@@ -35,7 +34,6 @@ pub(super) async fn impl_end(
         tracing::trace!(?guild_id, "track ended normally");
 
         drop(data_r);
-
         let mut data_w = data.write().await;
         let queue = data_w.queue_mut();
 
@@ -43,6 +41,7 @@ pub(super) async fn impl_end(
         if let Some(item) = queue.current() {
             player.play_now(item.data()).await?;
         }
+        drop(data_w);
     } else {
         tracing::trace!(?guild_id, "track ended forcefully");
     }

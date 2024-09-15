@@ -21,7 +21,6 @@ use crate::{
 pub struct Clear;
 
 impl BotSlashCommand for Clear {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice = require::in_voice(&ctx)?.and_unsuppressed()?;
@@ -30,22 +29,18 @@ impl BotSlashCommand for Clear {
         let player = require::player(&ctx)?;
 
         let data = player.data();
-        {
-            let data_r = data.read().await;
-            let queue = require::queue_not_empty(&data_r)?;
+        let data_r = data.read().await;
+        let queue = require::queue_not_empty(&data_r)?;
 
-            let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
-            check::all_users_track(queue, positions, in_voice_with_user)?;
+        let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
+        check::all_users_track(queue, positions, in_voice_with_user)?;
 
-            player.acquire_advance_lock_and_stop_with(queue).await?;
-            connection.dispatch(Event::QueueClear);
-            drop(connection);
-        }
+        player.acquire_advance_lock_and_stop_with(queue).await?;
+        drop(data_r);
+        connection.dispatch(Event::QueueClear);
+        drop(connection);
 
-        {
-            let mut data_w = data.write().await;
-            data_w.queue_mut().clear();
-        }
+        data.write().await.queue_mut().clear();
         out!("⏹️ Cleared the queue", ctx);
     }
 }

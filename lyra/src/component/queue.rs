@@ -260,7 +260,6 @@ async fn remove(
     impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
@@ -306,6 +305,7 @@ async fn impl_remove(
             player.acquire_advance_lock_and_stop_with(queue).await?;
         }
     }
+    drop(data_w);
 
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);
 

@@ -8,7 +8,6 @@ use crate::command::{check, macros::out, model::BotSlashCommand, require};
 pub struct Skip;
 
 impl BotSlashCommand for Skip {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -29,6 +28,7 @@ impl BotSlashCommand for Skip {
         } else {
             player.context.stop_now().await?;
         }
+        drop(data_w);
 
         out!(txt, ctx);
     }
