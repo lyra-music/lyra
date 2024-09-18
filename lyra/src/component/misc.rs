@@ -20,7 +20,7 @@ impl BotSlashCommand for Ping {
             out!(format!("🏓 Pong! `({}ms)`", latency.as_millis()), ctx);
         } else {
             caut!(
-                "Cannot calculate the ping at the moment, try again later.",
+                "Cannot calculate the ping immediately after the bot has started, try again shortly later.",
                 ctx
             );
         }

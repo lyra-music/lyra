@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, num::NonZeroUsize};
+use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
@@ -48,12 +48,17 @@ impl std::fmt::Display for RepeatMode {
 #[derive(Debug)]
 pub struct Item {
     track: TrackData,
+    enqueued: Duration,
     pub(super) requester: Id<UserMarker>,
 }
 
 impl Item {
-    const fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
-        Self { track, requester }
+    fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
+        Self {
+            track,
+            requester,
+            enqueued: lyra_ext::unix_time(),
+        }
     }
 
     pub const fn requester(&self) -> Id<UserMarker> {
@@ -62,6 +67,10 @@ impl Item {
 
     pub const fn data(&self) -> &TrackData {
         &self.track
+    }
+
+    pub const fn enqueued(&self) -> Duration {
+        self.enqueued
     }
 
     pub fn into_data(self) -> TrackData {

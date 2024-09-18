@@ -1,2 +1,2 @@
 mod lava_search;
-mod lava_src;
+pub(super) mod lava_src;

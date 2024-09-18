@@ -7,7 +7,7 @@ use twilight_model::{
 
 use super::model::Process;
 use crate::{
-    core::model::{BotState, BotStateRef},
+    core::model::{BotState, BotStateRef, DatabaseAware},
     error::gateway::ProcessResult,
 };
 

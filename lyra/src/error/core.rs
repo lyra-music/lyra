@@ -12,7 +12,7 @@ pub type FollowupResult<T> = Result<T, FollowupError>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub enum DeserializeBodyFromHttpError {
+pub enum DeserialiseBodyFromHttpError {
     TwilightHttp(#[from] twilight_http::Error),
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
 }

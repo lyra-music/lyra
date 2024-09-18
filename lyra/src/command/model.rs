@@ -2,9 +2,11 @@ mod ctx;
 
 use std::sync::Arc;
 
+use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::interaction::{
         application_command::{CommandData, CommandDataOption},
+        message_component::MessageComponentInteractionData,
         Interaction, InteractionDataResolved,
     },
     channel::Channel,
@@ -19,9 +21,9 @@ use twilight_model::{
 use crate::error::{command::AutocompleteResult, CommandResult};
 
 pub use self::ctx::{
-    Autocomplete as AutocompleteCtx, CommandDataAware, Ctx, Guild as GuildCtx,
-    GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx,
-    RespondViaMessage, RespondViaModal, Slash as SlashCtx, User,
+    Autocomplete as AutocompleteCtx, CommandDataAware, Component as ComponentCtx, Ctx,
+    Guild as GuildCtx, GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind,
+    Message as MessageCtx, RespondViaMessage, RespondViaModal, Slash as SlashCtx, User,
 };
 
 pub trait NonPingInteraction {
@@ -90,22 +92,18 @@ impl PartialCommandData {
 #[non_exhaustive]
 pub enum PartialInteractionData {
     Command(PartialCommandData),
-    _Other,
+    Component(Box<MessageComponentInteractionData>),
 }
 
-pub trait CommandInfoAware {
-    fn name() -> &'static str;
-}
-
-pub trait BotSlashCommand: CommandInfoAware {
+pub trait BotSlashCommand: CreateCommand {
     async fn run(self, ctx: SlashCtx) -> CommandResult;
 }
 
-pub trait BotUserCommand: CommandInfoAware {
+pub trait BotUserCommand: CreateCommand {
     async fn run(ctx: User) -> CommandResult;
 }
 
-pub trait BotMessageCommand: CommandInfoAware {
+pub trait BotMessageCommand: CreateCommand {
     async fn run(ctx: MessageCtx) -> CommandResult;
 }
 

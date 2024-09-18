@@ -32,7 +32,6 @@ struct RemoveRangeAutocompleteOptions {
     kind: RemoveRangeAutocompleteOptionsType,
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
     cx: &(impl CacheAware + LavalinkAndGuildIdAware + Sync),
@@ -69,7 +68,7 @@ async fn generate_remove_range_autocomplete_choices(
         }
     };
 
-    match options.focused.parse::<i64>() {
+    let choices = match options.focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -97,7 +96,9 @@ async fn generate_remove_range_autocomplete_choices(
             &excluded,
             cx,
         ),
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]

@@ -4,7 +4,7 @@ use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::{
-    core::model::{BotState, BotStateRef},
+    core::model::{BotState, BotStateRef, DatabaseAware},
     error::gateway::ProcessResult,
 };
 

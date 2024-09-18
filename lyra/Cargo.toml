@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
@@ -11,7 +11,7 @@ build = "build.rs"
 
 [build-dependencies]
 anyhow = "1"
-vergen-git2 = { version = "1.0.0", features = [
+vergen-git2 = { version = "1.0.1", features = [
     "build",
     "cargo",
     "rustc",
@@ -84,3 +84,5 @@ twilight-util = { git = "https://github.com/lyra-music/twilight", branch = "lyra
     "builder",
 ] }
 twilight-interactions = { git = "https://github.com/lyra-music/twilight-interactions", branch = "lyra" }
+reqwest = "0.12.7"
+moka = { version = "0.12.8", features = ["future"] }

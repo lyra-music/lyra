@@ -10,7 +10,10 @@ use std::sync::Arc;
 use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
 use twilight_gateway::MessageSender;
 use twilight_http::Client;
-use twilight_mention::Mention;
+use twilight_mention::{
+    timestamp::{Timestamp, TimestampStyle},
+    Mention,
+};
 use twilight_model::id::{
     marker::{ChannelMarker, GuildMarker},
     Id,
@@ -21,11 +24,14 @@ use crate::{
     command::require,
     component::connection::{
         join::JoinedChannelType,
-        leave::{disconnect, pre_disconnect_cleanup, LeaveResponse},
+        leave::{disconnect, disconnect_cleanup, LeaveResponse},
     },
     core::{
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::{connection as const_connection, exit_code::NOTICE},
+        r#const::{
+            connection::{self as const_connection, INACTIVITY_TIMEOUT},
+            exit_code::NOTICE,
+        },
         traced,
     },
     error::{
@@ -122,7 +128,7 @@ async fn start_inactivity_timeout(
         return Ok(());
     };
     connection.notify_change();
-    pre_disconnect_cleanup(&ctx).await?;
+    disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
     let response = LeaveResponse(channel_id);
@@ -189,7 +195,7 @@ pub async fn handle_voice_state_update(
             return Ok(());
         }
         Some(old_state) if state.channel_id.is_none() => {
-            pre_disconnect_cleanup(ctx).await?;
+            disconnect_cleanup(ctx).await?;
 
             let old_channel_id = old_state.channel_id();
             let response = LeaveResponse(old_channel_id);
@@ -242,9 +248,12 @@ async fn match_state_channel_id(
                 player.update_voice_channel(voice_is_empty).await?;
             }
             let forcefully_moved_notice = if voice_is_empty {
+                let duration = unix_time() + INACTIVITY_TIMEOUT;
+                let timestamp =
+                    Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
                 format!(
-                    "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",
-                    unix_time().as_secs() + u64::from(const_connection::INACTIVITY_TIMEOUT_SECS)
+                    "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` {} `)`",
+                    timestamp.mention()
                 )
             } else {
                 String::from("`(Bot was forcefully moved)`")

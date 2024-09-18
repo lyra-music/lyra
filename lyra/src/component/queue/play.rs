@@ -385,17 +385,17 @@ async fn play(
 
             let total_tracks = Vec::from(results);
             // SAFETY: at least one tracks must be loaded, so this unwrap is safe
-            let first_track = unsafe { total_tracks.first().unwrap_unchecked() };
+            let first_track = unsafe { total_tracks.first().unwrap_unchecked() }.clone();
 
             let player = util::auto_new_player(ctx).await?;
 
-            player.play(first_track).await?;
             player
                 .data_unwrapped()
                 .write()
                 .await
                 .queue_mut()
                 .enqueue(total_tracks, ctx.author_id());
+            player.play(&first_track).await?;
 
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
         }
@@ -547,8 +547,17 @@ fn extract_queries(message: &Message) -> Vec<Box<str>> {
 pub struct AddToQueue;
 
 impl AddToQueue {
+    const NAME: &'static str = "➕ Add to queue";
     pub fn create_command() -> Command {
-        CommandBuilder::new("➕ Add to queue", String::new(), CommandType::Message).build()
+        CommandBuilder::new(Self::NAME, String::new(), CommandType::Message).build()
+    }
+}
+
+impl CreateCommand for AddToQueue {
+    const NAME: &'static str = Self::NAME;
+    fn create_command() -> twilight_interactions::command::ApplicationCommandData {
+        // SAFETY: `AddToQueue::create_command()` will shadow this, so the trait function will never be called
+        unsafe { std::hint::unreachable_unchecked() }
     }
 }
 

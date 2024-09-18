@@ -29,7 +29,7 @@ pub enum StartPollError {
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum WaitForVotesError {
-    DeserializeBodyFromHttp(#[from] crate::error::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     TwilightHttp(#[from] twilight_http::Error),
     UpdateEmbed(#[from] UpdateEmbedError),
     EventRecv(#[from] tokio::sync::broadcast::error::RecvError),

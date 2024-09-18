@@ -21,8 +21,8 @@ pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
-pub use repeat::Repeat;
-pub use shuffle::Shuffle;
+pub use repeat::{get_next_repeat_mode, repeat, Repeat};
+pub use shuffle::{shuffle, Shuffle};
 
 use std::{collections::HashSet, num::NonZeroUsize, time::Duration};
 
@@ -260,7 +260,6 @@ async fn remove(
     impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
@@ -306,6 +305,7 @@ async fn impl_remove(
             player.acquire_advance_lock_and_stop_with(queue).await?;
         }
     }
+    drop(data_w);
 
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);
 

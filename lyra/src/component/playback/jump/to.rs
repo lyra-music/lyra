@@ -21,7 +21,6 @@ use crate::{
     LavalinkAndGuildIdAware,
 };
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_skip_to_choices(
     track: String,
     cx: &(impl CacheAware + LavalinkAndGuildIdAware + Sync),
@@ -38,7 +37,7 @@ async fn generate_skip_to_choices(
     let excluded = HashSet::from([queue.position()]);
     let queue_iter = queue.iter_positions_and_items();
 
-    match track.parse::<i64>() {
+    let choices = match track.parse::<i64>() {
         Ok(input) => {
             generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -46,7 +45,9 @@ async fn generate_skip_to_choices(
             generate_position_choices(queue.position(), queue_len, queue_iter, &excluded, cx)
         }
         Err(_) => generate_position_choices_from_fuzzy_match(&track, queue_iter, &excluded, cx),
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]
@@ -81,7 +82,6 @@ pub struct To {
 }
 
 impl BotSlashCommand for To {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -90,8 +90,9 @@ impl BotSlashCommand for To {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        let current_track = require::current_track(queue)?;
-        check::current_track_is_users(&current_track, in_voice_with_user)?;
+        if let Ok(current_track) = require::current_track(queue) {
+            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        }
 
         let queue_len = queue.len();
         if queue_len == 1 {
@@ -116,6 +117,7 @@ impl BotSlashCommand for To {
         player.context.play_now(track).await?;
 
         *queue.index_mut() = index;
+        drop(data_w);
         out!(txt, ctx);
     }
 }

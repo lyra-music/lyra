@@ -46,22 +46,17 @@ impl<T: Aware> Ctx<T> {
 }
 
 impl<T: Aware, U: Location> Ctx<T, U> {
-    pub fn command_data(&self) -> &PartialCommandData {
-        // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-        //         so `self.data` is present
-        let data = unsafe { self.data.as_ref().unwrap_unchecked() };
-        let PartialInteractionData::Command(data) = data else {
-            // SAFETY:
+    pub const fn command_data(&self) -> &PartialCommandData {
+        let Some(PartialInteractionData::Command(data)) = self.data.as_ref() else {
+            // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
+            //         so `data` will always be `PartialInteractionData::Command(_)`
             unsafe { unreachable_unchecked() }
         };
         data
     }
 
     pub fn into_command_data(self) -> PartialCommandData {
-        // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-        //         so `self.data` is present
-        let data = unsafe { self.data.unwrap_unchecked() };
-        let PartialInteractionData::Command(command_data) = data else {
+        let Some(PartialInteractionData::Command(command_data)) = self.data else {
             // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
             //         so `data` will always be `PartialInteractionData::Command(_)`
             unsafe { unreachable_unchecked() }

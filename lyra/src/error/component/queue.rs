@@ -29,6 +29,17 @@ pub mod play {
     }
 }
 
+pub mod repeat {
+    #[derive(thiserror::Error, Debug)]
+    #[error(transparent)]
+    pub enum Error {
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
+        Respond(#[from] crate::error::command::RespondError),
+    }
+}
+
+pub use repeat::Error as RepeatError;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -40,5 +51,5 @@ pub enum RemoveTracksError {
     #[error(transparent)]
     Followup(#[from] crate::error::command::FollowupError),
     #[error(transparent)]
-    DeserializeBodyFromHttp(#[from] crate::error::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
 }

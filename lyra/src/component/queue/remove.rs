@@ -18,7 +18,6 @@ use crate::{
     LavalinkAndGuildIdAware,
 };
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_choices(
     focused: &str,
     finished: Vec<i64>,
@@ -40,7 +39,7 @@ async fn generate_remove_choices(
 
     let queue_iter = queue.iter_positions_and_items();
 
-    match focused.parse::<i64>() {
+    let choices = match focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -50,7 +49,9 @@ async fn generate_remove_choices(
         Err(_) => {
             super::generate_position_choices_from_fuzzy_match(focused, queue_iter, &excluded, cx)
         }
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]

@@ -1,5 +1,6 @@
 mod autocomplete;
 mod command_data;
+mod component;
 mod menu;
 mod message;
 mod modal;
@@ -24,11 +25,11 @@ use twilight_model::{
 use crate::{
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
     core::model::{
-        AuthorIdAware, AuthorPermissionsAware, BotState, BotStateAware, CacheAware, HttpAware,
-        InteractionInterface, OwnedBotState, OwnedBotStateAware,
+        AuthorIdAware, AuthorPermissionsAware, BotState, BotStateAware, CacheAware, DatabaseAware,
+        HttpAware, InteractionInterface, OwnedBotState, OwnedBotStateAware,
     },
     error::{
-        command::RespondError, core::DeserializeBodyFromHttpError, Cache, CacheResult, NotInGuild,
+        command::RespondError, core::DeserialiseBodyFromHttpError, Cache, CacheResult, NotInGuild,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
@@ -139,10 +140,6 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         }
     }
 
-    pub fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
-        self.bot.db()
-    }
-
     #[inline]
     pub fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel().id
@@ -166,7 +163,7 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         &self.inner.token
     }
 
-    pub async fn interface(&self) -> Result<InteractionInterface, DeserializeBodyFromHttpError> {
+    pub async fn interface(&self) -> Result<InteractionInterface, DeserialiseBodyFromHttpError> {
         Ok(self.bot.interaction().await?.interfaces(&self.inner))
     }
 
@@ -290,6 +287,12 @@ impl<T: Kind, U: Location> HttpAware for Ctx<T, U> {
 impl<T: Kind, U: Location> LavalinkAware for Ctx<T, U> {
     fn lavalink(&self) -> &Lavalink {
         self.bot.lavalink()
+    }
+}
+
+impl<T: Kind, U: Location> DatabaseAware for Ctx<T, U> {
+    fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
+        self.bot.db()
     }
 }
 

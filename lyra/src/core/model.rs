@@ -1,4 +1,3 @@
-mod emoji;
 mod interaction;
 
 use std::{
@@ -11,7 +10,6 @@ use std::{
 
 use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
-use tokio::sync::OnceCell;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::ShardId;
 use twilight_http::Client;
@@ -25,12 +23,14 @@ use twilight_model::{
 };
 use twilight_standby::Standby;
 
-use crate::{error::core::DeserializeBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
+use crate::{error::core::DeserialiseBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
 
 pub use self::interaction::{
     AcknowledgementAware, Client as InteractionClient, Interface as InteractionInterface,
     MessageResponse, UnitFollowupResult, UnitRespondResult,
 };
+
+use super::r#static::application;
 
 pub struct Config {
     pub token: &'static str,
@@ -129,38 +129,39 @@ pub trait HttpAware {
     fn http(&self) -> &Client;
 }
 
+pub trait DatabaseAware {
+    fn db(&self) -> &Pool<Postgres>;
+}
+
 pub struct BotState {
-    cache: InMemoryCache,
+    cache: Arc<InMemoryCache>,
     http: Arc<Client>,
+    db: Pool<Postgres>,
     standby: Standby,
     lavalink: Lavalink,
-    db: Pool<Postgres>,
     info: BotInfo,
-    application_id: OnceCell<Id<ApplicationMarker>>,
-    application_emojis: OnceCell<&'static [Emoji]>,
 }
 
 impl BotState {
-    pub fn new(db: Pool<Postgres>, http: Arc<Client>, lavalink: Lavalink) -> Self {
+    pub fn new(
+        db: Pool<Postgres>,
+        http: Arc<Client>,
+        cache: Arc<InMemoryCache>,
+        lavalink: Lavalink,
+    ) -> Self {
         let info = BotInfo {
             started: Instant::now(),
             guild_counter: GuildCounter::new(),
         };
 
         Self {
-            cache: InMemoryCache::new(),
+            cache,
             http,
             standby: Standby::new(),
             lavalink,
             db,
             info,
-            application_id: OnceCell::new(),
-            application_emojis: OnceCell::new(),
         }
-    }
-
-    pub const fn db(&self) -> &Pool<Postgres> {
-        &self.db
     }
 
     pub const fn standby(&self) -> &Standby {
@@ -171,32 +172,21 @@ impl BotState {
         &self.info
     }
 
+    #[inline]
     pub async fn application_id(
         &self,
-    ) -> Result<Id<ApplicationMarker>, DeserializeBodyFromHttpError> {
-        self.application_id
-            .get_or_try_init(|| async {
-                let application = self.http.current_user_application().await?.model().await?;
-                Ok(application.id)
-            })
-            .await
-            .copied()
+    ) -> Result<Id<ApplicationMarker>, DeserialiseBodyFromHttpError> {
+        application::id(self).await
     }
 
+    #[inline]
     pub async fn application_emojis(
         &self,
-    ) -> Result<&'static [Emoji], DeserializeBodyFromHttpError> {
-        self.application_emojis
-            .get_or_try_init(|| async {
-                let application_id = self.application_id().await?;
-                let req = self.http.get_application_emojis(application_id);
-                Ok(&*req.await?.models().await?.leak())
-            })
-            .await
-            .copied()
+    ) -> Result<&'static [Emoji], DeserialiseBodyFromHttpError> {
+        application::emojis(self).await
     }
 
-    pub async fn interaction(&self) -> Result<InteractionClient, DeserializeBodyFromHttpError> {
+    pub async fn interaction(&self) -> Result<InteractionClient, DeserialiseBodyFromHttpError> {
         let client = self.http.interaction(self.application_id().await?);
         Ok(InteractionClient::new(client))
     }
@@ -234,5 +224,11 @@ impl CacheAware for Arc<BotState> {
 impl HttpAware for BotState {
     fn http(&self) -> &Client {
         &self.http
+    }
+}
+
+impl DatabaseAware for BotState {
+    fn db(&self) -> &Pool<Postgres> {
+        &self.db
     }
 }

@@ -174,7 +174,7 @@ pub enum HandlePollError {
     AnotherPollOngoing(#[from] AnotherPollOngoingError),
     StartPoll(#[from] super::poll::StartPollError),
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
-    DeserializeBodyFromHttp(#[from] crate::error::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     PollLoss(#[from] PollLossError),
     PollVoided(#[from] PollVoidedError),
     EventRecv(#[from] tokio::sync::broadcast::error::RecvError),
@@ -183,7 +183,7 @@ pub enum HandlePollError {
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum SendSupersededWinNoticeError {
-    DeserializeBodyFromHttp(#[from] crate::error::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     Http(#[from] twilight_http::Error),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
 }

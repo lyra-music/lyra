@@ -13,17 +13,22 @@ use lavalink_rs::{
     player_context::PlayerContext,
 };
 use lyra_ext::time::track_timestamp::TrackTimestamp;
+use moka::future::Cache;
 use sqlx::{Pool, Postgres};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker},
+    marker::{ChannelMarker, GuildMarker, MessageMarker},
     Id,
 };
 
 use crate::{
     command::require::{InVoice, PartialInVoice},
-    core::{model::HttpAware, r#const},
+    core::{
+        model::{CacheAware, DatabaseAware, HttpAware},
+        r#const,
+    },
     error::UnrecognisedConnection,
     gateway::GuildIdAware,
 };
@@ -38,7 +43,7 @@ pub use self::{
     queue_indexer::IndexerType,
 };
 
-type PlayerData = RwLock<RawPlayerData>;
+pub type PlayerData = RwLock<RawPlayerData>;
 pub type OwnedPlayerData = Arc<PlayerData>;
 pub type PlayerDataRead<'a> = RwLockReadGuard<'a, RawPlayerData>;
 pub type PlayerDataWrite<'a> = RwLockWriteGuard<'a, RawPlayerData>;
@@ -53,12 +58,22 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.lavalink().get_player_context(self.guild_id())
     }
 
+    fn get_player_data(&self) -> Option<OwnedPlayerData> {
+        self.get_player().map(|player| player.data_unwrapped())
+    }
+
     fn get_connection(&self) -> Option<ConnectionRef> {
         self.lavalink().get_connection(self.guild_id())
     }
 
     fn get_connection_mut(&self) -> Option<ConnectionRefMut> {
         self.lavalink().get_connection_mut(self.guild_id())
+    }
+
+    /// # Errors
+    /// when an unrecognised connection was found
+    fn try_get_connection(&self) -> Result<ConnectionRef, UnrecognisedConnection> {
+        self.lavalink().try_get_connection(self.guild_id())
     }
 }
 
@@ -82,6 +97,8 @@ pub struct RawPlayerData {
     pitch: Pitch,
     track_timestamp: TrackTimestamp,
     text_channel_id: Id<ChannelMarker>,
+    now_playing_message_id: Option<Id<MessageMarker>>,
+    now_playing_message_channel_id: Id<ChannelMarker>,
 }
 
 impl RawPlayerData {
@@ -93,6 +110,8 @@ impl RawPlayerData {
             pitch: Pitch::new(),
             queue: Queue::new(),
             track_timestamp: TrackTimestamp::new(),
+            now_playing_message_id: None,
+            now_playing_message_channel_id: text_channel_id,
         }
     }
 
@@ -144,6 +163,11 @@ impl RawPlayerData {
     }
 
     #[inline]
+    pub const fn speed(&self) -> f64 {
+        self.track_timestamp.speed()
+    }
+
+    #[inline]
     pub fn set_speed(&mut self, multiplier: f64) {
         self.track_timestamp.set_speed(multiplier);
     }
@@ -154,6 +178,26 @@ impl RawPlayerData {
 
     pub fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
         self.text_channel_id = text_channel_id;
+    }
+
+    pub const fn now_playing_message_id(&self) -> Option<Id<MessageMarker>> {
+        self.now_playing_message_id
+    }
+
+    pub fn sync_now_playing_message_channel_id(&mut self) {
+        self.now_playing_message_channel_id = self.text_channel_id;
+    }
+
+    pub fn take_now_playing_message_id(&mut self) -> Option<Id<MessageMarker>> {
+        self.now_playing_message_id.take()
+    }
+
+    pub fn set_now_playing_message_id(&mut self, message_id: Id<MessageMarker>) {
+        self.now_playing_message_id = Some(message_id);
+    }
+
+    pub const fn now_playing_message_channel_id(&self) -> Id<ChannelMarker> {
+        self.now_playing_message_channel_id
     }
 }
 
@@ -379,6 +423,13 @@ impl Lavalink {
     ) -> LavalinkResult<()> {
         self.inner.delete_player(guild_id).await
     }
+
+    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + '_ {
+        self.inner
+            .players
+            .iter()
+            .filter_map(|p| p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()))
+    }
 }
 
 impl DelegateMethods for LavalinkClient {
@@ -473,9 +524,13 @@ pub trait GetConnection: GuildIdAware {}
 impl GetConnection for InVoice<'_> {}
 impl GetConnection for PartialInVoice {}
 
+pub type ArtworkCache = Cache<(Box<str>, usize), Arc<[u32]>>;
+
 pub struct ClientData {
-    http: Arc<Client>,
     db: Pool<Postgres>,
+    http: Arc<Client>,
+    cache: Arc<InMemoryCache>,
+    artwork_cache: ArtworkCache,
 }
 
 impl HttpAware for ClientData {
@@ -484,12 +539,29 @@ impl HttpAware for ClientData {
     }
 }
 
+impl CacheAware for ClientData {
+    fn cache(&self) -> &InMemoryCache {
+        &self.cache
+    }
+}
+
+impl DatabaseAware for ClientData {
+    fn db(&self) -> &Pool<Postgres> {
+        &self.db
+    }
+}
+
 impl ClientData {
-    pub const fn new(http: Arc<Client>, db: Pool<Postgres>) -> Self {
-        Self { http, db }
+    pub fn new(http: Arc<Client>, cache: Arc<InMemoryCache>, db: Pool<Postgres>) -> Self {
+        Self {
+            http,
+            cache,
+            db,
+            artwork_cache: Cache::new(10_000),
+        }
     }
 
-    pub const fn db(&self) -> &Pool<Postgres> {
-        &self.db
+    pub const fn artwork_cache(&self) -> &ArtworkCache {
+        &self.artwork_cache
     }
 }

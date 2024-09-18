@@ -29,7 +29,6 @@ struct MoveAutocompleteOptions {
     kind: MoveAutocompleteOptionType,
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_move_choices(
     options: &MoveAutocompleteOptions,
     cx: &(impl LavalinkAndGuildIdAware + CacheAware + Sync),
@@ -65,7 +64,7 @@ async fn generate_move_choices(
         }
     };
 
-    match options.focused.parse::<i64>() {
+    let choices = match options.focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -93,7 +92,9 @@ async fn generate_move_choices(
             &excluded,
             cx,
         ),
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]
@@ -148,7 +149,6 @@ pub struct Move {
 }
 
 impl BotSlashCommand for Move {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -207,6 +207,7 @@ impl BotSlashCommand for Move {
         };
 
         queue.insert(insert_position, track);
+        drop(data_w);
 
         out!(message, ctx);
     }
