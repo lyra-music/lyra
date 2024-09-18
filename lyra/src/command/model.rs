@@ -2,6 +2,7 @@ mod ctx;
 
 use std::sync::Arc;
 
+use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::interaction::{
         application_command::{CommandData, CommandDataOption},
@@ -94,19 +95,15 @@ pub enum PartialInteractionData {
     Component(Box<MessageComponentInteractionData>),
 }
 
-pub trait CommandInfoAware {
-    fn name() -> &'static str;
-}
-
-pub trait BotSlashCommand: CommandInfoAware {
+pub trait BotSlashCommand: CreateCommand {
     async fn run(self, ctx: SlashCtx) -> CommandResult;
 }
 
-pub trait BotUserCommand: CommandInfoAware {
+pub trait BotUserCommand: CreateCommand {
     async fn run(ctx: User) -> CommandResult;
 }
 
-pub trait BotMessageCommand: CommandInfoAware {
+pub trait BotMessageCommand: CreateCommand {
     async fn run(ctx: MessageCtx) -> CommandResult;
 }
 

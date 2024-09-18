@@ -1,6 +1,7 @@
 use std::fmt::{Display, Write};
 
 use twilight_http::{request::application::interaction::UpdateResponse, Response};
+use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::{command::CommandOptionChoice, interaction::Interaction},
     channel::{
@@ -16,10 +17,7 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    command::{
-        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
-        model::CommandInfoAware,
-    },
+    command::declare::{commands, POPULATED_COMMANDS_MAP},
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
 };
 
@@ -366,7 +364,7 @@ impl<'a> Client<'a> {
     pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
         let commands = self
             .0
-            .set_global_commands(&[SLASH_COMMANDS.as_slice(), MESSAGE_COMMANDS.as_slice()].concat())
+            .set_global_commands(&commands())
             .await?
             .models()
             .await?;
@@ -381,9 +379,9 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
-    pub fn populated_command<T: CommandInfoAware>(
+    pub fn populated_command<T: CreateCommand>(
     ) -> &'static twilight_model::application::command::Command {
-        let name = T::name();
+        let name = T::NAME;
         POPULATED_COMMANDS_MAP
             .get()
             .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
@@ -391,7 +389,7 @@ impl<'a> Client<'a> {
             .unwrap_or_else(|| panic!("command not found: {name}"))
     }
 
-    pub fn mention_command<T: CommandInfoAware>() -> MentionCommand {
+    pub fn mention_command<T: CreateCommand>() -> MentionCommand {
         let cmd = Self::populated_command::<T>();
 
         let name = cmd.name.clone().into();

@@ -547,8 +547,17 @@ fn extract_queries(message: &Message) -> Vec<Box<str>> {
 pub struct AddToQueue;
 
 impl AddToQueue {
+    const NAME: &'static str = "➕ Add to queue";
     pub fn create_command() -> Command {
-        CommandBuilder::new("➕ Add to queue", String::new(), CommandType::Message).build()
+        CommandBuilder::new(Self::NAME, String::new(), CommandType::Message).build()
+    }
+}
+
+impl CreateCommand for AddToQueue {
+    const NAME: &'static str = Self::NAME;
+    fn create_command() -> twilight_interactions::command::ApplicationCommandData {
+        // SAFETY: `AddToQueue::create_command()` will shadow this, so the trait function will never be called
+        unsafe { std::hint::unreachable_unchecked() }
     }
 }
 
