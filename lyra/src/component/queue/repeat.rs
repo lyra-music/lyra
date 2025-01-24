@@ -87,8 +87,13 @@ pub async fn repeat(
     via_controller: bool,
 ) -> Result<(), RepeatError> {
     ctx.try_get_connection()?.dispatch(Event::QueueRepeat);
-    data.write().await.queue_mut().set_repeat_mode(mode);
+    data.write()
+        .await
+        .set_repeat_mode_then_update_and_apply_to_now_playing(mode)
+        .await?;
+
     let message = format!("{} {}", mode.emoji(), mode);
     let content = controller_fmt(ctx, via_controller, &message);
-    out_or_upd!(content, ctx);
+    out_or_upd!(content, ?ctx);
+    Ok(())
 }

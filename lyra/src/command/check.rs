@@ -17,9 +17,7 @@ use crate::{
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
-        model::{
-            AuthorIdAware, AuthorPermissionsAware, BotState, DatabaseAware, OwnedBotStateAware,
-        },
+        model::{BotState, DatabaseAware, OwnedBotStateAware, UserIdAware, UserPermissionsAware},
         traced,
     },
     error::{
@@ -65,19 +63,19 @@ pub const STAGE_MANAGER_PERMISSIONS: Permissions = Permissions::MANAGE_CHANNELS
 
 pub fn does_user_have_permissions(
     permissions: Permissions,
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> bool {
-    let author_permissions = ctx.author_permissions();
+    let author_permissions = ctx.user_permissions();
     author_permissions.contains(permissions)
         || author_permissions.contains(Permissions::ADMINISTRATOR)
 }
 
 #[inline]
-pub fn is_user_dj(ctx: &impl AuthorPermissionsAware) -> bool {
+pub fn is_user_dj(ctx: &impl UserPermissionsAware) -> bool {
     does_user_have_permissions(DJ_PERMISSIONS, ctx)
 }
 
-pub fn user_is_dj(ctx: &impl AuthorPermissionsAware) -> Result<(), UserNotDjError> {
+pub fn user_is_dj(ctx: &impl UserPermissionsAware) -> Result<(), UserNotDjError> {
     if !is_user_dj(ctx) {
         return Err(UserNotDjError);
     }
@@ -85,7 +83,7 @@ pub fn user_is_dj(ctx: &impl AuthorPermissionsAware) -> Result<(), UserNotDjErro
 }
 
 pub fn user_is_access_manager(
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> Result<(), UserNotAccessManagerError> {
     if !does_user_have_permissions(ACCESS_MANAGER_PERMISSIONS, ctx) {
         return Err(UserNotAccessManagerError);
@@ -94,7 +92,7 @@ pub fn user_is_access_manager(
 }
 
 pub fn user_is_stage_manager(
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> Result<(), UserNotStageManagerError> {
     if !does_user_have_permissions(STAGE_MANAGER_PERMISSIONS, ctx) {
         return Err(UserNotStageManagerError);
@@ -113,7 +111,7 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
 
     let channel = ctx.channel();
     let mut access_calculator_builder = CalculatorBuilder::new(weak.guild_id(), ctx.db().clone())
-        .user(ctx.author_id())
+        .user(ctx.user_id())
         .roles(weak.member().roles.iter());
     match channel.kind {
         ChannelType::PublicThread
@@ -206,7 +204,7 @@ pub struct PollStarterInfo {
 
 type InVoiceWithUserOnlyResult = Result<(), check::UserOnlyInError>;
 
-impl<'a> InVoiceWithUserResult<'a> {
+impl InVoiceWithUserResult<'_> {
     pub fn only(self) -> InVoiceWithUserOnlyResult {
         if matches!(self.kind, InVoiceWithUserResultKind::UserIsDj) {
             return Ok(());
@@ -247,23 +245,18 @@ impl ResolveWithPoll for InVoiceWithUserOnlyResult {
     }
 }
 
-pub trait StartPoll {
+pub trait StartPoll: Sized {
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
-    ) -> Result<(), check::HandlePollError>
-    where
-        Self: Sized;
+    ) -> Result<(), check::HandlePollError>;
 }
 
 impl StartPoll for Option<PollStarter> {
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
-    ) -> Result<(), check::HandlePollError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), check::HandlePollError> {
         let Some(PollStarter(info)) = self else {
             return Ok(());
         };
@@ -761,7 +754,7 @@ async fn handle_poll(
                 }
                 .into());
             }
-            connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
+            connection.dispatch(Event::AlternateVoteCast(ctx.user_id().into()));
 
             let mut rx = connection.subscribe();
 

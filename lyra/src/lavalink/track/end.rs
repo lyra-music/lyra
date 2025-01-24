@@ -9,7 +9,7 @@ use crate::{
 #[tracing::instrument(err, skip_all, name = "track_end")]
 pub(super) async fn impl_end(
     lavalink: LavalinkClient,
-    _: String,
+    _session_id: String,
     event: &TrackEnd,
 ) -> ProcessResult {
     let guild_id = event.guild_id;
@@ -50,10 +50,9 @@ pub(super) async fn impl_end(
 
 pub async fn delete_now_playing_message(cx: &(impl HttpAware + Sync), data: &PlayerData) {
     let mut data_w = data.write().await;
-    if let Some(message_id) = data_w.take_now_playing_message_id() {
-        let channel_id = data_w.now_playing_message_channel_id();
-        let _ = cx.http().delete_message(channel_id, message_id).await;
-        data_w.sync_now_playing_message_channel_id();
+    if let Some(message) = data_w.take_now_playing_message() {
+        let channel_id = message.channel_id();
+        let _ = cx.http().delete_message(channel_id, message.id()).await;
     };
     drop(data_w);
 }

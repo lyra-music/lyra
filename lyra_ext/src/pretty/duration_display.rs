@@ -35,10 +35,7 @@ impl DurationDisplay for u128 {
 
 pub struct FromPrettyStrError;
 
-pub trait FromPrettyStr
-where
-    Self: Sized,
-{
+pub trait FromPrettyStr: Sized {
     /// # Errors
     /// if `value` doesn't match `timestamp` or `timestamp_2` regex
     fn from_pretty_str(value: &str) -> Result<Self, FromPrettyStrError>;

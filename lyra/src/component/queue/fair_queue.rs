@@ -32,9 +32,11 @@ impl BotSlashCommand for FairQueue {
             IndexerType::Fair => {
                 data.write()
                     .await
-                    .queue_mut()
-                    .set_indexer_type(IndexerType::Standard);
-                out!("**` ⮆ `** Disabled fair queue", ctx);
+                    .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
+                    .await?;
+
+                out!("**` ⮆ `** Disabled fair queue", ?ctx);
+                Ok(())
             }
             IndexerType::Shuffled => {
                 bad!(
@@ -45,9 +47,11 @@ impl BotSlashCommand for FairQueue {
             IndexerType::Standard => {
                 data.write()
                     .await
-                    .queue_mut()
-                    .set_indexer_type(IndexerType::Fair);
-                out!("⚖️ Enabled fair queue", ctx);
+                    .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Fair)
+                    .await?;
+
+                out!("⚖️ Enabled fair queue", ?ctx);
+                Ok(())
             }
         }
     }

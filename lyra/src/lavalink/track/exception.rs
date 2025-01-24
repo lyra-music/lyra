@@ -10,7 +10,7 @@ use crate::{
 #[tracing::instrument(err, skip_all, name = "track_exception")]
 pub(super) async fn impl_exception(
     lavalink: LavalinkClient,
-    _: String,
+    _session_id: String,
     event: &TrackException,
 ) -> ProcessResult {
     let guild_id = event.guild_id;
@@ -29,15 +29,13 @@ pub(super) async fn impl_exception(
 
     let data = player.data_unwrapped();
     if rec.now_playing {
-        let mut data_w = data.write().await;
-        if let Some(message_id) = data_w.take_now_playing_message_id() {
-            let channel_id = data_w.now_playing_message_channel_id();
+        let message = data.write().await.take_now_playing_message();
+        if let Some(message) = message {
             let _ = lavalink
                 .data_unwrapped()
                 .http()
-                .delete_message(channel_id, message_id)
+                .delete_message(message.channel_id(), message.id())
                 .await;
-            data_w.sync_now_playing_message_channel_id();
         };
     }
 

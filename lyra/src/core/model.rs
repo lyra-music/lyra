@@ -10,16 +10,17 @@ use std::{
 
 use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
-use twilight_cache_inmemory::InMemoryCache;
+use twilight_cache_inmemory::{model::CachedMember, InMemoryCache};
 use twilight_gateway::ShardId;
 use twilight_http::Client;
 use twilight_model::{
-    guild::{Emoji, Permissions},
+    guild::{Emoji, PartialMember, Permissions},
     id::{
         marker::{ApplicationMarker, UserMarker},
         Id,
     },
-    user::CurrentUser,
+    user::{CurrentUser, User},
+    util::ImageHash,
 };
 use twilight_standby::Standby;
 
@@ -105,12 +106,110 @@ impl BotInfo {
 pub type BotStateRef<'a> = &'a BotState;
 pub type OwnedBotState = Arc<BotState>;
 
-pub trait AuthorIdAware {
-    fn author_id(&self) -> Id<UserMarker>;
+pub trait DiscriminatorAware {
+    fn discriminator(&self) -> u16;
 }
 
-pub trait AuthorPermissionsAware {
-    fn author_permissions(&self) -> Permissions;
+pub trait UserIdAware {
+    fn user_id(&self) -> Id<UserMarker>;
+}
+
+impl UserIdAware for CachedMember {
+    fn user_id(&self) -> Id<UserMarker> {
+        self.user_id()
+    }
+}
+
+pub trait UserPermissionsAware {
+    fn user_permissions(&self) -> Permissions;
+}
+
+pub trait AvatarAware {
+    fn avatar(&self) -> Option<ImageHash>;
+}
+
+pub trait UserAware {
+    fn user(&self) -> &User;
+}
+
+impl UserAware for User {
+    fn user(&self) -> &User {
+        self
+    }
+}
+
+impl<T: UserAware> UserIdAware for T {
+    fn user_id(&self) -> Id<UserMarker> {
+        self.user().id
+    }
+}
+
+impl<T: UserAware> AvatarAware for T {
+    fn avatar(&self) -> Option<ImageHash> {
+        self.user().avatar
+    }
+}
+
+impl<T: UserAware> DiscriminatorAware for T {
+    fn discriminator(&self) -> u16 {
+        self.user().discriminator
+    }
+}
+
+pub trait PartialMemberAware {
+    fn member(&self) -> &PartialMember;
+}
+
+impl PartialMemberAware for PartialMember {
+    fn member(&self) -> &PartialMember {
+        self
+    }
+}
+
+pub trait GuildAvatarAware {
+    fn guild_avatar(&self) -> Option<ImageHash>;
+}
+
+impl GuildAvatarAware for CachedMember {
+    fn guild_avatar(&self) -> Option<ImageHash> {
+        self.avatar()
+    }
+}
+
+impl<T: PartialMemberAware> GuildAvatarAware for T {
+    fn guild_avatar(&self) -> Option<ImageHash> {
+        self.member().avatar
+    }
+}
+
+pub trait UserNickAware {
+    fn nick(&self) -> Option<&str>;
+}
+
+impl<T: PartialMemberAware> UserNickAware for T {
+    fn nick(&self) -> Option<&str> {
+        self.member().nick.as_deref()
+    }
+}
+
+pub trait UsernameAware {
+    fn username(&self) -> &str;
+}
+
+impl<T: UserAware> UsernameAware for T {
+    fn username(&self) -> &str {
+        self.user().name.as_str()
+    }
+}
+
+pub trait UserGlobalNameAware {
+    fn user_global_name(&self) -> Option<&str>;
+}
+
+impl<T: UserAware> UserGlobalNameAware for T {
+    fn user_global_name(&self) -> Option<&str> {
+        self.user().global_name.as_deref()
+    }
 }
 
 pub trait BotStateAware {
@@ -127,6 +226,10 @@ pub trait CacheAware {
 
 pub trait HttpAware {
     fn http(&self) -> &Client;
+}
+
+pub trait OwnedHttpAware {
+    fn http_owned(&self) -> Arc<Client>;
 }
 
 pub trait DatabaseAware {

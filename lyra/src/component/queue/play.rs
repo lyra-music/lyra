@@ -31,7 +31,7 @@ use crate::{
         require, util, AutocompleteCtx, MessageCtx, SlashCtx,
     },
     core::{
-        model::AuthorIdAware,
+        model::UserIdAware,
         r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
     },
     error::{
@@ -49,11 +49,14 @@ struct LoadTrackContext {
     lavalink: LavalinkClient,
 }
 
-impl LoadTrackContext {
-    fn new_via(cx: &(impl GuildIdAware + LavalinkAware)) -> Self {
+impl<T> From<&T> for LoadTrackContext
+where
+    T: GuildIdAware + LavalinkAware,
+{
+    fn from(value: &T) -> Self {
         Self {
-            guild_id: cx.guild_id(),
-            lavalink: cx.lavalink().clone_inner(),
+            guild_id: value.guild_id(),
+            lavalink: value.lavalink().clone_inner(),
         }
     }
 }
@@ -324,7 +327,7 @@ async fn play(
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
     ctx.defer().await?;
-    let load_ctx = LoadTrackContext::new_via(ctx);
+    let load_ctx = LoadTrackContext::from(&*ctx);
     match load_ctx.process_many(queries).await {
         Ok(results) => {
             let (tracks, playlists) = results.split();
@@ -394,7 +397,7 @@ async fn play(
                 .write()
                 .await
                 .queue_mut()
-                .enqueue(total_tracks, ctx.author_id());
+                .enqueue(total_tracks, ctx.user_id());
             player.play(&first_track).await?;
 
             out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);

@@ -5,7 +5,7 @@ use crate::{core::model::HttpAware, error::lavalink::ProcessResult, lavalink::Un
 #[tracing::instrument(err, skip_all, name = "track_stuck")]
 pub(super) async fn impl_stuck(
     lavalink: LavalinkClient,
-    _: String,
+    _session_id: String,
     event: &TrackStuck,
 ) -> ProcessResult {
     let guild_id = event.guild_id;

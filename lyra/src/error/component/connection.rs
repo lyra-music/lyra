@@ -338,6 +338,7 @@ pub enum HandleVoiceStateUpdateError {
     MatchStateChannelID(#[from] MatchStateChannelIdError),
     DisconnectCleanup(#[from] leave::DisconnectCleanupError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    SetPauseWith(#[from] crate::error::command::require::SetPauseWithError),
 }
 
 #[derive(Error, Debug)]

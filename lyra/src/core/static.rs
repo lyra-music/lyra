@@ -28,7 +28,7 @@ pub mod application {
             .get_or_try_init(|| async {
                 let application_id = id(cx).await?;
                 let req = cx.http().get_application_emojis(application_id);
-                Ok(&*req.await?.models().await?.leak())
+                Ok(&*req.await?.model().await?.items.leak())
             })
             .await
             .copied()
@@ -46,6 +46,34 @@ pub mod component {
         pub play_pause: &'static str,
         pub next: &'static str,
         pub repeat: &'static str,
+    }
+
+    pub enum NowPlayingButtonType {
+        Shuffle,
+        Previous,
+        PlayPause,
+        Next,
+        Repeat,
+    }
+
+    impl TryFrom<&str> for NowPlayingButtonType {
+        type Error = ();
+
+        fn try_from(id: &str) -> Result<Self, Self::Error> {
+            if id == NOW_PLAYING_BUTTON_IDS.next {
+                Ok(Self::Next)
+            } else if id == NOW_PLAYING_BUTTON_IDS.play_pause {
+                Ok(Self::PlayPause)
+            } else if id == NOW_PLAYING_BUTTON_IDS.previous {
+                Ok(Self::Previous)
+            } else if id == NOW_PLAYING_BUTTON_IDS.repeat {
+                Ok(Self::Repeat)
+            } else if id == NOW_PLAYING_BUTTON_IDS.shuffle {
+                Ok(Self::Shuffle)
+            } else {
+                Err(())
+            }
+        }
     }
 
     impl NowPlayingButtonIds {

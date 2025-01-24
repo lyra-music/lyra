@@ -18,7 +18,7 @@ pub trait AsGrapheme: UnicodeSegmentation {
     }
 }
 
-impl AsGrapheme for str {}
+impl<T> AsGrapheme for T where T: UnicodeSegmentation + ?Sized {}
 
 #[cfg(test)]
 mod test {

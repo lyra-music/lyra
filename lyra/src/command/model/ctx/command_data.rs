@@ -30,8 +30,8 @@ impl<T: Aware> Ctx<T> {
         acknowledgement: oneshot::Sender<()>,
     ) -> Self {
         Self {
-            data: Some(PartialInteractionData::Command(PartialCommandData::new(
-                data,
+            data: Some(PartialInteractionData::Command(Box::new(
+                PartialCommandData::new(data),
             ))),
             inner,
             bot,
@@ -55,7 +55,7 @@ impl<T: Aware, U: Location> Ctx<T, U> {
         data
     }
 
-    pub fn into_command_data(self) -> PartialCommandData {
+    pub fn into_command_data(self) -> Box<PartialCommandData> {
         let Some(PartialInteractionData::Command(command_data)) = self.data else {
             // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
             //         so `data` will always be `PartialInteractionData::Command(_)`

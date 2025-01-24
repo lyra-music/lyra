@@ -14,9 +14,11 @@ use twilight_model::{
 };
 
 use crate::{
-    core::model::{AuthorIdAware, AuthorPermissionsAware, CacheAware},
+    core::model::{CacheAware, UserIdAware, UserPermissionsAware},
     error::{
-        command::require::{InVoiceWithSomeoneElseError, UnsuppressedError},
+        command::require::{
+            InVoiceWithSomeoneElseError, SeekToWithError, SetPauseWithError, UnsuppressedError,
+        },
         lavalink::NoPlayerError,
         Cache, CacheResult, InVoiceWithoutSomeoneElse, NotInGuild, NotInVoice, NotPlaying,
         QueueEmpty, Suppressed,
@@ -81,28 +83,30 @@ impl PlayerInterface {
         Ok(())
     }
 
-    pub async fn seek_to_with<'data, 'guard>(
+    pub async fn seek_to_with(
         &self,
         timestamp: Duration,
-        data_w: &'guard mut PlayerDataWrite<'data>,
-    ) -> LavalinkResult<()> {
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> Result<(), SeekToWithError> {
         data_w.seek_to(timestamp);
+        data_w.update_and_apply_now_playing_timestamp().await?;
         self.context.set_position(timestamp).await?;
         Ok(())
     }
 
-    pub async fn set_pause(&self, state: bool) -> LavalinkResult<()> {
+    pub async fn set_pause(&self, state: bool) -> Result<(), SetPauseWithError> {
         let data = self.data();
         let mut data_w = data.write().await;
         self.set_pause_with(state, &mut data_w).await
     }
 
-    pub async fn set_pause_with<'data, 'guard>(
+    pub async fn set_pause_with(
         &self,
         state: bool,
-        data_w: &'guard mut PlayerDataWrite<'data>,
-    ) -> LavalinkResult<()> {
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> Result<(), SetPauseWithError> {
         data_w.set_pause(state);
+        data_w.update_and_apply_now_playing_pause(state).await?;
         self.context.set_pause(state).await?;
         Ok(())
     }
@@ -173,12 +177,12 @@ pub fn in_voice<T: CtxKind>(ctx: &GuildCtx<T>) -> Result<InVoice, NotInVoice> {
 impl<'a> InVoice<'a> {
     pub unsafe fn new(
         state: InVoiceCachedVoiceState,
-        ctx: &'a (impl AuthorPermissionsAware + AuthorIdAware + CacheAware),
+        ctx: &'a (impl UserPermissionsAware + UserIdAware + CacheAware),
     ) -> Self {
         Self {
             state,
-            author_permissions: ctx.author_permissions(),
-            author_id: ctx.author_id(),
+            author_permissions: ctx.user_permissions(),
+            author_id: ctx.user_id(),
             cache: ctx.cache(),
         }
     }
@@ -219,14 +223,14 @@ impl CacheAware for InVoice<'_> {
     }
 }
 
-impl AuthorIdAware for InVoice<'_> {
-    fn author_id(&self) -> Id<UserMarker> {
+impl UserIdAware for InVoice<'_> {
+    fn user_id(&self) -> Id<UserMarker> {
         self.author_id
     }
 }
 
-impl AuthorPermissionsAware for InVoice<'_> {
-    fn author_permissions(&self) -> Permissions {
+impl UserPermissionsAware for InVoice<'_> {
+    fn user_permissions(&self) -> Permissions {
         self.author_permissions
     }
 }
@@ -239,14 +243,14 @@ impl GuildIdAware for InVoice<'_> {
 
 pub fn someone_else_in(
     channel_id: Id<ChannelMarker>,
-    cx: &(impl CacheAware + AuthorIdAware),
+    cx: &(impl CacheAware + UserIdAware),
 ) -> CacheResult<bool> {
     let cache = cx.cache();
     cache
         .voice_channel_states(channel_id)
         .and_then(|states| {
             for state in states {
-                if !cache.user(state.user_id())?.bot && state.user_id() != cx.author_id() {
+                if !cache.user(state.user_id())?.bot && state.user_id() != cx.user_id() {
                     return Some(true);
                 }
             }

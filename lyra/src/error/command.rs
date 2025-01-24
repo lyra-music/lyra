@@ -61,6 +61,9 @@ pub enum Error {
     UnrecognisedConnection(#[from] super::UnrecognisedConnection),
     PlayPause(#[from] super::component::playback::PlayPauseError),
     Repeat(#[from] super::component::queue::RepeatError),
+    Shuffle(#[from] super::component::queue::ShuffleError),
+    UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
+    SeekToWith(#[from] require::SeekToWithError),
 }
 
 pub enum FlattenedError<'a> {
@@ -100,6 +103,7 @@ pub enum FlattenedError<'a> {
     NoPlayer,
     NotInGuild,
     UnrecognisedConnection,
+    TimestampParse,
 }
 
 pub use FlattenedError as Fe;
@@ -530,6 +534,9 @@ impl<'a> Fe<'a> {
         match error {
             super::component::playback::PlayPauseError::Lavalink(_) => Self::Lavalink,
             super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
+            super::component::playback::PlayPauseError::SetPauseWith(e) => {
+                Self::from_set_pause_with(e)
+            }
         }
     }
 
@@ -539,7 +546,56 @@ impl<'a> Fe<'a> {
                 Self::UnrecognisedConnection
             }
             super::component::queue::RepeatError::Respond(e) => Self::from_respond(e),
+            super::component::queue::RepeatError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
         }
+    }
+
+    const fn from_shuffle(error: &'a super::component::queue::ShuffleError) -> Self {
+        match error {
+            super::component::queue::ShuffleError::Respond(e) => Self::from_respond(e),
+            super::component::queue::ShuffleError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+        }
+    }
+
+    const fn from_update_now_playing_message(
+        error: &'a super::lavalink::UpdateNowPlayingMessageError,
+    ) -> Self {
+        match error {
+            super::lavalink::UpdateNowPlayingMessageError::TwilightHttp(_) => Self::TwilightHttp,
+            super::lavalink::UpdateNowPlayingMessageError::BuildNowPlayingEmbed(e) => {
+                Self::from_build_now_playing_embed(e)
+            }
+            super::lavalink::UpdateNowPlayingMessageError::DeserialiseBodyFromHttp(e) => {
+                Self::from_deserialize_body_from_http_error(e)
+            }
+        }
+    }
+
+    const fn from_build_now_playing_embed(
+        error: &'a super::lavalink::BuildNowPlayingEmbedError,
+    ) -> Self {
+        match error {
+            super::lavalink::BuildNowPlayingEmbedError::ImageSourceUrl(_) => Self::ImageSourceUrl,
+            super::lavalink::BuildNowPlayingEmbedError::TimestampParse(_) => Self::TimestampParse,
+        }
+    }
+
+    const fn from_seek_to_with(error: &'a require::SeekToWithError) -> Self {
+        match error {
+            require::SeekToWithError::Lavalink(_) => Self::Lavalink,
+            require::SeekToWithError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+        }
+    }
+
+    #[inline]
+    const fn from_set_pause_with(error: &'a require::SetPauseWithError) -> Self {
+        Self::from_seek_to_with(error)
     }
 }
 
@@ -581,6 +637,9 @@ impl Error {
             Self::HandlePoll(e) => Fe::from_handle_poll(e),
             Self::PlayPause(e) => Fe::from_play_pause(e),
             Self::Repeat(e) => Fe::from_repeat(e),
+            Self::Shuffle(e) => Fe::from_shuffle(e),
+            Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
+            Self::SeekToWith(e) => Fe::from_seek_to_with(e),
         }
     }
 }

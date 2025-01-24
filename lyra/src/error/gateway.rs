@@ -30,6 +30,8 @@ pub enum ProcessError {
     PlayPause(#[from] super::component::playback::PlayPauseError),
     #[error(transparent)]
     Repeat(#[from] super::component::queue::RepeatError),
+    #[error(transparent)]
+    Shuffle(#[from] super::component::queue::ShuffleError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]
     CommandExecute {
         name: Box<str>,

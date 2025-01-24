@@ -19,7 +19,7 @@ use twilight_model::{
     },
     guild::Permissions,
     id::{
-        marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
+        marker::{ChannelMarker, MessageMarker, UserMarker},
         Id,
     },
 };
@@ -30,7 +30,7 @@ use twilight_util::builder::embed::{
 use crate::{
     command::macros::{caut, hid, nope},
     core::{
-        model::{AuthorIdAware, BotStateAware, CacheAware, HttpAware},
+        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
         r#const::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
@@ -40,7 +40,6 @@ use crate::{
         command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
         Cache as CacheError,
     },
-    gateway::GuildIdAware,
     lavalink::{Event, EventRecvResult},
     LavalinkAware,
 };
@@ -48,7 +47,7 @@ use crate::{
 use super::{
     model::{GuildCtx, GuildInteraction, NonPingInteraction, RespondViaMessage},
     require::PartialInVoice,
-    util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware, MessageLinkAware},
+    util::{GuildIdAndDisplayAvatarUrlAware, GuildIdAndDisplayNameAware, MessageLinkAware},
 };
 
 #[derive(Hash)]
@@ -113,8 +112,8 @@ impl Voter {
     }
 }
 
-impl crate::core::model::AuthorPermissionsAware for Voter {
-    fn author_permissions(&self) -> Permissions {
+impl crate::core::model::UserPermissionsAware for Voter {
+    fn user_permissions(&self) -> Permissions {
         self.permissions
     }
 }
@@ -220,26 +219,6 @@ fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAct
             interaction: inter,
         },
     }
-}
-
-fn get_author_info(
-    guild_id: Id<GuildMarker>,
-    ctx: &GuildCtx<impl RespondViaMessage>,
-) -> (&str, String) {
-    let author_name = ctx
-        .member()
-        .nick
-        .as_deref()
-        .or_else(|| ctx.author().global_name.as_deref())
-        .unwrap_or_else(|| &ctx.author().name);
-
-    let author_icon = ctx
-        .member()
-        .avatar_url(guild_id)
-        .or_else(|| ctx.author().avatar_url())
-        .unwrap_or_else(|| ctx.author().default_avatar_url());
-
-    (author_name, author_icon)
 }
 
 fn generate_embed(
@@ -456,14 +435,13 @@ pub async fn start(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     in_voice: &PartialInVoice,
 ) -> Result<Resolution, StartPollError> {
-    let guild_id = ctx.guild_id();
-
-    let (author_name, author_icon) = get_author_info(guild_id, ctx);
+    let author_name = ctx.guild_display_name();
+    let author_icon = ctx.guild_display_avatar_url();
     let embed_latent = generate_latent_embed_colours();
     let (upvote_button_id, row) = generate_upvote_button_id_and_row();
 
     let users_in_voice = get_users_in_voice(ctx, in_voice)?;
-    let votes = HashMap::from([(ctx.author_id(), Vote(true))]);
+    let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
     #[allow(clippy::cast_precision_loss)]
     let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;

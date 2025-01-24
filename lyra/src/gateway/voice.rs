@@ -94,8 +94,6 @@ impl GuildIdAware for Context {
     }
 }
 
-impl LavalinkAndGuildIdAware for Context {}
-
 impl Process for Context {
     async fn process(self) -> ProcessResult {
         let connection_changed = match self.get_connection() {

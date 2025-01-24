@@ -37,18 +37,20 @@ pub async fn shuffle(
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
-) -> Result<(), crate::error::command::RespondError> {
-    let mut data_w = data.write().await;
-    let indexer_type = data_w.queue().indexer_type();
+) -> Result<(), crate::error::component::queue::ShuffleError> {
+    let indexer_type = data.read().await.queue().indexer_type();
     match indexer_type {
         IndexerType::Shuffled => {
-            data_w.queue_mut().set_indexer_type(IndexerType::Standard);
-            drop(data_w);
+            data.write()
+                .await
+                .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
+                .await?;
+
             let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle");
-            out!(content, ctx);
+            out!(content, ?ctx);
+            Ok(())
         }
         IndexerType::Fair => {
-            drop(data_w);
             bad!(
                 // The shuffle button on the playback controller will be disabled, so no need to use `controller_fmt` here
                 "Cannot enable shuffle as fair queue is currently enabled",
@@ -56,10 +58,14 @@ pub async fn shuffle(
             );
         }
         IndexerType::Standard => {
-            data_w.queue_mut().set_indexer_type(IndexerType::Shuffled);
-            drop(data_w);
+            data.write()
+                .await
+                .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Shuffled)
+                .await?;
+
             let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle");
-            out!(content, ctx);
+            out!(content, ?ctx);
+            Ok(())
         }
     }
 }

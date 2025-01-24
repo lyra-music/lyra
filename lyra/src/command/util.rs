@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
 use lyra_ext::unix_time;
 use rand::{distributions::Alphanumeric, Rng};
-use twilight_cache_inmemory::model::CachedMember;
 use twilight_gateway::Event;
 use twilight_mention::{
     timestamp::{Timestamp, TimestampStyle},
@@ -20,8 +19,6 @@ use twilight_model::{
         marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
         Id,
     },
-    user::User,
-    util::ImageHash,
 };
 
 use super::{
@@ -35,7 +32,10 @@ use super::{
 use crate::{
     component::connection::auto_join,
     core::{
-        model::{AuthorIdAware, BotStateAware, CacheAware, OwnedBotStateAware},
+        model::{
+            AvatarAware, BotStateAware, CacheAware, DiscriminatorAware, GuildAvatarAware,
+            OwnedBotStateAware, UserGlobalNameAware, UserIdAware, UserNickAware, UsernameAware,
+        },
         r#const::{
             self,
             discord::{BASE_URL, CDN_URL},
@@ -51,18 +51,17 @@ use crate::{
         },
         ConfirmationTimedOut, Suppressed as SuppressedError,
     },
-    gateway::GuildIdAware,
+    gateway::{GuildIdAware, OptionallyGuildIdAware},
     lavalink::DelegateMethods,
     LavalinkAware,
 };
 
-pub trait MessageLinkAware {
+pub trait MessageLinkAware: OptionallyGuildIdAware {
     fn id(&self) -> Id<MessageMarker>;
     fn channel_id(&self) -> Id<ChannelMarker>;
-    fn guild_id(&self) -> Option<Id<GuildMarker>>;
     fn link(&self) -> String {
         let guild_id_str = self
-            .guild_id()
+            .get_guild_id()
             .map_or_else(|| String::from("@me"), |i| i.to_string());
         format!(
             "{}/channels/{}/{}/{}",
@@ -74,6 +73,12 @@ pub trait MessageLinkAware {
     }
 }
 
+impl OptionallyGuildIdAware for twilight_model::channel::Message {
+    fn get_guild_id(&self) -> Option<Id<GuildMarker>> {
+        self.guild_id
+    }
+}
+
 impl MessageLinkAware for twilight_model::channel::Message {
     fn id(&self) -> Id<MessageMarker> {
         self.id
@@ -82,9 +87,11 @@ impl MessageLinkAware for twilight_model::channel::Message {
     fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel_id
     }
+}
 
-    fn guild_id(&self) -> Option<Id<GuildMarker>> {
-        self.guild_id
+impl OptionallyGuildIdAware for twilight_cache_inmemory::model::CachedMessage {
+    fn get_guild_id(&self) -> Option<Id<GuildMarker>> {
+        self.guild_id()
     }
 }
 
@@ -95,10 +102,6 @@ impl MessageLinkAware for twilight_cache_inmemory::model::CachedMessage {
 
     fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel_id()
-    }
-
-    fn guild_id(&self) -> Option<Id<GuildMarker>> {
-        self.guild_id()
     }
 }
 
@@ -119,6 +122,12 @@ impl From<twilight_model::channel::Message> for MessageLinkComponent {
     }
 }
 
+impl OptionallyGuildIdAware for MessageLinkComponent {
+    fn get_guild_id(&self) -> Option<Id<GuildMarker>> {
+        self.guild_id
+    }
+}
+
 impl MessageLinkAware for MessageLinkComponent {
     fn id(&self) -> Id<MessageMarker> {
         self.id
@@ -127,45 +136,30 @@ impl MessageLinkAware for MessageLinkComponent {
     fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel_id
     }
-
-    fn guild_id(&self) -> Option<Id<GuildMarker>> {
-        self.guild_id
-    }
 }
 
-pub trait AvatarUrlAware {
-    fn id(&self) -> Id<UserMarker>;
-    fn avatar(&self) -> Option<ImageHash>;
+pub trait AvatarUrlAware: AvatarAware + UserIdAware {
     fn avatar_url(&self) -> Option<String> {
         let avatar = self.avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
-        let formatted = format!("{}/avatars/{}/{}.{}", CDN_URL, self.id(), avatar, ext);
+        let formatted = format!("{}/avatars/{}/{}.{}", CDN_URL, self.user_id(), avatar, ext);
         Some(formatted)
     }
 }
 
-impl AvatarUrlAware for User {
-    fn id(&self) -> Id<UserMarker> {
-        self.id
-    }
-    fn avatar(&self) -> Option<ImageHash> {
-        self.avatar
-    }
-}
+impl<T: AvatarAware + UserIdAware> AvatarUrlAware for T {}
 
-pub trait GuildAvatarUrlAware {
-    fn id(&self) -> Id<UserMarker>;
-    fn avatar(&self) -> Option<ImageHash>;
-    fn avatar_url(&self, guild_id: Id<GuildMarker>) -> Option<String> {
-        let avatar = self.avatar()?;
+pub trait GuildAvatarUrlAware: UserIdAware + GuildAvatarAware {
+    fn guild_avatar_url(&self, guild_id: Id<GuildMarker>) -> Option<String> {
+        let avatar = self.guild_avatar()?;
         let ext = if avatar.is_animated() { "gif" } else { "png" };
 
         let formatted = format!(
             "{}/guilds/{}/users/{}/avatars/{}.{}",
             CDN_URL,
             guild_id,
-            self.id(),
+            self.user_id(),
             avatar,
             ext,
         );
@@ -173,60 +167,80 @@ pub trait GuildAvatarUrlAware {
     }
 }
 
-impl GuildAvatarUrlAware for PartialMember {
-    fn id(&self) -> Id<UserMarker> {
+impl<T: UserIdAware + GuildAvatarAware> GuildAvatarUrlAware for T {}
+
+impl UserIdAware for PartialMember {
+    fn user_id(&self) -> Id<UserMarker> {
         self.user
             .as_ref()
             .unwrap_or_else(|| panic!("user field is missing"))
             .id
     }
-    fn avatar(&self) -> Option<ImageHash> {
-        self.avatar
-    }
 }
 
-impl GuildAvatarUrlAware for CachedMember {
-    fn id(&self) -> Id<UserMarker> {
-        self.user_id()
-    }
-    fn avatar(&self) -> Option<ImageHash> {
-        self.avatar()
-    }
-}
-
-pub trait DefaultAvatarUrlAware {
-    fn id(&self) -> Id<UserMarker>;
-    fn discriminator(&self) -> u16;
+pub trait DefaultAvatarUrlAware: UserIdAware + DiscriminatorAware {
     fn default_avatar_url(&self) -> String {
         let discriminator = self.discriminator();
         if discriminator == 0 {
             return format!(
                 "{}/embed/avatars/{}.png",
                 CDN_URL,
-                (self.id().get() >> 22) % 6
+                (self.user_id().get() >> 22) % 6
             );
         }
         format!("{}/embed/avatars/{}.png", CDN_URL, self.discriminator() % 5)
     }
 }
 
-impl DefaultAvatarUrlAware for User {
-    fn id(&self) -> Id<UserMarker> {
-        self.id
-    }
+impl<T: UserIdAware + DiscriminatorAware> DefaultAvatarUrlAware for T {}
 
-    fn discriminator(&self) -> u16 {
-        self.discriminator
+pub trait DisplayAvatarUrlAware: AvatarUrlAware + DefaultAvatarUrlAware {
+    fn display_avatar_url(&self) -> String {
+        self.avatar_url()
+            .unwrap_or_else(|| self.default_avatar_url())
     }
 }
 
+impl<T: AvatarUrlAware + DefaultAvatarUrlAware> DisplayAvatarUrlAware for T {}
+
+pub trait GuildIdAndDisplayAvatarUrlAware:
+    GuildAvatarUrlAware + DisplayAvatarUrlAware + GuildIdAware
+{
+    fn guild_display_avatar_url(&self) -> String {
+        self.guild_avatar_url(self.guild_id())
+            .unwrap_or_else(|| self.display_avatar_url())
+    }
+}
+
+impl<T> GuildIdAndDisplayAvatarUrlAware for T where
+    T: GuildAvatarUrlAware + DisplayAvatarUrlAware + GuildIdAware
+{
+}
+
+pub trait GuildIdAndDisplayNameAware: UserNickAware + DisplayNameAware + GuildIdAware {
+    fn guild_display_name(&self) -> &str {
+        self.nick()
+            .unwrap_or_else(|| DisplayNameAware::display_name(self))
+    }
+}
+
+impl<T> GuildIdAndDisplayNameAware for T where T: UserNickAware + DisplayNameAware + GuildIdAware {}
+
+pub trait DisplayNameAware: UsernameAware + UserGlobalNameAware {
+    fn display_name(&self) -> &str {
+        self.user_global_name().unwrap_or_else(|| self.username())
+    }
+}
+
+impl<T: UsernameAware + UserGlobalNameAware> DisplayNameAware for T {}
+
 pub fn controller_fmt<'a>(
-    ctx: &impl AuthorIdAware,
+    ctx: &impl UserIdAware,
     via_controller: bool,
     string: &'a str,
 ) -> Cow<'a, str> {
     if via_controller {
-        return format!("{} {}", ctx.author_id().mention(), string).into();
+        return format!("{} {}", ctx.user_id().mention(), string).into();
     }
     string.into()
 }
@@ -243,12 +257,10 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
     match auto_join(ctx).await {
         Err(e) => Err(e.unflatten_into_auto_join_attempt().into()),
         Ok(state) => {
-            let Err(UnsuppressedError::Suppressed(suppressed)) = {
-                // SAFETY: as `auto_join` was called and ran successfully,
-                //         there must now be an active voice connection.
-                unsafe { InVoice::new(state, ctx) }
-            }
-            .and_unsuppressed() else {
+            // SAFETY: as `auto_join` was called and ran successfully,
+            //         there must now be an active voice connection.
+            let in_voice = unsafe { InVoice::new(state, ctx) };
+            let Err(UnsuppressedError::Suppressed(suppressed)) = in_voice.and_unsuppressed() else {
                 return Ok(());
             };
             handle_suppressed_auto_join(suppressed, ctx).await?;
@@ -332,7 +344,7 @@ pub async fn prompt_for_confirmation(
     )
     .await?;
 
-    let author_id = ctx.author_id();
+    let author_id = ctx.user_id();
     let wait_for_modal_submit = ctx
         .bot()
         .standby()

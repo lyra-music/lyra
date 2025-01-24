@@ -1,5 +1,6 @@
 mod connection;
 mod correct_info;
+mod now_playing;
 mod pitch;
 mod queue;
 mod queue_indexer;
@@ -26,10 +27,13 @@ use twilight_model::id::{
 use crate::{
     command::require::{InVoice, PartialInVoice},
     core::{
-        model::{CacheAware, DatabaseAware, HttpAware},
+        model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
         r#const,
     },
-    error::UnrecognisedConnection,
+    error::{
+        lavalink::{NewNowPlayingMessageError, UpdateNowPlayingMessageError},
+        UnrecognisedConnection,
+    },
     gateway::GuildIdAware,
 };
 
@@ -38,6 +42,9 @@ use self::connection::{ConnectionRef, ConnectionRefMut};
 pub use self::{
     connection::{wait_for_with, Connection, Event, EventRecvResult},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
+    now_playing::{
+        Data as NowPlayingData, Message as NowPlayingMessage, Update as NowPlayingDataUpdate,
+    },
     pitch::Pitch,
     queue::{Item as QueueItem, Queue, RepeatMode},
     queue_indexer::IndexerType,
@@ -77,6 +84,8 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
     }
 }
 
+impl<T> ClientAndGuildIdAware for T where T: ClientAware + GuildIdAware {}
+
 type ClientRefAndGuildId<'a> = (&'a Lavalink, Id<GuildMarker>);
 
 impl ClientAware for ClientRefAndGuildId<'_> {
@@ -84,12 +93,12 @@ impl ClientAware for ClientRefAndGuildId<'_> {
         self.0
     }
 }
+
 impl GuildIdAware for ClientRefAndGuildId<'_> {
     fn guild_id(&self) -> Id<GuildMarker> {
         self.1
     }
 }
-impl ClientAndGuildIdAware for ClientRefAndGuildId<'_> {}
 
 pub struct RawPlayerData {
     queue: Queue,
@@ -97,9 +106,10 @@ pub struct RawPlayerData {
     pitch: Pitch,
     track_timestamp: TrackTimestamp,
     text_channel_id: Id<ChannelMarker>,
-    now_playing_message_id: Option<Id<MessageMarker>>,
-    now_playing_message_channel_id: Id<ChannelMarker>,
+    now_playing_message: Option<NowPlayingMessage>,
 }
+
+pub type UpdateNowPlayingMessageResult = Result<(), UpdateNowPlayingMessageError>;
 
 impl RawPlayerData {
     pub fn new(text_channel_id: Id<ChannelMarker>) -> Self {
@@ -110,8 +120,7 @@ impl RawPlayerData {
             pitch: Pitch::new(),
             queue: Queue::new(),
             track_timestamp: TrackTimestamp::new(),
-            now_playing_message_id: None,
-            now_playing_message_channel_id: text_channel_id,
+            now_playing_message: None,
         }
     }
 
@@ -181,23 +190,81 @@ impl RawPlayerData {
     }
 
     pub const fn now_playing_message_id(&self) -> Option<Id<MessageMarker>> {
-        self.now_playing_message_id
+        match self.now_playing_message {
+            Some(ref msg) => Some(msg.id()),
+            None => None,
+        }
     }
 
-    pub fn sync_now_playing_message_channel_id(&mut self) {
-        self.now_playing_message_channel_id = self.text_channel_id;
+    #[inline]
+    pub fn take_now_playing_message(&mut self) -> Option<NowPlayingMessage> {
+        self.now_playing_message.take()
     }
 
-    pub fn take_now_playing_message_id(&mut self) -> Option<Id<MessageMarker>> {
-        self.now_playing_message_id.take()
+    #[inline]
+    pub async fn new_now_playing_message(
+        &mut self,
+        http: Arc<Client>,
+        data: NowPlayingData,
+    ) -> Result<(), NewNowPlayingMessageError> {
+        self.now_playing_message =
+            Some(NowPlayingMessage::new(http, data, self.text_channel_id).await?);
+        Ok(())
     }
 
-    pub fn set_now_playing_message_id(&mut self, message_id: Id<MessageMarker>) {
-        self.now_playing_message_id = Some(message_id);
+    #[inline]
+    pub async fn update_and_apply_now_playing_timestamp(
+        &mut self,
+    ) -> UpdateNowPlayingMessageResult {
+        let timestamp = self.timestamp();
+        if let Some(ref mut msg) = self.now_playing_message {
+            msg.update_timestamp(timestamp);
+            msg.apply_update().await?;
+        }
+        Ok(())
     }
 
-    pub const fn now_playing_message_channel_id(&self) -> Id<ChannelMarker> {
-        self.now_playing_message_channel_id
+    #[inline]
+    async fn update_and_apply_now_playing_data(
+        &mut self,
+        update: NowPlayingDataUpdate,
+    ) -> UpdateNowPlayingMessageResult {
+        let timestamp = self.timestamp();
+        if let Some(ref mut msg) = self.now_playing_message {
+            msg.update(update);
+            msg.update_timestamp(timestamp);
+            msg.apply_update().await?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn set_repeat_mode_then_update_and_apply_to_now_playing(
+        &mut self,
+        mode: RepeatMode,
+    ) -> UpdateNowPlayingMessageResult {
+        self.queue_mut().set_repeat_mode(mode);
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Repeat(mode))
+            .await
+    }
+
+    #[inline]
+    pub async fn set_indexer_then_update_and_apply_to_now_playing(
+        &mut self,
+        kind: IndexerType,
+    ) -> UpdateNowPlayingMessageResult {
+        self.queue_mut().set_indexer_type(kind);
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Indexer(kind))
+            .await
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_pause(
+        &mut self,
+        paused: bool,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Paused(paused))
+            .await
     }
 }
 
@@ -424,7 +491,7 @@ impl Lavalink {
         self.inner.delete_player(guild_id).await
     }
 
-    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + '_ {
+    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + use<'_> {
         self.inner
             .players
             .iter()
@@ -536,6 +603,12 @@ pub struct ClientData {
 impl HttpAware for ClientData {
     fn http(&self) -> &Client {
         &self.http
+    }
+}
+
+impl OwnedHttpAware for ClientData {
+    fn http_owned(&self) -> Arc<Client> {
+        self.http.clone()
     }
 }
 

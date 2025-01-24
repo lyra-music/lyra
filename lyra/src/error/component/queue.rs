@@ -35,10 +35,21 @@ pub mod repeat {
     pub enum Error {
         UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
         Respond(#[from] crate::error::command::RespondError),
+        UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
+    }
+}
+
+pub mod shuffle {
+    #[derive(thiserror::Error, Debug)]
+    #[error(transparent)]
+    pub enum Error {
+        Respond(#[from] crate::error::command::RespondError),
+        UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
     }
 }
 
 pub use repeat::Error as RepeatError;
+pub use shuffle::Error as ShuffleError;
 
 use thiserror::Error;
 

@@ -19,5 +19,9 @@ pub async fn run() -> Result<(), super::error::Run> {
         )
         .init();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .map_err(crate::error::InstallDefaultCryptoProvider)?;
+
     Ok(super::runner::start().await?)
 }

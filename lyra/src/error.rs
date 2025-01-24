@@ -202,8 +202,13 @@ pub struct PrettifiedTimestampParse;
 pub enum Run {
     ColorEyre(#[from] color_eyre::Report),
     Dotenvy(#[from] dotenvy::Error),
-    StartError(#[from] runner::StartError),
+    Start(#[from] runner::StartError),
+    InstallDefaultCryptoProvider(#[from] InstallDefaultCryptoProvider),
 }
+
+#[derive(Error, Debug)]
+#[error("error installing default crypto provider: {:?}", .0)]
+pub struct InstallDefaultCryptoProvider(pub std::sync::Arc<rustls::crypto::CryptoProvider>);
 
 #[derive(Error, Debug)]
 #[error("not in a guild")]

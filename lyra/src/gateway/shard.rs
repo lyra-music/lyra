@@ -21,7 +21,7 @@ impl BotState {
         &'a self,
         inner: &'a Ready,
         shard_id: ShardId,
-    ) -> ReadyContext {
+    ) -> ReadyContext<'a> {
         ReadyContext {
             inner,
             shard_id,

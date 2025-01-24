@@ -91,7 +91,7 @@ impl PartialCommandData {
 
 #[non_exhaustive]
 pub enum PartialInteractionData {
-    Command(PartialCommandData),
+    Command(Box<PartialCommandData>),
     Component(Box<MessageComponentInteractionData>),
 }
 

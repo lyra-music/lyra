@@ -146,7 +146,7 @@ impl Queue {
     pub fn dequeue<'a>(
         &'a mut self,
         positions: &'a [NonZeroUsize],
-    ) -> impl Iterator<Item = Item> + 'a {
+    ) -> impl Iterator<Item = Item> + use<'a> {
         let iter_indices = positions.iter().map(|p| p.get() - 1);
         self.indexer.dequeue(iter_indices.clone());
         iter_indices.rev().filter_map(|i| self.inner.remove(i))
@@ -158,15 +158,15 @@ impl Queue {
         self.indexer.clear();
     }
 
-    pub fn drain(
+    pub fn drain<T: std::ops::RangeBounds<usize> + Iterator<Item = usize> + Clone>(
         &mut self,
-        indices: impl std::ops::RangeBounds<usize> + Iterator<Item = usize> + Clone,
-    ) -> impl Iterator<Item = Item> + '_ {
+        indices: T,
+    ) -> impl Iterator<Item = Item> + use<'_, T> {
         self.indexer.drain(indices.clone());
         self.inner.drain(indices)
     }
 
-    pub fn drain_all(&mut self) -> impl Iterator<Item = Item> + '_ {
+    pub fn drain_all(&mut self) -> impl Iterator<Item = Item> + use<'_> {
         self.reset();
         self.inner.drain(..)
     }

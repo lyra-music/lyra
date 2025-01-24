@@ -4,7 +4,10 @@ use twilight_model::{
     gateway::payload::incoming::InteractionCreate,
 };
 
-use crate::{command::model::PartialInteractionData, core::model::OwnedBotState};
+use crate::{
+    command::model::PartialInteractionData,
+    core::{model::OwnedBotState, r#static::component::NowPlayingButtonType},
+};
 
 use super::{ComponentMarker, Ctx, Location};
 
@@ -43,7 +46,8 @@ impl<U: Location> Ctx<ComponentMarker, U> {
         unsafe { self.inner.message.as_ref().unwrap_unchecked() }
     }
 
-    pub fn take_custom_id(&mut self) -> String {
-        std::mem::take(&mut self.component_data_mut().custom_id)
+    pub fn take_custom_id_into_now_playing_button_type(&mut self) -> Option<NowPlayingButtonType> {
+        let id = std::mem::take(&mut self.component_data_mut().custom_id);
+        NowPlayingButtonType::try_from(id.as_str()).ok()
     }
 }

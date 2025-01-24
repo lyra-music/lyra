@@ -23,17 +23,14 @@ use crate::{
         util::MessageLinkAware,
         AutocompleteCtx, MessageCtx, SlashCtx,
     },
-    component::{
-        connection::Join,
-        queue::{get_next_repeat_mode, repeat, Play},
-    },
+    component::{connection::Join, queue::Play},
     core::{
         model::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
         r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
-        r#static::component::NOW_PLAYING_BUTTON_IDS,
+        r#static::component::NowPlayingButtonType,
     },
     error::{
         command::{
@@ -42,14 +39,14 @@ use crate::{
             },
             declare::{CommandExecuteError, Fuunacee},
             util::AutoJoinSuppressedError,
-            Error as CommandError, Fe,
+            Fe,
         },
         gateway::{ProcessError, ProcessResult},
         AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
         PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
         Suppressed as SuppressedError,
     },
-    LavalinkAware,
+    CommandError, LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -102,7 +99,7 @@ impl Context {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
             // SAFETY: interaction is of type `ApplicationCommand`,
             //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
-            unsafe { std::hint::unreachable_unchecked() }
+            unsafe { unreachable_unchecked() }
         };
 
         let name = data.name.clone().into();
@@ -221,7 +218,7 @@ impl Context {
         let player_data = player.data();
         let player_data_r = player_data.read().await;
         let now_playing_message_id = player_data_r.now_playing_message_id();
-        if now_playing_message_id != Some(ctx.message().id) {
+        if now_playing_message_id.is_none_or(|id| id != ctx.message().id) {
             return Ok(());
         }
         let Some(current_track_title) = player_data_r
@@ -233,39 +230,43 @@ impl Context {
         };
         drop(player_data_r);
 
-        match ctx.take_custom_id() {
-            id if id == NOW_PLAYING_BUTTON_IDS.shuffle => {
-                crate::component::queue::shuffle(player_data, &mut ctx, true).await?;
+        let Some(now_playing_button) = ctx.take_custom_id_into_now_playing_button_type() else {
+            return Ok(());
+        };
+        match now_playing_button {
+            NowPlayingButtonType::Shuffle => {
+                crate::component::queue::shuffle(player_data.clone(), &mut ctx, true).await?;
             }
-            id if id == NOW_PLAYING_BUTTON_IDS.previous => {
+            NowPlayingButtonType::Previous => {
                 crate::component::playback::back(
                     Some(current_track_title),
                     player,
-                    player_data,
+                    player_data.clone(),
                     &mut ctx,
                     true,
                 )
                 .await?;
             }
-            id if id == NOW_PLAYING_BUTTON_IDS.play_pause => {
-                crate::component::playback::play_pause(player, player_data, &mut ctx, true).await?;
+            NowPlayingButtonType::PlayPause => {
+                crate::component::playback::play_pause(player, player_data.clone(), &mut ctx, true)
+                    .await?;
             }
-            id if id == NOW_PLAYING_BUTTON_IDS.next => {
+            NowPlayingButtonType::Next => {
                 crate::component::playback::skip(
                     &current_track_title,
                     player,
-                    player_data,
+                    player_data.clone(),
                     &mut ctx,
                     true,
                 )
                 .await?;
             }
-            id if id == NOW_PLAYING_BUTTON_IDS.repeat => {
-                let mode = get_next_repeat_mode(&ctx).await;
-                repeat(&mut ctx, player_data, mode, true).await?;
+            NowPlayingButtonType::Repeat => {
+                let mode = crate::component::queue::get_next_repeat_mode(&ctx).await;
+                crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true).await?;
             }
-            _ => {}
-        }
+        };
+
         Ok(())
     }
 

@@ -6,9 +6,7 @@ mod view;
 use bitflags::bitflags;
 use const_str::concat as const_str_concat;
 use itertools::Itertools;
-use lyra_ext::{
-    logical_bind::LogicalBind, num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay,
-};
+use lyra_ext::{logical_bind::LogicalBind, num::u64_to_i64_truncating};
 use sqlx::{Pool, Postgres};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
@@ -232,8 +230,6 @@ bitflags! {
             | Self::ALL_CHANNELS.bits();
     }
 }
-
-impl FlagsDisplay for AccessCategoryFlags {}
 
 impl From<AccessCategory> for AccessCategoryFlags {
     fn from(category: AccessCategory) -> Self {

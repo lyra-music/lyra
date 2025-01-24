@@ -63,12 +63,15 @@ struct InactivityTimeoutContext {
     guild_id: Id<GuildMarker>,
 }
 
-impl InactivityTimeoutContext {
-    fn new_via(cx: &(impl OwnedBotStateAware + SenderAware + GuildIdAware)) -> Self {
+impl<T> From<&T> for InactivityTimeoutContext
+where
+    T: OwnedBotStateAware + SenderAware + GuildIdAware,
+{
+    fn from(value: &T) -> Self {
         Self {
-            inner: cx.bot_owned(),
-            sender: cx.sender().clone(),
-            guild_id: cx.guild_id(),
+            inner: value.bot_owned(),
+            sender: value.sender().clone(),
+            guild_id: value.guild_id(),
         }
     }
 }
@@ -102,8 +105,6 @@ impl GuildIdAware for InactivityTimeoutContext {
         self.guild_id
     }
 }
-
-impl LavalinkAndGuildIdAware for InactivityTimeoutContext {}
 
 async fn start_inactivity_timeout(
     ctx: InactivityTimeoutContext,
@@ -175,7 +176,7 @@ pub async fn handle_voice_state_update(
         Some(old_state) if state.user_id != ctx.bot().user_id() => {
             let old_channel_id = old_state.channel_id();
             if old_channel_id == connected_channel_id
-                && state.channel_id != Some(old_channel_id)
+                && state.channel_id.is_none_or(|id| id != old_channel_id)
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 if let Ok(player) = require::player(ctx) {
@@ -187,7 +188,7 @@ pub async fn handle_voice_state_update(
                 };
 
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::new_via(ctx),
+                    InactivityTimeoutContext::from(ctx),
                     connected_channel_id,
                     text_channel_id,
                 ));
@@ -293,7 +294,7 @@ async fn match_state_channel_id(
 
             if voice_is_empty {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::new_via(ctx),
+                    InactivityTimeoutContext::from(ctx),
                     channel_id,
                     text_channel_id,
                 ));

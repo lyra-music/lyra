@@ -6,7 +6,7 @@ use crate::{core::model::HttpAware, error::core::DeserialiseBodyFromHttpError};
 
 macro_rules! generate_emojis {
     ($ (($name: ident, $default: expr)) ,* $(,)? ) => {$(
-        pub async fn $name(_cx: &(impl HttpAware + Sync)) -> Result<&'static EmojiReactionType, DeserialiseBodyFromHttpError> {
+        pub async fn $name(cx: &(impl HttpAware + Sync)) -> Result<&'static EmojiReactionType, DeserialiseBodyFromHttpError> {
             ::paste::paste! {
                 static [<$name:upper>]: OnceLock<EmojiReactionType> = OnceLock::new();
                 if let Some(emoji) = [<$name:upper>].get() {
@@ -14,10 +14,7 @@ macro_rules! generate_emojis {
                 }
             }
 
-            let emojis: &'static [twilight_model::guild::Emoji] = &[];
-
-            // FIXME: https://github.com/twilight-rs/twilight/issues/2373
-            // let emojis = crate::core::r#static::application::emojis(cx).await?;
+            let emojis = crate::core::r#static::application::emojis(cx).await?;
             let emoji = emojis.iter().find(|e| e.name == stringify!($name));
             let reaction = emoji.map_or(
                 {

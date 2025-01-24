@@ -12,10 +12,8 @@ pub struct PluginTrackInfo {
     /// The url of the artist artwork
     pub artist_artwork_url: Option<String>,
     /// The url of the preview
-    #[allow(dead_code)]
     pub preview_url: Option<String>,
     /// Whether the track is a preview
-    #[allow(dead_code)]
     pub is_preview: bool,
 }
 

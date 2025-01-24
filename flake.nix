@@ -33,7 +33,10 @@
     devShells =
       forEachSystem
       (system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+	  inherit systems;
+	  config.allowUnfree = true;
+	};
       in {
         default = devenv.lib.mkShell {
           inherit inputs pkgs;
@@ -50,9 +53,8 @@
                 codespell
                 act
                 sqlx-cli
-                pgcli
+                # pgcli
                 cargo-edit
-                openssl
               ];
 
               # https://devenv.sh/scripts/
@@ -73,7 +75,7 @@
                 initialDatabases = [{name = "mydb";}];
                 extensions = extensions: [
                   extensions.postgis
-                  extensions.timescaledb
+		  extensions.timescaledb
                 ];
                 settings.shared_preload_libraries = "timescaledb";
                 initialScript = "CREATE EXTENSION IF NOT EXISTS timescaledb;";

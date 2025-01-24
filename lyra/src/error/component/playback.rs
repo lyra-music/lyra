@@ -7,6 +7,7 @@ pub use play_pause::Error as PlayPauseError;
 pub enum HandleVoiceStateUpdateError {
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
     TwilightHttp(#[from] twilight_http::Error),
+    SetPauseWith(#[from] crate::error::command::require::SetPauseWithError),
 }
 
 pub mod play_pause {
@@ -17,5 +18,6 @@ pub mod play_pause {
     pub enum Error {
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
         Respond(#[from] crate::error::command::RespondError),
+        SetPauseWith(#[from] crate::error::command::require::SetPauseWithError),
     }
 }

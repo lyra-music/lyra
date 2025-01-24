@@ -5,6 +5,7 @@ use lyra_ext::iter::{chunked_range::chunked_range, multi_interleave::multi_inter
 use rand::{seq::SliceRandom, Rng};
 use twilight_model::id::{marker::UserMarker, Id};
 
+#[derive(Clone, Copy)]
 pub enum IndexerType {
     Standard,
     Fair,
@@ -74,11 +75,11 @@ impl FairIndexer {
         }
     }
 
-    fn iter_bucket_lens(&self) -> impl Iterator<Item = usize> + Clone + '_ {
+    fn iter_bucket_lens(&self) -> impl Iterator<Item = usize> + Clone + use<'_> {
         self.inner.iter().map(|(_, l)| l).copied()
     }
 
-    fn iter_bucket_ranges(&self) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+    fn iter_bucket_ranges(&self) -> impl Iterator<Item = std::ops::Range<usize>> + use<'_> {
         self.inner.iter().scan(self.starting_index, |i, (_, l)| {
             let j = *i;
             *i += l;
@@ -86,7 +87,7 @@ impl FairIndexer {
         })
     }
 
-    fn iter_indices(&self) -> impl Iterator<Item = usize> + '_ {
+    fn iter_indices(&self) -> impl Iterator<Item = usize> + use<'_> {
         multi_interleave(chunked_range(self.starting_index, self.iter_bucket_lens()))
     }
 

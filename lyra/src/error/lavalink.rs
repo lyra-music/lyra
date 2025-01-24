@@ -12,16 +12,39 @@ pub enum ProcessError {
     Sqlx(#[from] sqlx::Error),
     DeserialiseBody(#[from] twilight_http::response::DeserializeBodyError),
     DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-    GenerateNowPlayingEmbed(#[from] GenerateNowPlayingEmbedError),
+    NewNowPlayingMessage(#[from] NewNowPlayingMessageError),
+    NewNowPlayingData(#[from] NewNowPlayingDataError),
+}
+
+#[derive(Error, Debug)]
+#[error("constructing a new now playing data failed: {:?}", .0)]
+pub enum NewNowPlayingDataError {
+    Cache(#[from] super::Cache),
+    GetDominantPaletteFromUrl(#[from] std::sync::Arc<GetDominantPaletteFromUrlError>),
+}
+
+#[derive(Error, Debug)]
+#[error("building the now playing message embed failed: {:?}", .0)]
+pub enum BuildNowPlayingEmbedError {
+    ImageSourceUrl(#[from] twilight_util::builder::embed::image_source::ImageSourceUrlError),
+    TimestampParse(#[from] twilight_model::util::datetime::TimestampParseError),
 }
 
 #[derive(Error, Debug)]
 #[error("generating now playing embed failed: {:?}", .0)]
-pub enum GenerateNowPlayingEmbedError {
-    ImageSourceUrl(#[from] twilight_util::builder::embed::image_source::ImageSourceUrlError),
-    Cache(#[from] super::Cache),
-    TimestampParse(#[from] twilight_model::util::datetime::TimestampParseError),
-    GetDominantPaletteFromUrl(#[from] std::sync::Arc<GetDominantPaletteFromUrlError>),
+pub enum NewNowPlayingMessageError {
+    TwilightHttp(#[from] twilight_http::Error),
+    DeserialiseBody(#[from] twilight_http::response::DeserializeBodyError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
+    BuildNowPlayingEmbed(#[from] BuildNowPlayingEmbedError),
+}
+
+#[derive(Error, Debug)]
+#[error("updating now playing message failed: {:?}", .0)]
+pub enum UpdateNowPlayingMessageError {
+    BuildNowPlayingEmbed(#[from] BuildNowPlayingEmbedError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
+    TwilightHttp(#[from] twilight_http::Error),
 }
 
 #[derive(Error, Debug)]

@@ -28,9 +28,7 @@ use crate::{
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
-        model::{
-            AuthorIdAware, BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware,
-        },
+        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
         r#const::connection::INACTIVITY_TIMEOUT,
         traced,
     },
@@ -107,7 +105,7 @@ type GetUsersVoiceChannelResult =
 fn get_users_voice_channel(ctx: &GuildCtx<impl CtxKind>) -> GetUsersVoiceChannelResult {
     let channel_id = ctx
         .cache()
-        .voice_state(ctx.author_id(), ctx.guild_id())
+        .voice_state(ctx.user_id(), ctx.guild_id())
         .ok_or(UserNotInVoiceError)?
         .channel_id();
     let voice = ctx.cache().channel(channel_id).ok_or(CacheError)?;
@@ -245,9 +243,12 @@ async fn impl_connect_to(
             let _ = ctx
                 .bot()
                 .standby()
-                .wait_for_event(move |e: &Event| match e {
-                    Event::VoiceServerUpdate(v) => v.guild_id == guild_id,
-                    _ => false,
+                .wait_for_event(move |e: &Event| {
+                    if let Event::VoiceServerUpdate(v) = e {
+                        v.guild_id == guild_id
+                    } else {
+                        false
+                    }
                 })
                 .await;
             tracing::trace!("voice server update received");
@@ -360,7 +361,7 @@ async fn handle_response(
         );
 
         traced::tokio_spawn(start_inactivity_timeout(
-            super::InactivityTimeoutContext::new_via(ctx),
+            super::InactivityTimeoutContext::from(&*ctx),
             joined.id,
             text_channel_id,
         ));

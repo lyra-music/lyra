@@ -109,7 +109,7 @@ pub enum PrettyPollResolvableErrorDisplayer<'a> {
     QueueNotSeekable(PrettyQueueNotSeekableDisplayer),
 }
 
-impl<'a> std::fmt::Display for PrettyPollResolvableErrorDisplayer<'a> {
+impl std::fmt::Display for PrettyPollResolvableErrorDisplayer<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PrettyPollResolvableErrorDisplayer::InVoiceWithSomeoneElse(e) => e.fmt(f),

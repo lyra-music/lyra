@@ -10,8 +10,7 @@ authors = ["fdnt7"]
 build = "build.rs"
 
 [build-dependencies]
-anyhow = "1"
-vergen-git2 = { version = "1.0.1", features = [
+vergen-git2 = { version = "1.0.5", features = [
     "build",
     "cargo",
     "rustc",
@@ -37,32 +36,32 @@ lyra_ext = { path = "../lyra_ext" }
 
 paste = "1.0.15"
 const-str = "0.5.7"
-const_panic = { version = "0.2.9", features = ["derive"] }
-bitflags = "2.6.0"
+const_panic = { version = "0.2.12", features = ["derive"] }
+bitflags = "2.8.0"
 dashmap = "6.1.0"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
-thiserror = "1.0.63"
+thiserror = "2.0.11"
 color-eyre = "0.6.3"
-futures = "0.3.30"
-tokio = { version = "1.40.0", features = [
+futures = "0.3.31"
+tokio = { version = "1.43.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
     "macros",
 ] }
-serde = "1.0.210"
-serde_json = "1.0.128"
-regex = "1.10.6"
+serde = "1.0.217"
+serde_json = "1.0.137"
+regex = "1.11.1"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
-log = "0.4.22"
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+log = "0.4.25"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 rand = "0.8.5"
-itertools = "0.13.0"
+itertools = "0.14.0"
 rayon = "1.10.0"
-sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8.3", features = [ "postgres", "runtime-tokio", "tls-rustls-aws-lc-rs" ] }
 mixbox = "2.0.0"
 lavalink-rs = { git = "https://github.com/lyra-music/lavalink-rs", branch = "lyra", features = [
     "twilight16",
@@ -73,8 +72,8 @@ twilight = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
 twilight-cache-inmemory = { git = "https://github.com/lyra-music/twilight", branch = "lyra", features = [
     "permission-calculator",
 ] }
-twilight-gateway = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
-twilight-http = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
+twilight-gateway = { git = "https://github.com/lyra-music/twilight", branch = "lyra", default-features = false, features = ["rustls-native-roots", "rustls-aws_lc_rs", "twilight-http", "zlib-stock"] }
+twilight-http = { git = "https://github.com/lyra-music/twilight", branch = "lyra", default-features = false, features = ["decompression", "rustls-native-roots", "rustls-aws_lc_rs"] }
 twilight-model = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
 twilight-standby = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
 twilight-validate = { git = "https://github.com/lyra-music/twilight", branch = "lyra" }
@@ -84,5 +83,6 @@ twilight-util = { git = "https://github.com/lyra-music/twilight", branch = "lyra
     "builder",
 ] }
 twilight-interactions = { git = "https://github.com/lyra-music/twilight-interactions", branch = "lyra" }
-reqwest = "0.12.7"
-moka = { version = "0.12.8", features = ["future"] }
+moka = { version = "0.12.10", features = ["future"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["charset", "rustls-tls-native-roots"] }
+rustls = "0.23.21"

@@ -27,13 +27,13 @@ impl TargetIdAware for UserAppMarker {}
 impl TargetIdAware for MessageAppMarker {}
 
 impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
-    pub fn target_id(&self) -> Id<GenericMarker> {
+    pub const fn target_id(&self) -> Id<GenericMarker> {
         // SAFETY: `self` is `Ctx<impl TargetIdAware, _>`,
         //         so `self.partial_command_data().target_id` is present
         unsafe { self.command_data().target_id.unwrap_unchecked() }
     }
 
-    fn resolved_data(&self) -> &InteractionDataResolved {
+    const fn resolved_data(&self) -> &InteractionDataResolved {
         // SAFETY: `self` is `Ctx<impl TargetIdAware, _>`,
         //         so `self.partial_command_data().resolved` is present
         unsafe { self.command_data().resolved.as_ref().unwrap_unchecked() }
@@ -42,7 +42,7 @@ impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
 
 impl<U: Location> Ctx<UserMarker, U> {
     #[inline]
-    pub fn target_user_id(&self) -> Id<TwilightUserMarker> {
+    pub const fn target_user_id(&self) -> Id<TwilightUserMarker> {
         self.target_id().cast()
     }
 
@@ -60,7 +60,7 @@ impl<U: Location> Ctx<UserMarker, U> {
 
 impl<U: Location> Ctx<MessageMarker, U> {
     #[inline]
-    pub fn target_message_id(&self) -> Id<TwilightMessageMarker> {
+    pub const fn target_message_id(&self) -> Id<TwilightMessageMarker> {
         self.target_id().cast()
     }
 
