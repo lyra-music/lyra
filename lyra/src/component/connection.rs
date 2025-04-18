@@ -1,37 +1,38 @@
 mod join;
 mod leave;
 
-pub use join::{auto as auto_join, Join};
+pub use join::{Join, auto as auto_join};
 pub use leave::Leave;
 use lyra_ext::{iso8601_time, unix_time};
 
 use std::sync::Arc;
 
-use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
+use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
 use twilight_gateway::MessageSender;
 use twilight_http::Client;
 use twilight_mention::{
-    timestamp::{Timestamp, TimestampStyle},
     Mention,
+    timestamp::{Timestamp, TimestampStyle},
 };
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker},
 };
 
 use self::join::JoinedChannel;
 use crate::{
+    LavalinkAndGuildIdAware, LavalinkAware,
     command::require,
     component::connection::{
         join::JoinedChannelType,
-        leave::{disconnect, disconnect_cleanup, LeaveResponse},
+        leave::{LeaveResponse, disconnect, disconnect_cleanup},
     },
     core::{
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
         r#const::{
             connection::{self as const_connection, INACTIVITY_TIMEOUT},
             exit_code::NOTICE,
         },
+        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
         traced,
     },
     error::{
@@ -40,9 +41,8 @@ use crate::{
             HandleVoiceStateUpdateError, MatchStateChannelIdError, StartInactivityTimeoutError,
         },
     },
-    gateway::{voice, GuildIdAware, SenderAware},
+    gateway::{GuildIdAware, SenderAware, voice},
     lavalink::Lavalink,
-    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 pub fn users_in_voice(cx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
@@ -185,7 +185,7 @@ pub async fn handle_voice_state_update(
                         .create_message(text_channel_id)
                         .content("⚡▶ Paused `(Bot is not used by anyone)`")
                         .await?;
-                };
+                }
 
                 traced::tokio_spawn(start_inactivity_timeout(
                     InactivityTimeoutContext::from(ctx),
@@ -298,7 +298,7 @@ async fn match_state_channel_id(
                     channel_id,
                     text_channel_id,
                 ));
-            };
+            }
             Ok(())
         }
         Some(_) | None => Ok(()),

@@ -1,7 +1,7 @@
 [package]
 name = "lyra_ext"
 version = "0.8.1"
-edition = "2021"
+edition = "2024"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "forbid"
@@ -16,23 +16,23 @@ pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
 
 [dependencies]
-rstest = "0.24.0"
+rstest = "0.25.0"
 heck = "0.5.0"
-const-str = "0.5.7"
+const-str = "0.6.2"
 unicode-segmentation = "1"
 bitflags = "2"
 regex = "1"
 rayon = "1"
-mock_instant = "0.5.2"
+mock_instant = "0.5.3"
 thiserror = "2"
 
 [dependencies.kmeans_colors]
-version = "0.6.0"
+version = "0.7.0"
 features = ["palette_color"]
 default-features = false
 
 [dependencies.image]
-version = "0.25.5"
+version = "0.25.6"
 features = ["jpeg", "png", "gif", "tiff"]
 default-features = false
 
@@ -42,6 +42,6 @@ features = ["std"]
 default-features = false
 
 [dependencies.time]
-version = "0.3.37"
+version = "0.3.41"
 features = ["formatting"]
 default-features = false

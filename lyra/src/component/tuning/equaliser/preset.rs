@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{macros::out, require},
     component::tuning::{
-        check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser, UpdateFilter,
+        UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
 };
 

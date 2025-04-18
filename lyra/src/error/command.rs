@@ -600,6 +600,7 @@ impl<'a> Fe<'a> {
 }
 
 impl Error {
+    #[must_use]
     pub const fn flatten_as(&self) -> Fe<'_> {
         match self {
             Self::UserNotAccessManager(_) => Fe::UserNotAccessManager,

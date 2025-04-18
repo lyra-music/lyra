@@ -8,7 +8,7 @@ mod modal;
 use std::{marker::PhantomData, sync::Arc};
 
 use tokio::sync::oneshot;
-use twilight_cache_inmemory::{model::CachedMember, InMemoryCache, Reference};
+use twilight_cache_inmemory::{InMemoryCache, Reference, model::CachedMember};
 use twilight_gateway::{Latency, MessageSender};
 use twilight_http::Client as HttpClient;
 use twilight_model::{
@@ -16,24 +16,24 @@ use twilight_model::{
     gateway::payload::incoming::InteractionCreate,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
     },
     user::User as TwilightUser,
 };
 
 use crate::{
+    LavalinkAware,
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
     core::model::{
         BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, InteractionInterface,
         OwnedBotState, OwnedBotStateAware, PartialMemberAware, UserAware, UserPermissionsAware,
     },
     error::{
-        command::RespondError, core::DeserialiseBodyFromHttpError, Cache, CacheResult, NotInGuild,
+        Cache, CacheResult, NotInGuild, command::RespondError, core::DeserialiseBodyFromHttpError,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
-    LavalinkAware,
 };
 
 use super::PartialInteractionData;

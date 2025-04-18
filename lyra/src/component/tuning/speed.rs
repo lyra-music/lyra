@@ -6,12 +6,12 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
+        SlashCtx,
         macros::{bad, out},
         model::BotSlashCommand,
         require::{self, PlayerInterface},
-        SlashCtx,
     },
-    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
+    component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     error::CommandResult,
 };
 

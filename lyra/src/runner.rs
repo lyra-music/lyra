@@ -1,8 +1,8 @@
 use std::{
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -10,29 +10,29 @@ use dotenvy_macro::dotenv;
 use lavalink_rs::{client::LavalinkClient, model::client::NodeDistributionStrategy};
 use log::LevelFilter;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions,
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
 use tokio::task::JoinHandle;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::{
-    error::StartRecommendedError, CloseFrame, Config as ShardConfig, ConfigBuilder, Event,
-    EventTypeFlags, Intents, MessageSender, Shard, StreamExt,
+    CloseFrame, Config as ShardConfig, ConfigBuilder, Event, EventTypeFlags, Intents,
+    MessageSender, Shard, StreamExt, error::StartRecommendedError,
 };
-use twilight_http::{client::ClientBuilder, Client};
+use twilight_http::{Client, client::ClientBuilder};
 use twilight_model::{
     channel::message::AllowedMentions,
     gateway::{
         payload::outgoing::update_presence::UpdatePresencePayload,
         presence::{Activity, ActivityType, MinimalActivity, Status},
     },
-    id::{marker::UserMarker, Id},
+    id::{Id, marker::UserMarker},
 };
 
 use crate::{
-    core::r#const::metadata::BANNER,
-    lavalink::{handlers, ClientData},
     LavalinkAware,
+    core::r#const::metadata::BANNER,
+    lavalink::{ClientData, handlers},
 };
 
 use super::{
@@ -120,7 +120,7 @@ pub async fn start() -> Result<(), StartError> {
 
 async fn build_and_split_shards(
     client: &Client,
-) -> Result<impl ExactSizeIterator<Item = Shard>, StartRecommendedError> {
+) -> Result<impl ExactSizeIterator<Item = Shard> + use<>, StartRecommendedError> {
     let shard_config = build_shard_config();
     let shards =
         twilight_gateway::create_recommended(client, shard_config, |_, builder| builder.build())

@@ -1,7 +1,7 @@
 use syn::{
+    Ident, Result, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Ident, Result, Token,
 };
 
 pub struct Args(pub(super) Vec<Ident>);

@@ -2,7 +2,7 @@ pub mod application {
     use tokio::sync::OnceCell;
     use twilight_model::{
         guild::Emoji,
-        id::{marker::ApplicationMarker, Id},
+        id::{Id, marker::ApplicationMarker},
     };
 
     use crate::{core::model::HttpAware, error::core::DeserialiseBodyFromHttpError};
@@ -38,7 +38,7 @@ pub mod application {
 pub mod component {
     use std::sync::LazyLock;
 
-    use rand::{distributions::Alphanumeric, Rng};
+    use rand::{Rng, distr::Alphanumeric};
 
     pub struct NowPlayingButtonIds {
         pub shuffle: &'static str,
@@ -79,9 +79,7 @@ pub mod component {
     impl NowPlayingButtonIds {
         const BUTTON_ID_LEN: usize = 100;
         fn new() -> Self {
-            let mut button_id_iter = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .map(char::from);
+            let mut button_id_iter = rand::rng().sample_iter(&Alphanumeric).map(char::from);
 
             let mut button_id_gen = || {
                 button_id_iter

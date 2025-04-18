@@ -2,7 +2,7 @@ use lyra_ext::num::u64_to_i64_truncating;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
     core::model::DatabaseAware,
     error::CommandResult,
     gateway::GuildIdAware,

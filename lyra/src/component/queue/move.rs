@@ -4,17 +4,17 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         macros::{bad, out, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     component::queue::normalize_queue_position,
     core::model::CacheAware,
-    error::{command::AutocompleteResult, CommandResult},
+    error::{CommandResult, command::AutocompleteResult},
     lavalink::CorrectTrackInfo,
-    LavalinkAndGuildIdAware,
 };
 
 enum MoveAutocompleteOptionType {
@@ -171,7 +171,10 @@ impl BotSlashCommand for Move {
 
         if self.track == self.position {
             bad!(
-                format!("Invalid new position: {}; New position must be different from the old position", self.position),
+                format!(
+                    "Invalid new position: {}; New position must be different from the old position",
+                    self.position
+                ),
                 ctx
             );
         }

@@ -1,5 +1,5 @@
 use thiserror::Error;
-use twilight_model::id::{marker::MessageMarker, Id};
+use twilight_model::id::{Id, marker::MessageMarker};
 
 #[derive(Error, Debug)]
 #[error(transparent)]

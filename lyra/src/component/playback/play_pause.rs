@@ -2,14 +2,13 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::out,
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
-        SlashCtx,
     },
-    error::{component::playback::PlayPauseError, CommandResult},
+    error::{CommandResult, component::playback::PlayPauseError},
     lavalink::OwnedPlayerData,
 };
 

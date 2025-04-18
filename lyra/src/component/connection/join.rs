@@ -4,8 +4,8 @@ use lyra_ext::{iso8601_time, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::{
-    timestamp::{Timestamp, TimestampStyle},
     Mention,
+    timestamp::{Timestamp, TimestampStyle},
 };
 use twilight_model::{
     application::interaction::InteractionChannel,
@@ -13,37 +13,35 @@ use twilight_model::{
     gateway::payload::outgoing::UpdateVoiceState,
     guild::Permissions,
     id::{
-        marker::{ChannelMarker, GuildMarker, MessageMarker},
         Id,
+        marker::{ChannelMarker, GuildMarker, MessageMarker},
     },
 };
 
 use crate::{
+    LavalinkAware,
     command::{
-        check,
+        SlashCtx, check,
         macros::{bad, cant, nope, note, note_fol, out_or_fol, sus_fol},
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
         require::{self, InVoiceCachedVoiceState},
-        SlashCtx,
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
         r#const::connection::INACTIVITY_TIMEOUT,
+        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
         traced,
     },
     error::{
-        self,
+        self, Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
         component::connection::join::{
             AutoJoinError, ConnectToError, ConnectToNewError, DeleteEmptyVoiceNoticeError,
             Error as JoinError, GetUsersVoiceChannelError, HandleResponseError, ImplAutoJoinError,
             ImplConnectToError, ImplJoinError, Pfe,
         },
-        Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{GuildIdAware, SenderAware},
     lavalink::Connection,
-    LavalinkAware,
 };
 
 pub(super) enum Response {
@@ -136,7 +134,7 @@ fn check_user_is_stage_manager(
 ) -> Result<(), error::UserNotStageManager> {
     if channel_type == ChannelType::GuildStageVoice {
         check::user_is_stage_manager(ctx)?;
-    };
+    }
     Ok(())
 }
 
@@ -401,7 +399,7 @@ pub async fn join(
 
 /// Joins a voice/stage channel
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "join", dm_permission = false)]
+#[command(name = "join", contexts = "guild")]
 pub struct Join {
     /// Which channel? (if not given, your currently connected channel)
     #[command(channel_types = "guild_voice guild_stage_voice")]

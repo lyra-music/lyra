@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
         check,
         macros::out,
@@ -11,7 +12,6 @@ use crate::{
     },
     error::CommandResult,
     lavalink::Event,
-    LavalinkAndGuildIdAware,
 };
 
 /// Clears the queue

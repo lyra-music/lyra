@@ -2,29 +2,29 @@ mod interaction;
 
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Instant,
 };
 
 use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
-use twilight_cache_inmemory::{model::CachedMember, InMemoryCache};
+use twilight_cache_inmemory::{InMemoryCache, model::CachedMember};
 use twilight_gateway::ShardId;
 use twilight_http::Client;
 use twilight_model::{
     guild::{Emoji, PartialMember, Permissions},
     id::{
-        marker::{ApplicationMarker, UserMarker},
         Id,
+        marker::{ApplicationMarker, UserMarker},
     },
     user::{CurrentUser, User},
     util::ImageHash,
 };
 use twilight_standby::Standby;
 
-use crate::{error::core::DeserialiseBodyFromHttpError, lavalink::Lavalink, LavalinkAware};
+use crate::{LavalinkAware, error::core::DeserialiseBodyFromHttpError, lavalink::Lavalink};
 
 pub use self::interaction::{
     AcknowledgementAware, Client as InteractionClient, Interface as InteractionInterface,

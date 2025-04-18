@@ -4,7 +4,7 @@ use lyra_ext::num::u64_to_i64_truncating;
 use crate::{
     core::model::{DatabaseAware, OwnedHttpAware},
     error::lavalink::ProcessResult,
-    lavalink::{model::NowPlayingData, CorrectTrackInfo, UnwrappedData},
+    lavalink::{CorrectTrackInfo, UnwrappedData, model::NowPlayingData},
 };
 
 #[tracing::instrument(err, skip_all, name = "track_start")]

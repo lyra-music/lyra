@@ -4,11 +4,12 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
+        SlashCtx,
         macros::{bad, out},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
-    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
+    component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     error::CommandResult,
 };
 
@@ -101,7 +102,7 @@ impl BotSlashCommand for On {
         let Some(update) = SetDistortion::new(distortion) else {
             bad!(
                 format!(
-                    "At least one setting must be changed: Offset settings must not all be `{}`, and scale settings must not all be `{}`", 
+                    "At least one setting must be changed: Offset settings must not all be `{}`, and scale settings must not all be `{}`",
                     SetDistortion::DEFAULT_OFFSET,
                     SetDistortion::DEFAULT_SCALE,
                 ),

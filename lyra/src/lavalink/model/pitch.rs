@@ -18,13 +18,13 @@ impl Pitch {
         }
     }
 
-    pub fn set(&mut self, multiplier: f64) {
+    pub const fn set(&mut self, multiplier: f64) {
         self.multiplier = multiplier;
         self.half_tone_shifts = 0;
     }
 
     #[inline]
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.set(Self::DEFAULT_MULTIPLIER);
     }
 
@@ -43,7 +43,7 @@ impl Pitch {
         ((value - Self::DEFAULT_MULTIPLIER).abs() > ERR_MARGIN).then_some(value)
     }
 
-    pub fn shift(&mut self, half_tones: NonZeroI64) {
+    pub const fn shift(&mut self, half_tones: NonZeroI64) {
         self.half_tone_shifts += half_tones.get();
     }
 

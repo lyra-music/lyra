@@ -7,6 +7,7 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
         check,
         macros::{bad, out},
@@ -18,7 +19,6 @@ use crate::{
         generate_position_choices_from_input, validate_input_position,
     },
     core::model::CacheAware,
-    LavalinkAndGuildIdAware,
 };
 
 async fn generate_skip_to_choices(

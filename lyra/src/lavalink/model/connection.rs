@@ -1,8 +1,8 @@
 use lyra_ext::nested_transpose::NestedTranspose;
-use tokio::sync::{broadcast, Notify};
+use tokio::sync::{Notify, broadcast};
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker, UserMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker, UserMarker},
 };
 
 use crate::{command::poll::Poll, core::r#const};
@@ -44,11 +44,11 @@ impl Connection {
         self.poll.as_ref()
     }
 
-    pub fn set_poll(&mut self, poll: Poll) {
+    pub const fn set_poll(&mut self, poll: Poll) {
         self.poll = Some(poll);
     }
 
-    pub fn reset_poll(&mut self) {
+    pub const fn reset_poll(&mut self) {
         self.poll = None;
     }
 

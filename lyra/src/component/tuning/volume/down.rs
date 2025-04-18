@@ -3,12 +3,12 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    LavalinkAware,
+    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    LavalinkAware,
 };
 
 /// Decrease the playback volume

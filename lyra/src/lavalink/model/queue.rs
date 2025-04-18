@@ -3,7 +3,7 @@ use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use tokio::sync::Notify;
-use twilight_model::id::{marker::UserMarker, Id};
+use twilight_model::id::{Id, marker::UserMarker};
 
 use super::queue_indexer::{Indexer, IndexerType};
 
@@ -111,7 +111,7 @@ impl Queue {
         self.index
     }
 
-    pub fn index_mut(&mut self) -> &mut usize {
+    pub const fn index_mut(&mut self) -> &mut usize {
         &mut self.index
     }
 
@@ -180,7 +180,7 @@ impl Queue {
         self.repeat_mode
     }
 
-    pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
+    pub const fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
     }
 

@@ -5,15 +5,14 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use super::AccessCategory;
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{note, out, sus},
         model::BotSlashCommand,
         require,
         util::prompt_for_confirmation,
-        SlashCtx,
     },
     component::config::access::AccessCategoryFlags,
-    core::{model::DatabaseAware, r#const::text::NO_ROWS_AFFECTED_MESSAGE},
+    core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
     error::CommandResult,
     gateway::GuildIdAware,
 };

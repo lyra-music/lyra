@@ -4,8 +4,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::{
-    command::{model::BotSlashCommand, require, SlashCtx},
-    core::{model::DatabaseAware, r#const::colours::EMBED_DEFAULT},
+    command::{SlashCtx, model::BotSlashCommand, require},
+    core::{r#const::colours::EMBED_DEFAULT, model::DatabaseAware},
     error::CommandResult,
 };
 

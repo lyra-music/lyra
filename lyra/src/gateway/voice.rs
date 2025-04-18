@@ -3,19 +3,19 @@ use std::sync::Arc;
 use futures::TryFutureExt;
 use twilight_model::gateway::payload::incoming::VoiceStateUpdate;
 
-use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
+use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
 use twilight_gateway::MessageSender;
 use twilight_http::Client;
-use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 use crate::{
+    LavalinkAndGuildIdAware, LavalinkAware,
     component::{connection, playback, tuning},
     core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
     error::gateway::{ProcessError, ProcessResult},
     gateway::{GuildIdAware, SenderAware},
     lavalink::Lavalink,
-    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 use super::{LastCachedStates, Process};

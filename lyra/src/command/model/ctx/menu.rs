@@ -2,10 +2,10 @@ use twilight_model::{
     application::interaction::InteractionDataResolved,
     channel::Message as TwilightMessage,
     id::{
+        Id,
         marker::{
             GenericMarker, MessageMarker as TwilightMessageMarker, UserMarker as TwilightUserMarker,
         },
-        Id,
     },
     user::User as TwilightUser,
 };

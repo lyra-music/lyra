@@ -1,4 +1,4 @@
-use time::{format_description::well_known::Iso8601, OffsetDateTime};
+use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
 /// # Panics
 /// This function panics when writing ISO 8601 datetime to string fails

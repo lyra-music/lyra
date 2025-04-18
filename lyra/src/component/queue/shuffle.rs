@@ -2,12 +2,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{bad, out},
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
-        SlashCtx,
     },
     error::CommandResult,
     lavalink::{IndexerType, OwnedPlayerData},

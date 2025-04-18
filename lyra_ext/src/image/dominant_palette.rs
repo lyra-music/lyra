@@ -1,6 +1,6 @@
 use image::{DynamicImage, ImageResult};
 use kmeans_colors::Sort;
-use palette::{cast::from_component_slice, FromColor, IntoColor, Lab, Srgb, Srgba};
+use palette::{FromColor, IntoColor, Lab, Srgb, Srgba, cast::from_component_slice};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 pub type DominantColour = Srgb<u8>;

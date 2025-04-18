@@ -20,28 +20,29 @@ use twilight_interactions::command::{
 use twilight_model::{
     application::command::{Command, CommandOptionChoice, CommandOptionChoiceValue, CommandType},
     channel::{Attachment, Message},
-    id::{marker::GuildMarker, Id},
+    id::{Id, marker::GuildMarker},
 };
 use twilight_util::builder::command::CommandBuilder;
 
 use crate::{
+    LavalinkAware,
     command::{
+        AutocompleteCtx, MessageCtx, SlashCtx,
         macros::{bad, bad_or_fol, crit_or_fol, out_or_fol, what_or_fol},
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
-        require, util, AutocompleteCtx, MessageCtx, SlashCtx,
+        require, util,
     },
     core::{
-        model::UserIdAware,
         r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
+        model::UserIdAware,
     },
     error::{
+        CommandResult, LoadFailed as LoadFailedError,
         command::AutocompleteResult,
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
-        CommandResult, LoadFailed as LoadFailedError,
     },
     gateway::GuildIdAware,
     lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedData, UnwrappedPlayerInfoUri},
-    LavalinkAware,
 };
 
 struct LoadTrackContext {
@@ -572,7 +573,7 @@ impl BotMessageCommand for AddToQueue {
         let queries = extract_queries(message);
         if queries.is_empty() {
             bad!("No audio files or URLs found in this message.", ctx);
-        };
+        }
         Ok(play(&mut ctx, queries).await?)
     }
 }

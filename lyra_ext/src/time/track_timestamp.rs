@@ -30,7 +30,7 @@ impl Data {
         }
     }
 
-    fn reset(&mut self, started: Instant) {
+    const fn reset(&mut self, started: Instant) {
         self.most_recent_operation = started;
         self.most_recent_position = started;
         self.paused = false;

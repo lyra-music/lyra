@@ -8,12 +8,13 @@ use std::{
 };
 
 use twilight_model::{
-    channel::{message::MessageFlags, ChannelType},
+    channel::{ChannelType, message::MessageFlags},
     guild::Permissions,
-    id::{marker::ChannelMarker, Id},
+    id::{Id, marker::ChannelMarker},
 };
 
 use crate::{
+    LavalinkAware,
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
@@ -21,11 +22,6 @@ use crate::{
         traced,
     },
     error::{
-        // self,
-        command::check::{
-            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
-            UserOnlyInError,
-        },
         Cache,
         InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError,
@@ -34,6 +30,11 @@ use crate::{
         UserNotAllowed as UserNotAllowedError,
         UserNotDj as UserNotDjError,
         UserNotStageManager as UserNotStageManagerError,
+        // self,
+        command::check::{
+            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
+            UserOnlyInError,
+        },
     },
     gateway::GuildIdAware,
     lavalink::{
@@ -44,13 +45,12 @@ use crate::{
         // PlayerAware,
         QueueItem,
     },
-    LavalinkAware,
 };
 
 use super::{
     model::{GuildCtx, RespondViaMessage},
     poll::{self, Resolution as PollResolution, Topic as PollTopic},
-    require::{self, someone_else_in, CurrentTrack, InVoice, PartialInVoice},
+    require::{self, CurrentTrack, InVoice, PartialInVoice, someone_else_in},
 };
 
 pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissions::MUTE_MEMBERS);
@@ -136,7 +136,7 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
                     access_calculator_builder.category_channel(category_channel_id);
             }
         }
-    };
+    }
 
     let user_allowed_to_use_commands = access_calculator_builder.build().await?.calculate();
     if !user_allowed_to_use_commands {
@@ -166,7 +166,7 @@ pub async fn user_allowed_to_use(
 
     if !allowed_to_use_channel {
         return Err(UserNotAllowedError.into());
-    };
+    }
     Ok(())
 }
 
@@ -217,7 +217,7 @@ impl InVoiceWithUserResult<'_> {
 pub trait ResolveWithPoll {
     type Error;
     fn or_else_try_resolve_with(self, topic: PollTopic)
-        -> Result<Option<PollStarter>, Self::Error>;
+    -> Result<Option<PollStarter>, Self::Error>;
 }
 
 impl ResolveWithPoll for InVoiceWithUserOnlyResult {

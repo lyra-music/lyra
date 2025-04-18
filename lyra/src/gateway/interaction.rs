@@ -13,7 +13,9 @@ use twilight_model::{
 
 use super::model::Process;
 use crate::{
+    CommandError, LavalinkAware,
     command::{
+        AutocompleteCtx, MessageCtx, SlashCtx,
         macros::{
             bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
             note, out_upd, sus, sus_fol,
@@ -21,32 +23,30 @@ use crate::{
         model::{ComponentCtx, NonPingInteraction},
         require,
         util::MessageLinkAware,
-        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{connection::Join, queue::Play},
     core::{
+        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
         model::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
-        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
         r#static::component::NowPlayingButtonType,
     },
     error::{
+        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
+        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
+        Suppressed as SuppressedError,
         command::{
+            Fe,
             check::{
                 AlternateVoteResponse, AnotherPollOngoingError, PollLossError, PollLossErrorKind,
             },
             declare::{CommandExecuteError, Fuunacee},
             util::AutoJoinSuppressedError,
-            Fe,
         },
         gateway::{ProcessError, ProcessResult},
-        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
-        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
-        Suppressed as SuppressedError,
     },
-    CommandError, LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -165,9 +165,12 @@ impl Context {
                 match_error(error, name, acknowledged, i).await
             }
             _ => {
-                crit!(format!(
-                    "Something unexpectedly went wrong: ```rs\n{source:#?}``` Please report this to the bot developers."
-                ), ?i);
+                crit!(
+                    format!(
+                        "Something unexpectedly went wrong: ```rs\n{source:#?}``` Please report this to the bot developers."
+                    ),
+                    ?i
+                );
                 Err(ProcessError::CommandExecute { name, source })
             }
         }
@@ -265,7 +268,7 @@ impl Context {
                 let mode = crate::component::queue::get_next_repeat_mode(&ctx).await;
                 crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true).await?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -439,7 +442,10 @@ async fn match_autojoin_attempt_failed(
             );
         }
         AutoJoinAttemptFailedError::UserNotAllowed(_) => {
-            nope_or_fol!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", ia);
+            nope_or_fol!(
+                "Attempting to join your currently connected channel failed as you are not allowed to use the bot here.",
+                ia
+            );
         }
         AutoJoinAttemptFailedError::Forbidden(e) => {
             cant_or_fol!(
@@ -451,7 +457,10 @@ async fn match_autojoin_attempt_failed(
             );
         }
         AutoJoinAttemptFailedError::UserNotStageManager(_) => {
-            nope_or_fol!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", ia);
+            nope_or_fol!(
+                "Attempting to join your currently connected stage failed as you are not a **Stage Manager**.",
+                ia
+            );
         }
     }
 }
@@ -487,25 +496,42 @@ async fn match_another_poll_ongoing(
 
     match error.alternate_vote {
         Some(AlternateVoteResponse::Casted) => {
-            note!(format!("The ongoing poll at {message_link} may resolve this. Your vote has automatically been casted."), i);
+            note!(
+                format!(
+                    "The ongoing poll at {message_link} may resolve this. Your vote has automatically been casted."
+                ),
+                i
+            );
         }
         Some(AlternateVoteResponse::DjCasted) => {
-            hid!("Superseded the ongoing poll at {message_link} to win.", i);
+            hid!(
+                format!("Superseded the ongoing poll at {message_link} to win."),
+                i
+            );
         }
         Some(AlternateVoteResponse::CastDenied) => {
             nope!(
-                format!("The ongoing poll at {message_link} may resolve this, although you are not eligible to cast a vote there."),
+                format!(
+                    "The ongoing poll at {message_link} may resolve this, although you are not eligible to cast a vote there."
+                ),
                 i
             );
         }
         Some(AlternateVoteResponse::CastedAlready(casted)) => {
             caut!(
-                format!("The ongoing poll at {message_link} may resolve this, although you've already casted a vote: **{casted}**."),
+                format!(
+                    "The ongoing poll at {message_link} may resolve this, although you've already casted a vote: **{casted}**."
+                ),
                 i
             );
         }
         None => {
-            sus!(format!("Another poll is needed to resolve that. Please resolve the ongoing poll at {message_link} first."), i);
+            sus!(
+                format!(
+                    "Another poll is needed to resolve that. Please resolve the ongoing poll at {message_link} first."
+                ),
+                i
+            );
         }
     }
 }

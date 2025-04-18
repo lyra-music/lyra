@@ -5,20 +5,20 @@ use std::sync::Arc;
 use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::interaction::{
+        Interaction, InteractionDataResolved,
         application_command::{CommandData, CommandDataOption},
         message_component::MessageComponentInteractionData,
-        Interaction, InteractionDataResolved,
     },
     channel::Channel,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, GenericMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, GenericMarker, UserMarker},
     },
     user::User as TwilightUser,
 };
 
-use crate::error::{command::AutocompleteResult, CommandResult};
+use crate::error::{CommandResult, command::AutocompleteResult};
 
 pub use self::ctx::{
     Autocomplete as AutocompleteCtx, CommandDataAware, Component as ComponentCtx, Ctx,

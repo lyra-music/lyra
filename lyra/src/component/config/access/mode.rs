@@ -7,13 +7,13 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 use super::AccessCategory;
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{out, sus},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
     component::config::access::AccessCategoryFlags,
-    core::{model::DatabaseAware, r#const::text::NO_ROWS_AFFECTED_MESSAGE},
+    core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
     error::CommandResult,
     gateway::GuildIdAware,
 };

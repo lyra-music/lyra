@@ -2,9 +2,9 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
+        SlashCtx,
         macros::{caut, out},
         model::BotSlashCommand,
-        SlashCtx,
     },
     error::CommandResult,
 };

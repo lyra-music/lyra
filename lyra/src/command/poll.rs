@@ -1,7 +1,7 @@
 use std::{
     collections::{
-        hash_map::{DefaultHasher, Entry},
         HashMap, HashSet,
+        hash_map::{DefaultHasher, Entry},
     },
     hash::{Hash, Hasher},
     time::Duration,
@@ -10,17 +10,17 @@ use std::{
 use futures::StreamExt;
 use itertools::Itertools;
 use lyra_ext::rgb_hex::{hex_to_rgb, rgb_to_hex};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use twilight_model::{
     application::interaction::{Interaction, InteractionData},
     channel::message::{
-        component::{ActionRow, Button, ButtonStyle},
         Component, Embed, EmojiReactionType,
+        component::{ActionRow, Button, ButtonStyle},
     },
     guild::Permissions,
     id::{
-        marker::{ChannelMarker, MessageMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, MessageMarker, UserMarker},
     },
 };
 use twilight_util::builder::embed::{
@@ -28,20 +28,20 @@ use twilight_util::builder::embed::{
 };
 
 use crate::{
+    LavalinkAware,
     command::macros::{caut, hid, nope},
     core::{
-        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
         r#const::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },
+        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
     },
     error::{
-        command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
         Cache as CacheError,
+        command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
     },
     lavalink::{Event, EventRecvResult},
-    LavalinkAware,
 };
 
 use super::{
@@ -123,11 +123,7 @@ pub struct Vote(bool);
 
 impl Vote {
     const fn value(self) -> isize {
-        if self.0 {
-            1
-        } else {
-            -1
-        }
+        if self.0 { 1 } else { -1 }
     }
 }
 
@@ -245,7 +241,7 @@ fn generate_embed(
 
 fn generate_upvote_button_id_and_row() -> (String, Component) {
     let (upvote_button_id, downvote_button_id): (String, _) = {
-        let mut button_id_iter = rand::thread_rng()
+        let mut button_id_iter = rand::rng()
             .sample_iter(&Alphanumeric)
             .take(200)
             .map(char::from);

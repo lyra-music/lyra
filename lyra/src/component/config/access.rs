@@ -11,8 +11,8 @@ use sqlx::{Pool, Postgres};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker},
 };
 
 pub use self::{
@@ -40,7 +40,7 @@ impl Calculator {
                  in_access_controls,
                  access_mode,
              }| {
-                access_mode.map_or(true, |access_mode| access_mode == in_access_controls)
+                access_mode.is_none_or(|access_mode| access_mode == in_access_controls)
             },
         )
     }

@@ -8,16 +8,16 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     component::queue::Remove,
     core::model::{CacheAware, InteractionClient},
-    error::{command::AutocompleteResult, CommandResult},
-    LavalinkAndGuildIdAware,
+    error::{CommandResult, command::AutocompleteResult},
 };
 
 enum RemoveRangeAutocompleteOptionsType {

@@ -1,12 +1,12 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, model::BotSlashCommand, require, SlashCtx},
+    LavalinkAware,
+    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
     component::tuning::unmuting_checks,
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    LavalinkAware,
 };
 
 /// Toggles server muting the bot

@@ -15,14 +15,14 @@ use lyra_ext::{
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
+pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 #[allow(clippy::module_name_repetitions)]
 pub use play::AddToQueue;
 pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
-pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
-pub use repeat::{get_next_repeat_mode, repeat, Repeat};
-pub use shuffle::{shuffle, Shuffle};
+pub use repeat::{Repeat, get_next_repeat_mode, repeat};
+pub use shuffle::{Shuffle, shuffle};
 
 use std::{collections::HashSet, num::NonZeroUsize, time::Duration};
 
@@ -37,12 +37,12 @@ use crate::{
         require::PlayerInterface,
     },
     core::{
-        model::{CacheAware, InteractionClient},
         r#const::{
             discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
+        model::{CacheAware, InteractionClient},
     },
-    error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
+    error::{PositionOutOfRange as PositionOutOfRangeError, component::queue::RemoveTracksError},
     lavalink::{CorrectTrackInfo, QueueItem},
 };
 

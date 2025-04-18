@@ -20,19 +20,19 @@ use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker, MessageMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker, MessageMarker},
 };
 
 use crate::{
     command::require::{InVoice, PartialInVoice},
     core::{
-        model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
         r#const,
+        model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
     },
     error::{
-        lavalink::{NewNowPlayingMessageError, UpdateNowPlayingMessageError},
         UnrecognisedConnection,
+        lavalink::{NewNowPlayingMessageError, UpdateNowPlayingMessageError},
     },
     gateway::GuildIdAware,
 };
@@ -40,7 +40,7 @@ use crate::{
 use self::connection::{ConnectionRef, ConnectionRefMut};
 
 pub use self::{
-    connection::{wait_for_with, Connection, Event, EventRecvResult},
+    connection::{Connection, Event, EventRecvResult, wait_for_with},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
     now_playing::{
         Data as NowPlayingData, Message as NowPlayingMessage, Update as NowPlayingDataUpdate,
@@ -134,7 +134,7 @@ impl RawPlayerData {
     }
 
     #[inline]
-    pub fn queue_mut(&mut self) -> &mut Queue {
+    pub const fn queue_mut(&mut self) -> &mut Queue {
         &mut self.queue
     }
 
@@ -143,12 +143,12 @@ impl RawPlayerData {
     }
 
     #[inline]
-    pub fn set_volume(&mut self, volume: NonZeroU16) {
+    pub const fn set_volume(&mut self, volume: NonZeroU16) {
         self.volume = volume;
     }
 
     #[inline]
-    pub fn pitch_mut(&mut self) -> &mut Pitch {
+    pub const fn pitch_mut(&mut self) -> &mut Pitch {
         &mut self.pitch
     }
 
@@ -185,7 +185,7 @@ impl RawPlayerData {
         self.text_channel_id
     }
 
-    pub fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
+    pub const fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
         self.text_channel_id = text_channel_id;
     }
 
@@ -197,7 +197,7 @@ impl RawPlayerData {
     }
 
     #[inline]
-    pub fn take_now_playing_message(&mut self) -> Option<NowPlayingMessage> {
+    pub const fn take_now_playing_message(&mut self) -> Option<NowPlayingMessage> {
         self.now_playing_message.take()
     }
 

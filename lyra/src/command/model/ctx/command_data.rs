@@ -14,7 +14,7 @@ use crate::{
     core::model::OwnedBotState,
 };
 
-use super::{autocomplete::Marker, AppCtxKind, AppCtxMarker, Ctx, Kind, Location};
+use super::{AppCtxKind, AppCtxMarker, Ctx, Kind, Location, autocomplete::Marker};
 
 pub trait Aware: Kind {}
 impl<T: AppCtxKind> Aware for AppCtxMarker<T> {}
@@ -70,12 +70,14 @@ impl<T: Aware, U: Location> Ctx<T, U> {
             command_data_options: &[CommandDataOption],
         ) -> Vec<Arc<str>> {
             match command_data_options {
-                [CommandDataOption {
-                    name,
-                    value:
-                        CommandOptionValue::SubCommand(command_data_options)
-                        | CommandOptionValue::SubCommandGroup(command_data_options),
-                }] => {
+                [
+                    CommandDataOption {
+                        name,
+                        value:
+                            CommandOptionValue::SubCommand(command_data_options)
+                            | CommandOptionValue::SubCommandGroup(command_data_options),
+                    },
+                ] => {
                     names.push(name.clone().into());
                     recurse_through_names(names, command_data_options)
                 }

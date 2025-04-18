@@ -5,24 +5,24 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::Mention;
 use twilight_model::{
     gateway::payload::outgoing::UpdateVoiceState,
-    id::{marker::ChannelMarker, Id},
+    id::{Id, marker::ChannelMarker},
 };
 
 use crate::{
+    LavalinkAware,
     command::{
-        check,
+        SlashCtx, check,
         macros::{caut, out},
         model::{BotSlashCommand, CtxKind, GuildCtx},
-        require, SlashCtx,
+        require,
     },
     core::model::HttpAware,
     error::{
-        component::connection::leave::{self, DisconnectCleanupError},
         CommandResult,
+        component::connection::leave::{self, DisconnectCleanupError},
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{delete_now_playing_message, DelegateMethods, Event, UnwrappedData},
-    LavalinkAware,
+    lavalink::{DelegateMethods, Event, UnwrappedData, delete_now_playing_message},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -48,7 +48,7 @@ pub(super) async fn disconnect_cleanup(
 
     if let Some(connection) = lavalink.get_connection(guild_id) {
         connection.dispatch(Event::QueueClear);
-    };
+    }
     if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
         delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
     }

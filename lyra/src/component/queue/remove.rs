@@ -8,14 +8,14 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     core::model::CacheAware,
-    error::{command::AutocompleteResult, CommandResult},
-    LavalinkAndGuildIdAware,
+    error::{CommandResult, command::AutocompleteResult},
 };
 
 async fn generate_remove_choices(

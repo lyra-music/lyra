@@ -12,9 +12,8 @@ use twilight_model::application::{
 
 use crate::{
     command::{
-        check,
+        AutocompleteCtx, MessageCtx, SlashCtx, check,
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand},
-        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{
         config::Config,

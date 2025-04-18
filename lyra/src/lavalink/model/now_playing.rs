@@ -3,15 +3,15 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 use lavalink_rs::model::GuildId;
 use lyra_ext::{image::dominant_palette, pretty::duration_display::DurationDisplay};
 use twilight_http::Client;
-use twilight_mention::{timestamp::TimestampStyle, Mention};
+use twilight_mention::{Mention, timestamp::TimestampStyle};
 use twilight_model::{
     channel::message::{
-        component::{ActionRow, Button, ButtonStyle},
         Component, Embed, EmojiReactionType,
+        component::{ActionRow, Button, ButtonStyle},
     },
     id::{
-        marker::{ChannelMarker, MessageMarker},
         Id,
+        marker::{ChannelMarker, MessageMarker},
     },
 };
 use twilight_util::builder::embed::{
@@ -22,12 +22,12 @@ use crate::{
     command::util::{DisplayAvatarUrlAware, DisplayNameAware, GuildAvatarUrlAware},
     core::{emoji, model::HttpAware, r#static::component::NOW_PLAYING_BUTTON_IDS},
     error::{
+        Cache,
         core::DeserialiseBodyFromHttpError,
         lavalink::{
             BuildNowPlayingEmbedError, GetDominantPaletteFromUrlError, NewNowPlayingDataError,
             NewNowPlayingMessageError, UpdateNowPlayingMessageError,
         },
-        Cache,
     },
     lavalink::PluginInfo,
 };
@@ -216,7 +216,7 @@ impl Message {
         self.channel_id
     }
 
-    pub(super) fn update(&mut self, update: Update) {
+    pub(super) const fn update(&mut self, update: Update) {
         match update {
             Update::Indexer(idx) => self.data.indexer = idx,
             Update::Repeat(mode) => self.data.repeat_mode = mode,
@@ -224,7 +224,7 @@ impl Message {
         }
     }
 
-    pub(super) fn update_timestamp(&mut self, timestamp: Duration) {
+    pub(super) const fn update_timestamp(&mut self, timestamp: Duration) {
         self.data.timestamp = timestamp;
     }
 

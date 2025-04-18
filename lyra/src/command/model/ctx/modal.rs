@@ -1,5 +1,5 @@
 use twilight_model::{
-    application::interaction::{modal::ModalInteractionData, InteractionData},
+    application::interaction::{InteractionData, modal::ModalInteractionData},
     channel::message::Component,
 };
 

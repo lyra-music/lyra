@@ -1,5 +1,5 @@
-use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
-use twilight_model::id::{marker::GuildMarker, Id};
+use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
+use twilight_model::id::{Id, marker::GuildMarker};
 
 use twilight_gateway::{Event, MessageSender};
 

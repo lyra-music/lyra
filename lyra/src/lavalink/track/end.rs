@@ -3,7 +3,7 @@ use lavalink_rs::{client::LavalinkClient, model::events::TrackEnd};
 use crate::{
     core::model::HttpAware,
     error::lavalink::ProcessResult,
-    lavalink::{model::PlayerData, CorrectTrackInfo, UnwrappedData},
+    lavalink::{CorrectTrackInfo, UnwrappedData, model::PlayerData},
 };
 
 #[tracing::instrument(err, skip_all, name = "track_end")]
@@ -53,6 +53,6 @@ pub async fn delete_now_playing_message(cx: &(impl HttpAware + Sync), data: &Pla
     if let Some(message) = data_w.take_now_playing_message() {
         let channel_id = message.channel_id();
         let _ = cx.http().delete_message(channel_id, message.id()).await;
-    };
+    }
     drop(data_w);
 }

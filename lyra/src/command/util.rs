@@ -2,22 +2,22 @@ use std::borrow::Cow;
 
 use lavalink_rs::{error::LavalinkResult, player_context::PlayerContext};
 use lyra_ext::unix_time;
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use twilight_gateway::Event;
 use twilight_mention::{
-    timestamp::{Timestamp, TimestampStyle},
     Mention,
+    timestamp::{Timestamp, TimestampStyle},
 };
 use twilight_model::{
     application::interaction::{InteractionData, InteractionType},
     channel::{
-        message::component::{TextInput, TextInputStyle},
         ChannelType,
+        message::component::{TextInput, TextInputStyle},
     },
     guild::PartialMember,
     id::{
-        marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
     },
 };
 
@@ -30,18 +30,20 @@ use super::{
     require::{self, InVoice},
 };
 use crate::{
+    LavalinkAware,
     component::connection::auto_join,
     core::{
-        model::{
-            AvatarAware, BotStateAware, CacheAware, DiscriminatorAware, GuildAvatarAware,
-            OwnedBotStateAware, UserGlobalNameAware, UserIdAware, UserNickAware, UsernameAware,
-        },
         r#const::{
             self,
             discord::{BASE_URL, CDN_URL},
         },
+        model::{
+            AvatarAware, BotStateAware, CacheAware, DiscriminatorAware, GuildAvatarAware,
+            OwnedBotStateAware, UserGlobalNameAware, UserIdAware, UserNickAware, UsernameAware,
+        },
     },
     error::{
+        ConfirmationTimedOut, Suppressed as SuppressedError,
         command::{
             require::UnsuppressedError,
             util::{
@@ -49,11 +51,9 @@ use crate::{
                 HandleSuppressedAutoJoinError, PromptForConfirmationError,
             },
         },
-        ConfirmationTimedOut, Suppressed as SuppressedError,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware},
     lavalink::DelegateMethods,
-    LavalinkAware,
 };
 
 pub trait MessageLinkAware: OptionallyGuildIdAware {
@@ -332,7 +332,7 @@ pub async fn prompt_for_confirmation(
         value: None,
     };
 
-    let modal_custom_id = rand::thread_rng()
+    let modal_custom_id = rand::rng()
         .sample_iter(&Alphanumeric)
         .take(100)
         .map(char::from)
@@ -349,7 +349,7 @@ pub async fn prompt_for_confirmation(
         .bot()
         .standby()
         .wait_for(ctx.guild_id(), move |e: &Event| {
-            let Event::InteractionCreate(ref i) = e else {
+            let Event::InteractionCreate(i) = e else {
                 return false;
             };
             let Some(InteractionData::ModalSubmit(ref m)) = i.data else {

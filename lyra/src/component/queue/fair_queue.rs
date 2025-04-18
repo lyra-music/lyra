@@ -2,10 +2,10 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{bad, out},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
     error::CommandResult,
     lavalink::IndexerType,

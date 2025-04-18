@@ -5,19 +5,19 @@ mod restart;
 mod seek;
 mod skip;
 
-pub use back::{back, Back};
+pub use back::{Back, back};
 pub use jump::{Autocomplete as JumpAutocomplete, Jump};
-pub use play_pause::{play_pause, PlayPause};
+pub use play_pause::{PlayPause, play_pause};
 pub use restart::Restart;
 pub use seek::Seek;
-pub use skip::{skip, Skip};
+pub use skip::{Skip, skip};
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::require,
     core::model::{BotStateAware, CacheAware, HttpAware},
     error::component::playback::HandleVoiceStateUpdateError,
     gateway::voice::Context,
-    LavalinkAndGuildIdAware,
 };
 
 #[tracing::instrument(skip_all, name = "voice_state_update")]

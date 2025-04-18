@@ -36,7 +36,7 @@ pub(super) async fn impl_exception(
                 .http()
                 .delete_message(message.channel_id(), message.id())
                 .await;
-        };
+        }
     }
 
     lavalink

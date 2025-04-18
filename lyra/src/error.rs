@@ -10,8 +10,8 @@ pub use command::Result as CommandResult;
 use thiserror::Error;
 use twilight_mention::Mention;
 use twilight_model::id::{
-    marker::{ChannelMarker, UserMarker},
     Id,
+    marker::{ChannelMarker, UserMarker},
 };
 
 use crate::command::require::PartialInVoice;
@@ -86,7 +86,7 @@ impl std::fmt::Display for PrettyInVoiceWithSomeoneElseDisplayer<'_> {
         write!(
             f,
             "There are someone else in {}; You need to be a ***DJ*** to do that.",
-            self.0 .0.channel_id().mention(),
+            self.0.0.channel_id().mention(),
         )
     }
 }
