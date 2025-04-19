@@ -1,4 +1,6 @@
 pub fn main() {
+    println!("cargo:rerun-if-changed=migrations");
+    println!("cargo:rerun-if-changed=preset");
     emit().unwrap_or_else(|e| panic!("emit error: {e:?}"));
 }
 

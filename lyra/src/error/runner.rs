@@ -5,6 +5,7 @@ use thiserror::Error;
 pub enum StartError {
     StartRecommended(#[from] twilight_gateway::error::StartRecommendedError),
     Sqlx(#[from] sqlx::Error),
+    Migrate(#[from] sqlx::migrate::MigrateError),
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
     Http(#[from] twilight_http::Error),
     WaitUntilShutdown(#[from] WaitUntilShutdownError),

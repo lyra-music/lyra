@@ -1,16 +1,16 @@
 use std::{
+    env,
     str::FromStr,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicBool, Ordering},
     },
 };
 
-use dotenvy_macro::dotenv;
 use lavalink_rs::{client::LavalinkClient, model::client::NodeDistributionStrategy};
 use log::LevelFilter;
 use sqlx::{
-    ConnectOptions,
+    ConnectOptions, migrate,
     postgres::{PgConnectOptions, PgPoolOptions},
 };
 use tokio::task::JoinHandle;
@@ -46,12 +46,22 @@ use super::{
 };
 use super::{gateway::LastCachedStates, lavalink::Lavalink};
 
-const CONFIG: Config = Config {
-    token: dotenv!("BOT_TOKEN"),
-    lavalink_host: concat!(dotenv!("SERVER_ADDRESS"), ":", dotenv!("SERVER_PORT")),
-    lavalink_pwd: dotenv!("LAVALINK_SERVER_PASSWORD"),
-    database_url: dotenv!("DATABASE_URL"),
-};
+static CONFIG: LazyLock<Config> = LazyLock::new(|| Config {
+    token: env::var("BOT_TOKEN").expect("missing BOT_TOKEN").leak(),
+    lavalink_host: format!(
+        "{}:{}",
+        env::var("SERVER_ADDRESS").expect("missing SERVER_ADDRESS"),
+        env::var("SERVER_PORT").expect("missing SERVER_PORT")
+    )
+    .leak(),
+    lavalink_pwd: env::var("LAVALINK_SERVER_PASSWORD")
+        .expect("missing LAVALINK_SERVER_PASSWORD")
+        .leak(),
+    database_url: env::var("DATABASE_URL")
+        .expect("missing DATABASE_URL")
+        .leak(),
+});
+
 const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
@@ -85,12 +95,14 @@ fn build_shard_config() -> ShardConfig {
 pub async fn start() -> Result<(), StartError> {
     tracing::debug!("began starting the bot");
 
-    let options =
-        PgConnectOptions::from_str(CONFIG.database_url)?.log_statements(LevelFilter::Debug);
     let db = PgPoolOptions::new()
-        .max_connections(5)
-        .connect_with(options)
+        .max_connections(20)
+        .connect_with(
+            PgConnectOptions::from_str(CONFIG.database_url)?.log_statements(LevelFilter::Debug),
+        )
         .await?;
+
+    migrate!("../migrations").run(&db).await?;
 
     let http = build_http_client();
 
@@ -130,8 +142,8 @@ async fn build_lavalink_client(user_id: Id<UserMarker>, data: ClientData) -> Lav
     let events = handlers();
 
     let nodes = Vec::from([lavalink_rs::node::NodeBuilder {
-        hostname: String::from(CONFIG.lavalink_host),
-        password: String::from(CONFIG.lavalink_pwd),
+        hostname: CONFIG.lavalink_host.to_owned(),
+        password: CONFIG.lavalink_pwd.to_owned(),
         user_id: user_id.into(),
         ..Default::default()
     }]);

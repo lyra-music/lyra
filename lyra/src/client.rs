@@ -9,7 +9,7 @@ fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
 #[tracing::instrument(err)]
 pub async fn run() -> Result<(), super::error::Run> {
     color_eyre::install()?;
-    dotenvy::dotenv()?;
+    dotenvy::dotenv().ok();
 
     tracing_subscriber::fmt()
         .with_env_filter(
