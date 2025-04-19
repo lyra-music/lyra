@@ -39,6 +39,12 @@ services:
       - private
     expose:
       - ${SERVER_PORT:-2333}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-H", "Authorization: ${LAVALINK_SERVER_PASSWORD}", "http://localhost:2333/version"]
+      interval: 60s
+      start_period: 10s
+      timeout: 10s
+      retries: 5
 
   lyra:
     build:
@@ -54,8 +60,12 @@ services:
       LAVALINK_SERVER_PASSWORD: ${LAVALINK_SERVER_PASSWORD:?err}
       RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
     depends_on:
-      - db
-      - lavalink
+      lavalink:
+        condition: service_healthy
+        restart: true
+      db:
+        condition: service_started
+        restart: true
     restart: always
     networks:
       - private
@@ -63,4 +73,3 @@ services:
 networks:
   private:
     external: false
-
