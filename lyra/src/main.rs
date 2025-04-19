@@ -15,5 +15,8 @@ pub use {
 #[tokio::main]
 #[tracing::instrument]
 async fn main() {
-    let _ = client::run().await;
+    if let Err(e) = client::run().await {
+        tracing::error!(?e, "failed to run client");
+        panic!("failed to run client: {e:?}");
+    }
 }

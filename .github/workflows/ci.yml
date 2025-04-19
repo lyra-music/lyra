@@ -8,55 +8,49 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BOT_TOKEN: ~
-  SERVER_ADDRESS: ~
-  SERVER_PORT: ~
-  LAVALINK_SERVER_PASSWORD: ~
-  DATABASE_URL: postgres://user:password@localhost:5432/db
+  SQLX_OFFLINE: true
 
 jobs:
-  test:
+  codespell:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_DB: db
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Codespell
-        uses: codespell-project/actions-codespell@v1
+        uses: codespell-project/actions-codespell@v2
+
+  format_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Setup Mold
         uses: rui314/setup-mold@v1
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.5.0
+        uses: Swatinem/rust-cache@v2
 
-      - name: Setup Database
-        working-directory: database
-        run: |
-          cargo install sqlx-cli --no-default-features --features native-tls,postgres
-          cargo sqlx database setup
-
-      - name: Setup .env
-        run: touch .env
-
-      - name: Build And Test
-        run: |
+      - name: Build
+        run:
           cargo build --verbose
+
+      - name: Test
+        run:
           cargo test --verbose
+
+    
+          

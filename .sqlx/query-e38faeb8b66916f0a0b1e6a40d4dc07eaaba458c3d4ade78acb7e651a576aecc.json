@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT usr_access, rol_access, xch_access, tch_access, vch_access, cch_access FROM guild_configs WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "usr_access",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "rol_access",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "xch_access",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "tch_access",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "vch_access",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "cch_access",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e38faeb8b66916f0a0b1e6a40d4dc07eaaba458c3d4ade78acb7e651a576aecc"
+}

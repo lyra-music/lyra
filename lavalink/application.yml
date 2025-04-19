@@ -19,7 +19,7 @@ plugins:
       - "ytsearch:%QUERY%" # Will be used if track has no ISRC or no track could be found for the ISRC
       - "scsearch:%QUERY%" # you can add multiple other fallback sources here
     sources:
-      spotify: true # Enable Spotify source
+      # spotify: true # Enable Spotify source
       # applemusic: true # Enable Apple Music source
       # deezer: true # Enable Deezer source
       # yandexmusic: true # Enable Yandex Music source

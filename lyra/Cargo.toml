@@ -4,6 +4,8 @@ readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
 version = "0.8.1"
 edition = "2024"
+# When bumping, bump in other Cargo.toml files, Dockerfile too
+rust-version = "1.86"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
 authors = ["fdnt7"]
