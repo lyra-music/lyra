@@ -90,8 +90,7 @@ pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twili
         } else if let Some(d) = lavalink.get_player_data(guild_id) {
             Some(d.read().await.volume())
         } else {
-            // SAFETY: `100` is non-zero
-            Some(unsafe { NonZeroU16::new_unchecked(100) })
+            Some(NonZeroU16::new(100).expect("100 must be non-zero"))
         });
         let describe = if state_mute { "muted" } else { "unmuted" };
 

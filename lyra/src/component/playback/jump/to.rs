@@ -63,8 +63,7 @@ impl BotAutocomplete for Autocomplete {
     ) -> crate::error::command::AutocompleteResult {
         let mut ctx = require::guild(ctx)?;
         let AutocompleteValue::Focused(track) = self.track else {
-            // SAFETY: exactly one autocomplete option is focused, so this is unreachable
-            unsafe { std::hint::unreachable_unchecked() }
+            panic!("not exactly one autocomplete option focused")
         };
 
         let choices = generate_skip_to_choices(track, &ctx).await;

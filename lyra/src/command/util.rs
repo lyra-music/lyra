@@ -257,9 +257,7 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
     match auto_join(ctx).await {
         Err(e) => Err(e.unflatten_into_auto_join_attempt().into()),
         Ok(state) => {
-            // SAFETY: as `auto_join` was called and ran successfully,
-            //         there must now be an active voice connection.
-            let in_voice = unsafe { InVoice::new(state, ctx) };
+            let in_voice = InVoice::new(state, ctx);
             let Err(UnsuppressedError::Suppressed(suppressed)) = in_voice.and_unsuppressed() else {
                 return Ok(());
             };
@@ -375,9 +373,7 @@ pub async fn prompt_for_confirmation(
                 .is_some_and(|s| s == "YES");
             (ctx, confirmed)
         }
-        // SAFETY: the future has been filtered to only match modal submit interaction
-        //         so this branch is unreachable
-        Ok(Ok(_)) => unsafe { std::hint::unreachable_unchecked() },
+        Ok(Ok(_)) => panic!("event type not interaction create"),
         Ok(Err(e)) => return Err(e.into()),
         Err(_) => return Err(ConfirmationTimedOut.into()),
     };

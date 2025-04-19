@@ -117,8 +117,9 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
         ChannelType::PublicThread
         | ChannelType::PrivateThread
         | ChannelType::AnnouncementThread => {
-            // SAFETY: `channel.kind` is of type threads, so `parent_id` is present
-            let parent_id = unsafe { channel.parent_id.unwrap_unchecked() };
+            let parent_id = channel
+                .parent_id
+                .expect("channel of thread types should have a parent");
             access_calculator_builder = access_calculator_builder
                 .thread(channel.id)
                 .text_channel(parent_id);

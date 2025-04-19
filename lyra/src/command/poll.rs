@@ -191,17 +191,13 @@ struct WaitForPollActionsContext<'a> {
 }
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
-    // SAFETY: interaction is not of type `Ping`, so author exists
-    let user_id = unsafe { inter.author_id_unchecked() };
+    let user_id = inter.author_id_expected();
 
     let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
-        // SAFETY: interaction is of type `MessageComponent`,
-        //         so interaction data must also be of type `MessageComponent`
-        unsafe { std::hint::unreachable_unchecked() }
+        unreachable!()
     };
 
-    // SAFETY: interaction invoked in a guild, so author permissions exists
-    let voter_permissions = unsafe { inter.author_permissions_unchecked() };
+    let voter_permissions = inter.author_permissions_expected();
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),

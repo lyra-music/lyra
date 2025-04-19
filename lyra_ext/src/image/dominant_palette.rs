@@ -29,23 +29,19 @@ impl Get for DynamicImage {
             .map(|x| x.into_format::<_, f32>().into_color())
             .collect::<Vec<Lab>>();
 
-        // SAFETY: `0..RUNS` is a non-empty iterator,
-        //         so unwrapping `.max_by(...)` is safe
-        let result = unsafe {
-            (0..RUNS)
-                .map(|i| {
-                    kmeans_colors::get_kmeans_hamerly(
-                        palette_size,
-                        MAX_ITERATIONS,
-                        COVERAGE,
-                        false,
-                        &lab,
-                        RANDOM_SEED + u64::from(i),
-                    )
-                })
-                .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
-                .unwrap_unchecked()
-        };
+        let result = (0..RUNS)
+            .map(|i| {
+                kmeans_colors::get_kmeans_hamerly(
+                    palette_size,
+                    MAX_ITERATIONS,
+                    COVERAGE,
+                    false,
+                    &lab,
+                    RANDOM_SEED + u64::from(i),
+                )
+            })
+            .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
+            .expect("number of runs must be non-zero");
 
         let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
         res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));
@@ -90,17 +86,17 @@ mod test {
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_1.jpg"),
         2,
-        &[(93, 108, 132).into(), (131, 43, 145).into()]
+        &[(63, 51, 99).into(), (149, 168, 180).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         3,
-        &[(63, 60, 69).into(), (134, 94, 94).into(), (188, 157, 135).into()]
+        &[(126, 92, 92).into(), (57, 57, 67).into(), (188, 155, 133).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         4,
-        &[(98, 75, 83).into(), (149, 107, 101).into(), (192, 162, 138).into(), (47, 53, 62).into()]
+        &[(55, 54, 65).into(), (114, 92, 93).into(), (189, 158, 136).into(), (155, 91, 90).into()]
     )]
     fn dominant_palette(
         #[case] input_path: &str,

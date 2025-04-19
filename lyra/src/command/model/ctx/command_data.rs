@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc};
 
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
@@ -48,18 +48,14 @@ impl<T: Aware> Ctx<T> {
 impl<T: Aware, U: Location> Ctx<T, U> {
     pub const fn command_data(&self) -> &PartialCommandData {
         let Some(PartialInteractionData::Command(data)) = self.data.as_ref() else {
-            // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-            //         so `data` will always be `PartialInteractionData::Command(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         data
     }
 
     pub fn into_command_data(self) -> Box<PartialCommandData> {
         let Some(PartialInteractionData::Command(command_data)) = self.data else {
-            // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-            //         so `data` will always be `PartialInteractionData::Command(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         command_data
     }

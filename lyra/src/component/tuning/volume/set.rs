@@ -22,9 +22,9 @@ impl BotSlashCommand for Set {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        // SAFETY: `self.percent as u16` is in range [1, 1_000], so it is non-zero
         #[allow(clippy::cast_possible_truncation)]
-        let percent = unsafe { NonZeroU16::new_unchecked(self.percent.unsigned_abs() as u16) };
+        let percent = NonZeroU16::new(self.percent.unsigned_abs() as u16)
+            .expect("percent should be non-zero");
         player.context.set_volume(percent.get()).await?;
         player.data().write().await.set_volume(percent);
 

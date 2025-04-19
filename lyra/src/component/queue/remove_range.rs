@@ -126,9 +126,7 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 RemoveRangeAutocompleteOptionsType::EndFocusedStartCompleted(i),
             ),
-            // SAFETY: only one autocomplete options can be focused at a time,
-            //         so this branch is unreachable
-            _ => unsafe { std::hint::unreachable_unchecked() },
+            _ => panic!("not exactly one autocomplete option focused"),
         };
 
         let options = RemoveRangeAutocompleteOptions {

@@ -60,11 +60,12 @@ pub mod metadata {
         let rdr = include_str!("../../../assets/lyra2-ascii.ans");
         let mut wtr = Vec::new();
 
-        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
+        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS must be valid");
         ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
-            .expect("searching is infallible");
-        // SAFETY: since `rdr` is utf-8, `wtr` must also be utf-8
-        unsafe { String::from_utf8_unchecked(wtr).leak() }
+            .expect("searching must be infallible");
+        String::from_utf8(wtr)
+            .expect("interpolated banner must be utf-8")
+            .leak()
     });
 }
 

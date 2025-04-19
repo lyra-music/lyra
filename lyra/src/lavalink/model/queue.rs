@@ -99,8 +99,7 @@ impl Queue {
 
     fn position_from(&self, current: Option<&Item>) -> NonZeroUsize {
         let d = usize::from(current.is_some() || self.index == 0);
-        // SAFETY: `self.index + d` is non-zero
-        unsafe { NonZeroUsize::new_unchecked(self.index + d) }
+        NonZeroUsize::new(self.index + d).expect("normalised queue position must be non-zero")
     }
 
     pub fn position(&self) -> NonZeroUsize {

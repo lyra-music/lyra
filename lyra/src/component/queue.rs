@@ -272,25 +272,20 @@ async fn impl_remove(
     let queue = data_w.queue_mut();
 
     let removed_len = removed.len();
-    let removed_text = match removed_len {
-        0 => String::new(),
-        1..=ADD_TRACKS_WRAP_LIMIT => removed
-            .into_iter()
-            .map(|t| format!("`{}`", t.into_data().info.corrected_title()))
-            .collect::<Box<[_]>>()
-            .pretty_join_with_and(),
-        _ => format!("`{removed_len} tracks`"),
+    let (minus, removed_text) = match removed_len {
+        0 => unreachable!(),
+        1..=ADD_TRACKS_WRAP_LIMIT => (
+            "**`ー`**",
+            removed
+                .into_iter()
+                .map(|t| format!("`{}`", t.into_data().info.corrected_title()))
+                .collect::<Box<[_]>>()
+                .pretty_join_with_and(),
+        ),
+        _ => ("**`≡-`**", format!("`{removed_len} tracks`")),
     };
-    let minus = match removed_len {
-        // SAFETY: `/remove` always remove at least one track after input positions have been validated,
-        //         so this branch is unreachable
-        0 => unsafe { std::hint::unreachable_unchecked() },
-        1 => "**`ー`**",
-        _ => "**`≡-`**",
-    };
-
-    // SAFETY: `queue.index() + 1` is non-zero
-    let current = unsafe { NonZeroUsize::new_unchecked(queue.index() + 1) };
+    let current =
+        NonZeroUsize::new(queue.index() + 1).expect("1-indexed queue index must be non-zero");
     let before_current = positions.partition_point(|&i| i < current);
     *queue.index_mut() -= positions[..before_current].len();
 

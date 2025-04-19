@@ -87,10 +87,9 @@ impl SenderAware for Context {
 
 impl GuildIdAware for Context {
     fn guild_id(&self) -> Id<GuildMarker> {
-        // SAFETY: this bot cannot join DM voice calls,
-        //         meaning all voice states will be from a guild voice channel,
-        //         so `e.guild_id` is present
-        unsafe { self.inner.guild_id.unwrap_unchecked() }
+        self.inner
+            .guild_id
+            .expect("bots should currently only be able to join guild voice channels")
     }
 }
 

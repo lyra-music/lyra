@@ -115,8 +115,7 @@ impl RawPlayerData {
     pub fn new(text_channel_id: Id<ChannelMarker>) -> Self {
         Self {
             text_channel_id,
-            // SAFETY: `100` is non-zero
-            volume: unsafe { NonZeroU16::new_unchecked(100) },
+            volume: NonZeroU16::new(100).expect("100 must be non-zero"),
             pitch: Pitch::new(),
             queue: Queue::new(),
             track_timestamp: TrackTimestamp::new(),
@@ -370,10 +369,8 @@ pub trait DelegateMethods {
             }
             twilight_gateway::Event::VoiceStateUpdate(e) => {
                 self.handle_voice_state_update(
-                    // SAFETY: this bot cannot join DM voice calls,
-                    //         meaning all voice states will be from a guild voice channel,
-                    //         so `e.guild_id` is present
-                    unsafe { e.guild_id.unwrap_unchecked() },
+                    e.guild_id
+                        .expect("bots should currently only be able to join guild voice channels"),
                     e.channel_id,
                     e.user_id,
                     e.session_id.clone(),
@@ -467,16 +464,16 @@ impl Lavalink {
             .ok_or(UnrecognisedConnection)
     }
 
-    pub fn connection_from(&self, cx: &impl GetConnection) -> ConnectionRef {
-        // SAFETY: because the caller has an instance of `InVoice`,
-        //         this proves that there is a voice connection currently.
-        unsafe { self.connections.get(&cx.guild_id()).unwrap_unchecked() }
+    pub fn connection_from(&self, cx: &impl ConnectionAware) -> ConnectionRef {
+        self.connections
+            .get(&cx.guild_id())
+            .expect("connection-aware contexts must represent a valid voice connection")
     }
 
-    pub fn connection_mut_from(&self, cx: &impl GetConnection) -> ConnectionRefMut {
-        // SAFETY: because the caller has an instance of `InVoice`,
-        //         this proves that there is a voice connection currently.
-        unsafe { self.connections.get_mut(&cx.guild_id()).unwrap_unchecked() }
+    pub fn connection_mut_from(&self, cx: &impl ConnectionAware) -> ConnectionRefMut {
+        self.connections
+            .get_mut(&cx.guild_id())
+            .expect("connection-aware contexts must represent to a valid voice connection")
     }
 
     pub fn get_connection_mut(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRefMut> {
@@ -555,16 +552,14 @@ pub trait UnwrappedData {
 impl UnwrappedData for PlayerContext {
     type Data = OwnedPlayerData;
     fn data_unwrapped(&self) -> Self::Data {
-        // SAFETY: Player data exists of type `Arc<RwLock<PlayerData>>`
-        unsafe { self.data().unwrap_unchecked() }
+        self.data().expect("player data must exists")
     }
 }
 
 impl UnwrappedData for LavalinkClient {
     type Data = OwnedClientData;
     fn data_unwrapped(&self) -> Self::Data {
-        // SAFETY: Lavalink data exists of type `Arc<ClientData>`
-        unsafe { self.data().unwrap_unchecked() }
+        self.data().expect("lavalink data must exists")
     }
 }
 
@@ -586,10 +581,10 @@ impl UnwrappedPlayerInfoUri for TrackInfo {
     }
 }
 
-pub trait GetConnection: GuildIdAware {}
+pub trait ConnectionAware: GuildIdAware {}
 
-impl GetConnection for InVoice<'_> {}
-impl GetConnection for PartialInVoice {}
+impl ConnectionAware for InVoice<'_> {}
+impl ConnectionAware for PartialInVoice {}
 
 pub type ArtworkCache = Cache<(Box<str>, usize), Arc<[u32]>>;
 

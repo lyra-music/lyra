@@ -34,9 +34,9 @@
       forEachSystem
       (system: let
         pkgs = import nixpkgs {
-	  inherit systems;
-	  config.allowUnfree = true;
-	};
+          inherit systems;
+          config.allowUnfree = true;
+        };
       in {
         default = devenv.lib.mkShell {
           inherit inputs pkgs;
@@ -75,7 +75,7 @@
                 initialDatabases = [{name = "mydb";}];
                 extensions = extensions: [
                   extensions.postgis
-		  extensions.timescaledb
+                  extensions.timescaledb
                 ];
                 settings.shared_preload_libraries = "timescaledb";
                 initialScript = "CREATE EXTENSION IF NOT EXISTS timescaledb;";

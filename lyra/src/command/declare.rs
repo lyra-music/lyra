@@ -196,40 +196,17 @@ declare_autocomplete![
 
 pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
 
-type Commands = [Command; SLASH_COMMANDS_N + MESSAGE_COMMANDS_N];
+const COMMANDS_N: usize = SLASH_COMMANDS_N + MESSAGE_COMMANDS_N;
+type Commands = [Command; COMMANDS_N];
 
 #[inline]
 pub fn commands() -> Commands {
     let a = slash_commands();
     let b = message_commands();
 
-    let mut result = std::mem::MaybeUninit::<Commands>::uninit();
-    let dest = result.as_mut_ptr().cast::<Command>();
-
-    // SAFETY: The source pointer `a.as_ptr()` is valid for `a.len()` elements,
-    // and `dest` is valid and initialized for at least `a.len()` elements
-    // since `result` is uninitialized but has enough space to hold both arrays.
-    unsafe {
-        std::ptr::copy_nonoverlapping(a.as_ptr(), dest, a.len());
-    }
-
-    // SAFETY: The pointer `dest` is valid for the entire array, and the offset
-    // `a.len()` is guaranteed to be within bounds because `Commands` has enough space
-    // to store both `a` and `b`. This simply calculates the address of where `b` should start.
-    let new_dest = unsafe { dest.add(a.len()) };
-
-    // SAFETY: The source pointer `b.as_ptr()` is valid for `b.len()` elements,
-    // and `new_dest` points to the remaining uninitialized part of the `result` array.
-    // Since we ensure the bounds of `result` by construction, this is safe.
-    unsafe {
-        std::ptr::copy_nonoverlapping(b.as_ptr(), new_dest, b.len());
-    }
-
-    std::mem::forget(a);
-    std::mem::forget(b);
-
-    // SAFETY: The `result` has now been fully initialized by copying the elements from
-    // `a` and `b` into it. Therefore, it is safe to call `assume_init()` to retrieve the
-    // fully initialized array.
-    unsafe { result.assume_init() }
+    std::array::from_fn(|i| match i {
+        0..SLASH_COMMANDS_N => a[i].clone(),
+        SLASH_COMMANDS_N..COMMANDS_N => b[i - SLASH_COMMANDS_N].clone(),
+        _ => unreachable!(),
+    })
 }

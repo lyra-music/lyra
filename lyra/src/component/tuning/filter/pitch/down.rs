@@ -24,8 +24,8 @@ impl BotSlashCommand for Down {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        // SAFETY: `self.half_tones.unwrap_or(2)` is non-empty
-        let half_tones = unsafe { NonZeroI64::new_unchecked(self.half_tones.unwrap_or(2)) };
+        let half_tones = NonZeroI64::new(self.half_tones.unwrap_or(2))
+            .expect("half-tones step should be non-zero");
         let (old, new) = shift_pitch(&player, -half_tones).await?;
 
         let emoji = new.tier().emoji();

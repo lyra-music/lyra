@@ -30,10 +30,9 @@ impl LastCachedStates {
     pub fn new(cache: &InMemoryCache, event: &Event) -> Self {
         let voice_state = match event {
             Event::VoiceStateUpdate(event) => {
-                // SAFETY: this bot cannot join DM voice calls,
-                //         meaning all voice states will be from a guild voice channel,
-                //         so `e.guild_id` is present
-                let guild_id = unsafe { event.guild_id.unwrap_unchecked() };
+                let guild_id = event
+                    .guild_id
+                    .expect("bots should currently only be able to join guild voice channels");
                 cache
                     .voice_state(event.user_id, guild_id)
                     .as_deref()

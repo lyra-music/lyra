@@ -169,13 +169,14 @@ impl GuildIdAware for PartialInVoice {
 }
 
 pub fn in_voice<T: CtxKind>(ctx: &GuildCtx<T>) -> Result<InVoice, NotInVoice> {
-    let state = ctx.current_voice_state().ok_or(NotInVoice)?;
-    // SAFETY: it has been proven that there is a voice connection currently
-    Ok(unsafe { InVoice::new(state.into(), ctx) })
+    Ok(InVoice::new(
+        ctx.current_voice_state().ok_or(NotInVoice)?.into(),
+        ctx,
+    ))
 }
 
 impl<'a> InVoice<'a> {
-    pub unsafe fn new(
+    pub fn new(
         state: InVoiceCachedVoiceState,
         ctx: &'a (impl UserPermissionsAware + UserIdAware + CacheAware),
     ) -> Self {

@@ -122,9 +122,7 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 MoveAutocompleteOptionType::PositionFocusedTrackCompleted(i),
             ),
-            // SAFETY: only one autocomplete options can be focused at a time,
-            //         so this branch is unreachable
-            _ => unsafe { std::hint::unreachable_unchecked() },
+            _ => panic!("not exactly one autocomplete option focused"),
         };
 
         let options = MoveAutocompleteOptions {
@@ -185,17 +183,18 @@ impl BotSlashCommand for Move {
             self.position.unsigned_abs() as usize,
         );
 
-        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let position = unsafe { NonZeroUsize::new_unchecked(position_usize) };
+        let position =
+            NonZeroUsize::new(position_usize).expect("new track position must be non-zero");
         let track = &queue[position];
         check::track_is_users(track, position, in_voice_with_user)?;
 
-        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let track_position = unsafe { NonZeroUsize::new_unchecked(track_usize) };
+        let track_position =
+            NonZeroUsize::new(track_usize).expect("old track position must be non-zero");
         let queue_position = queue.position();
 
-        // SAFETY: `track_position.get() - 1` has been validated to be in-bounds, so this unwrap is safe
-        let track = unsafe { queue.remove(track_position.get() - 1).unwrap_unchecked() };
+        let track = queue
+            .remove(track_position.get() - 1)
+            .expect("new track position must be in-bounds");
         let track_title = track.data().info.corrected_title();
         let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 

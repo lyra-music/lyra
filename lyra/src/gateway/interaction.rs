@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, sync::Arc};
+use std::sync::Arc;
 
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
@@ -75,16 +75,10 @@ impl BotState {
 impl Process for Context {
     async fn process(self) -> ProcessResult {
         match self.inner.kind {
-            // SAFETY: `self.inner.kind` is `ApplicationCommand`, so this is safe
-            InteractionType::ApplicationCommand => unsafe { self.process_as_app_command() }.await,
-            InteractionType::ApplicationCommandAutocomplete => {
-                // SAFETY: `self.inner.kind` is `ApplicationCommandAutocomplete`, so this is safe
-                unsafe { self.process_as_autocomplete() }.await
-            }
-            // SAFETY: `self.inner.kind` is `MessageComponent`, so this is safe
-            InteractionType::MessageComponent => unsafe { self.process_as_component() }.await,
-            // SAFETY: `self.inner.kind` is `ModalSubmit`, so this is safe
-            InteractionType::ModalSubmit => unsafe { self.process_as_modal() }.await,
+            InteractionType::ApplicationCommand => self.process_as_app_command().await,
+            InteractionType::ApplicationCommandAutocomplete => self.process_as_autocomplete().await,
+            InteractionType::MessageComponent => self.process_as_component().await,
+            InteractionType::ModalSubmit => self.process_as_modal().await,
             InteractionType::Ping => Ok(()), // ignored
             _ => unimplemented!(),
         }
@@ -92,20 +86,17 @@ impl Process for Context {
 }
 
 impl Context {
-    async unsafe fn process_as_app_command(mut self) -> ProcessResult {
+    async fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
         let i = bot.interaction().await?.interfaces(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ApplicationCommand`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
 
         let name = data.name.clone().into();
         let inner_guild_id = self.inner.guild_id;
-        // SAFETY: interaction type is not `Ping`, so `channel` is present
-        let channel_id = unsafe { self.inner.channel_id_unchecked() };
+        let channel_id = self.inner.channel_id_expected();
         let (tx, mut rx) = oneshot::channel::<()>();
 
         let result = match data.kind {
@@ -158,9 +149,7 @@ impl Context {
             }
             Fuunacee::Command => {
                 let CommandExecuteError::Command(error) = source else {
-                    // SAFETY: `source.flatten_until_user_not_allowed_as()` is `Fuunacee::Command(_)`,
-                    //         so the unflattened source error must be `CommandExecuteError::Command(_)`
-                    unsafe { unreachable_unchecked() }
+                    unreachable!()
                 };
                 match_error(error, name, acknowledged, i).await
             }
@@ -176,11 +165,9 @@ impl Context {
         }
     }
 
-    async unsafe fn process_as_autocomplete(mut self) -> ProcessResult {
+    async fn process_as_autocomplete(mut self) -> ProcessResult {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ApplicationCommandAutocomplete`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
 
         let name = data.name.clone().into();
@@ -202,11 +189,9 @@ impl Context {
         Err(ProcessError::AutocompleteExecute { name, source })
     }
 
-    async unsafe fn process_as_component(mut self) -> ProcessResult {
+    async fn process_as_component(mut self) -> ProcessResult {
         let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `MessageComponent`,
-            //         so `self.inner.data.take()` will always be `InteractionData::MessageComponent(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         tracing::trace!(?data);
 
@@ -274,11 +259,9 @@ impl Context {
     }
 
     #[allow(clippy::unused_async)]
-    async unsafe fn process_as_modal(mut self) -> ProcessResult {
+    async fn process_as_modal(mut self) -> ProcessResult {
         let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ModalSubmit`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ModalSubmit(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         tracing::trace!(?data);
 

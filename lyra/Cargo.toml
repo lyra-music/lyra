@@ -18,8 +18,7 @@ vergen-git2 = { version = "1.0.7", features = [
 ] }
 
 [lints.rust]
-unsafe_op_in_unsafe_fn = "forbid"
-# dead_code = "allow"
+unsafe_code = "forbid"
 
 [lints.clippy]
 multiple_unsafe_ops_per_block = "forbid"

@@ -27,46 +27,43 @@ pub use self::ctx::{
 };
 
 pub trait NonPingInteraction {
-    unsafe fn author_unchecked(&self) -> &TwilightUser;
-    unsafe fn author_id_unchecked(&self) -> Id<UserMarker> {
-        // SAFETY: interaction type is not `Ping`, so an author exists
-        let author = unsafe { self.author_unchecked() };
-        author.id
+    fn author_expected(&self) -> &TwilightUser;
+    fn author_id_expected(&self) -> Id<UserMarker> {
+        self.author_expected().id
     }
-    unsafe fn channel_unchecked(&self) -> &Channel;
-    unsafe fn channel_id_unchecked(&self) -> Id<ChannelMarker> {
-        // SAFETY: interaction type is not `Ping`, so a channel exists
-        let channel = unsafe { self.channel_unchecked() };
-        channel.id
+    fn channel_expected(&self) -> &Channel;
+    fn channel_id_expected(&self) -> Id<ChannelMarker> {
+        self.channel_expected().id
     }
 }
 
 impl NonPingInteraction for Interaction {
-    unsafe fn author_unchecked(&self) -> &TwilightUser {
-        // SAFETY: interaction type is not `Ping`, so an author exists
-        unsafe { self.author().unwrap_unchecked() }
+    fn author_expected(&self) -> &TwilightUser {
+        self.author()
+            .expect("non-ping interactions should have an author")
     }
 
-    unsafe fn channel_unchecked(&self) -> &Channel {
-        // SAFETY: interaction type is not `Ping`, so channel exists
-        unsafe { self.channel.as_ref().unwrap_unchecked() }
+    fn channel_expected(&self) -> &Channel {
+        self.channel
+            .as_ref()
+            .expect("non-ping interactions should have a channel")
     }
 }
 
 pub trait GuildInteraction {
-    unsafe fn member_unchecked(&self) -> &PartialMember;
-    unsafe fn author_permissions_unchecked(&self) -> Permissions {
-        // SAFETY: interaction invoked in a guild, so member exists
-        let member = unsafe { self.member_unchecked() };
-        // SAFETY: member was sent from an interaction, so permissions is sent
-        unsafe { member.permissions.unwrap_unchecked() }
+    fn member_expected(&self) -> &PartialMember;
+    fn author_permissions_expected(&self) -> Permissions {
+        self.member_expected()
+            .permissions
+            .expect("member object sent from an interaction should have permissions")
     }
 }
 
 impl GuildInteraction for Interaction {
-    unsafe fn member_unchecked(&self) -> &PartialMember {
-        // SAFETY: interaction invoekd in a guild, so member exists
-        unsafe { self.member.as_ref().unwrap_unchecked() }
+    fn member_expected(&self) -> &PartialMember {
+        self.member
+            .as_ref()
+            .expect("interactions invoked in a guild should have a member")
     }
 }
 

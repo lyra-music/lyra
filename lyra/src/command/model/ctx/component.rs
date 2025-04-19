@@ -34,16 +34,16 @@ impl<U: Location> Ctx<ComponentMarker, U> {
 
     pub fn component_data_mut(&mut self) -> &mut MessageComponentInteractionData {
         let Some(PartialInteractionData::Component(data)) = self.data.as_mut() else {
-            // SAFETY: `self` is `Ctx<ComponentMarker>`,
-            //         so `data` will always be `PartialInteractionData::Component(_)`
-            unsafe { std::hint::unreachable_unchecked() }
+            unreachable!()
         };
         data
     }
 
     pub fn message(&self) -> &Message {
-        // SAFETY: `self` is `Ctx<ComponentMarker>`, so `self.inner.message` exists
-        unsafe { self.inner.message.as_ref().unwrap_unchecked() }
+        self.inner
+            .message
+            .as_ref()
+            .expect("component contexts must have a message attached to the component")
     }
 
     pub fn take_custom_id_into_now_playing_button_type(&mut self) -> Option<NowPlayingButtonType> {

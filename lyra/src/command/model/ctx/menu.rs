@@ -28,15 +28,16 @@ impl TargetIdAware for MessageAppMarker {}
 
 impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
     pub const fn target_id(&self) -> Id<GenericMarker> {
-        // SAFETY: `self` is `Ctx<impl TargetIdAware, _>`,
-        //         so `self.partial_command_data().target_id` is present
-        unsafe { self.command_data().target_id.unwrap_unchecked() }
+        self.command_data()
+            .target_id
+            .expect("target-id-aware contexts must have a target id")
     }
 
     const fn resolved_data(&self) -> &InteractionDataResolved {
-        // SAFETY: `self` is `Ctx<impl TargetIdAware, _>`,
-        //         so `self.partial_command_data().resolved` is present
-        unsafe { self.command_data().resolved.as_ref().unwrap_unchecked() }
+        self.command_data()
+            .resolved
+            .as_ref()
+            .expect("target-id-aware contexts must have a resolved mention resources data")
     }
 }
 
@@ -47,14 +48,10 @@ impl<U: Location> Ctx<UserMarker, U> {
     }
 
     pub fn target_user(&self) -> &TwilightUser {
-        // SAFETY: `self` is `Ctx<UserMarker, _>`,
-        //         so `self.resolved_data().users.get(&self.target_user_id())` is present
-        unsafe {
-            self.resolved_data()
-                .users
-                .get(&self.target_user_id())
-                .unwrap_unchecked()
-        }
+        self.resolved_data()
+            .users
+            .get(&self.target_user_id())
+            .expect("user contexts must contain a resolve mention of the target user id")
     }
 }
 
@@ -65,13 +62,9 @@ impl<U: Location> Ctx<MessageMarker, U> {
     }
 
     pub fn target_message(&self) -> &TwilightMessage {
-        // SAFETY: `self` is `Ctx<MessageMarker, _>`,
-        //         so `self.resolved_data().messages.get(&self.target_message_id())` is present
-        unsafe {
-            self.resolved_data()
-                .messages
-                .get(&self.target_message_id())
-                .unwrap_unchecked()
-        }
+        self.resolved_data()
+            .messages
+            .get(&self.target_message_id())
+            .expect("message contexts must contain a resolve mention of the target message id")
     }
 }

@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, time::Duration};
+use std::time::Duration;
 
 use futures::future;
 use itertools::{Either, Itertools};
@@ -76,9 +76,7 @@ impl LoadTrackContext {
             match loaded.load_type {
                 TrackLoadType::Track => {
                     let Some(TrackLoadData::Track(t)) = loaded.data else {
-                        // SAFETY: `loaded.load_type` is `Track`,
-                        //         so `loaded.data` must be `TrackLoadData::Track(_)`
-                        unsafe { unreachable_unchecked() }
+                        panic!("loaded track missing track load data")
                     };
                     Ok(LoadTrackResult::Track(t))
                 }
@@ -113,9 +111,7 @@ impl Playlist {
         match loaded.load_type {
             TrackLoadType::Playlist => {
                 let Some(TrackLoadData::Playlist(data)) = loaded.data else {
-                    // SAFETY: `loaded.load_type` is `Playlist`,
-                    //         so `loaded.data` must be `TrackLoadData::Playlist(_)`
-                    unsafe { unreachable_unchecked() }
+                    panic!("loaded playlist missing playlist load data")
                 };
 
                 Self {
@@ -124,7 +120,7 @@ impl Playlist {
                     tracks: data.tracks.into(),
                 }
             }
-            _ => panic!("`loaded.load_type` not `LoadType::PlaylistLoaded`"),
+            _ => panic!("`loaded resources not a playlist"),
         }
     }
 }
@@ -179,10 +175,6 @@ trait AutocompleteResultPrettify {
     fn prettify(&mut self) -> String;
 }
 
-trait UnsafeAutocompleteResultPrettify {
-    unsafe fn prettify(&mut self) -> String;
-}
-
 impl AutocompleteResultPrettify for TrackData {
     fn prettify(&mut self) -> String {
         let track_info = &mut self.info;
@@ -200,12 +192,10 @@ impl AutocompleteResultPrettify for TrackData {
     }
 }
 
-impl UnsafeAutocompleteResultPrettify for LoadedTracks {
-    unsafe fn prettify(&mut self) -> String {
+impl AutocompleteResultPrettify for LoadedTracks {
+    fn prettify(&mut self) -> String {
         let Some(TrackLoadData::Playlist(ref mut data)) = self.data else {
-            // SAFETY: `loaded.load_type` is `Search`,
-            //         so `loaded.data` must be `TrackLoadData::Search(_)`
-            unsafe { unreachable_unchecked() }
+            panic!("loaded searches missing playlist search data")
         };
 
         let name = data.info.take_and_correct_name();
@@ -224,28 +214,25 @@ impl UnsafeAutocompleteResultPrettify for LoadedTracks {
 impl BotAutocomplete for Autocomplete {
     async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
         let mut ctx = require::guild(ctx)?;
-        // SAFETY: exactly one autocomplete option is focused, so finding will always be successful
-        let query = unsafe {
-            [
-                self.query,
-                self.query_2,
-                self.query_3,
-                self.query_4,
-                self.query_5,
-            ]
-            .into_iter()
-            .find_map(|q| match q {
-                AutocompleteValue::Focused(q) => Some(q),
-                _ => None,
-            })
-            .map(|q| {
-                let source = self.source.unwrap_or_default();
-                (!regex::URL.is_match(&q))
-                    .then(|| format!("{}{}", source.value(), q).into_boxed_str())
-                    .unwrap_or_else(|| q.into_boxed_str())
-            })
-            .unwrap_unchecked()
-        };
+        let query = [
+            self.query,
+            self.query_2,
+            self.query_3,
+            self.query_4,
+            self.query_5,
+        ]
+        .into_iter()
+        .find_map(|q| match q {
+            AutocompleteValue::Focused(q) => Some(q),
+            _ => None,
+        })
+        .map(|q| {
+            let source = self.source.unwrap_or_default();
+            (!regex::URL.is_match(&q))
+                .then(|| format!("{}{}", source.value(), q).into_boxed_str())
+                .unwrap_or_else(|| q.into_boxed_str())
+        })
+        .expect("exactly one autocomplete option should be focused");
 
         let guild_id = ctx.guild_id();
         let load_ctx = LoadTrackContext {
@@ -257,9 +244,7 @@ impl BotAutocomplete for Autocomplete {
         let choices = match loaded.load_type {
             TrackLoadType::Search => {
                 let Some(TrackLoadData::Search(tracks)) = loaded.data else {
-                    // SAFETY: `loaded.load_type` is `Search`,
-                    //         so `loaded.data` must be `TrackLoadData::Search(_)`
-                    unsafe { unreachable_unchecked() }
+                    panic!("loaded searches missing playlist search data")
                 };
 
                 tracks
@@ -274,9 +259,7 @@ impl BotAutocomplete for Autocomplete {
             }
             TrackLoadType::Track => {
                 let Some(TrackLoadData::Track(mut track)) = loaded.data else {
-                    // SAFETY: `loaded.load_type` is `Track`,
-                    //         so `loaded.data` must be `TrackLoadData::Track(_)`
-                    unsafe { unreachable_unchecked() }
+                    panic!("loaded track missing track load data")
                 };
 
                 vec![CommandOptionChoice {
@@ -287,8 +270,7 @@ impl BotAutocomplete for Autocomplete {
             }
             TrackLoadType::Playlist => {
                 let mut choices = vec![CommandOptionChoice {
-                    // SAFETY: `loaded.load_type` is `Playlist`, so this is safe
-                    name: unsafe { loaded.prettify() },
+                    name: loaded.prettify(),
                     name_localizations: None,
                     value: CommandOptionChoiceValue::String(
                         query.grapheme_truncate(100).to_string(),
@@ -378,9 +360,7 @@ async fn play(
                 .collect::<Vec<_>>()
                 .pretty_join_with_and();
             let plus = match tracks_len + playlists_len {
-                // SAFETY: at least one tracks or playlists must be loaded,
-                //         so this should never happen
-                0 => unsafe { std::hint::unreachable_unchecked() },
+                0 => panic!("no tracks or playlists loaded"),
                 1 => "**`＋`**",
                 _ => "**`≡+`**",
             };
@@ -388,8 +368,10 @@ async fn play(
             util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
 
             let total_tracks = Vec::from(results);
-            // SAFETY: at least one tracks must be loaded, so this unwrap is safe
-            let first_track = unsafe { total_tracks.first().unwrap_unchecked() }.clone();
+            let first_track = total_tracks
+                .first()
+                .expect("at least one track must be loaded")
+                .clone();
 
             let player = util::auto_new_player(ctx).await?;
 
@@ -560,8 +542,7 @@ impl AddToQueue {
 impl CreateCommand for AddToQueue {
     const NAME: &'static str = Self::NAME;
     fn create_command() -> twilight_interactions::command::ApplicationCommandData {
-        // SAFETY: `AddToQueue::create_command()` will shadow this, so the trait function will never be called
-        unsafe { std::hint::unreachable_unchecked() }
+        unreachable!()
     }
 }
 

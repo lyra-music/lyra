@@ -67,20 +67,17 @@ fn build_http_client() -> Arc<Client> {
 fn build_shard_config() -> ShardConfig {
     ConfigBuilder::new(CONFIG.token.to_owned(), INTENTS)
         .presence(
-            // SAFETY: provided non-empty set of activities
-            unsafe {
-                UpdatePresencePayload::new(
-                    [Activity::from(MinimalActivity {
-                        kind: ActivityType::Listening,
-                        name: String::from("/play"),
-                        url: None,
-                    })],
-                    false,
-                    None,
-                    Status::Online,
-                )
-                .unwrap_unchecked()
-            },
+            UpdatePresencePayload::new(
+                [Activity::from(MinimalActivity {
+                    kind: ActivityType::Listening,
+                    name: String::from("/play"),
+                    url: None,
+                })],
+                false,
+                None,
+                Status::Online,
+            )
+            .expect("provided set of activities must be non-empty"),
         )
         .build()
 }

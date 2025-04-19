@@ -52,8 +52,7 @@ pub async fn back(
     queue.downgrade_repeat_mode();
     queue.acquire_advance_lock();
     queue.recede();
-    // SAFETY: since the queue is not empty, receding must always yield a new current track
-    let item = unsafe { queue.current().unwrap_unchecked() };
+    let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;
     let message = current_track_title.map_or_else(
         || format!("⏮️ `{}`", item.data().info.title),

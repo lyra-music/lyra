@@ -83,16 +83,13 @@ impl BotAutocomplete for Autocomplete {
             })
             .copied()
             .collect::<Vec<_>>();
-        // SAFETY: exactly one autocomplete option is focused, so finding will always be successful
-        let focused = unsafe {
-            tracks
-                .into_iter()
-                .find_map(|a| match a {
-                    AutocompleteValue::Focused(i) => Some(i),
-                    _ => None,
-                })
-                .unwrap_unchecked()
-        };
+        let focused = tracks
+            .into_iter()
+            .find_map(|a| match a {
+                AutocompleteValue::Focused(i) => Some(i),
+                _ => None,
+            })
+            .expect("exactly one autocomplete option should be focused");
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)

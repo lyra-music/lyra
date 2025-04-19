@@ -47,8 +47,7 @@ impl BotSlashCommand for Up {
 
             (
                 String::from("Muted"),
-                // SAFETY: `percent_u16` is in range [1, 1_000], so it is non-zero
-                unsafe { NonZeroU16::new_unchecked(percent_u16) },
+                NonZeroU16::new(percent_u16).expect("percent should be non-zero"),
             )
         } else {
             let old_percent = data.read().await.volume();
