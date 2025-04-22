@@ -9,4 +9,95 @@ A *featureful*, *self-hostable* **Discord music bot**, made with [`twilight-rs`]
 </div>
 
 > [!WARNING]
-> Still very early in development!
+> Still in early development!
+
+## Setup
+
+Start by copying the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Then, edit the `.env` file to set your environment variables. The file contains comments to guide you. At a minimum you should provide a valid `BOT_TOKEN`, database credentials, and lavalink credentials.
+
+### Docker
+
+> [!WARNING]
+> The project doesn't publish Docker images yet, so you need to build the image yourself.
+> The default compose configuration takes care of this for you, however.
+
+The easiest way to set up Λύρα is to use Docker. Start by creating a copy of the example docker compose file:
+
+```bash
+cp compose.example.yaml compose.yaml
+```
+
+In addition, you need to set `DOCKER_POSTGRES_PATH` and `DOCKER_PLUGINS_PATH` environment variables in `.env` to point to two empty directories you want to use for the database and plugins respectively. You can create them with:
+
+```bash
+mkdir -p /path/to/your/database
+mkdir -p /path/to/your/plugins
+chown -R 322:322 /path/to/your/plugins
+```
+
+```bash
+# File: .env
+DOCKER_POSTGRES_PATH=/path/to/your/database
+DOCKER_PLUGINS_PATH=/path/to/your/plugins
+```
+
+Then, run the following command to start the bot and the database:
+
+```bash
+docker compose up -d
+```
+This will start the bot and it's associated services in detached mode and run them in the background. To check the logs, run:
+
+```bash
+docker compose logs -f
+```
+
+To stop the bot, run:
+
+```bash
+docker compose down
+```
+
+### Nix
+
+From the project root, run:
+
+```bash
+nix develop --impure
+```
+
+This will download all the dependencies and set up the environment.
+
+Then, to start the services required for the bot to function, run:
+
+```bash
+devenv up
+```
+
+Finally, in a seperate process, run the bot:
+
+```bash
+cargo run --release
+```
+
+### Manual (Not recommended)
+
+If you want to set up the bot manually, you need to install the following dependencies:
+
+- [`Rust`](https://www.rust-lang.org/tools/install)
+- [`PostgreSQL`](https://www.postgresql.org/download/)
+- [`Lavalink`](https://lavalink.dev/getting-started/index.html)
+
+Follow the official documentation on how to set up and configure these tools.
+
+Then, clone the repository and run the following command:
+
+```bash
+cargo run --release
+```
