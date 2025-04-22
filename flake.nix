@@ -102,7 +102,7 @@
 
               # https://devenv.sh/processes/
               processes.lavalink = {
-		#process-compose = {};
+                #process-compose = {};
                 exec = ''
                   LAVALINK_DIR="$PWD/lavalink"
                   mkdir -p "$LAVALINK_DIR"
@@ -130,6 +130,10 @@
                     curl -Lo "$FILE" "$LATEST_URL"
                     echo "$LATEST_VERSION" > "$META_FILE"
                   fi
+
+                  set -a # automatically export all variables
+                  source .env
+                  set +a
 
                   cd lavalink && java -jar Lavalink.jar
                 '';
