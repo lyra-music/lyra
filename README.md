@@ -64,18 +64,25 @@ To stop the bot, run:
 docker compose down
 ```
 
-### nix
+### Nix
 
 From the project root, run:
 
 ```bash
-nix develop
+nix develop --impure
 ```
 
-Then, to start the bot, run:
+This will download all the dependencies and set up the environment.
+
+Then, to start the services required for the bot to function, run:
 
 ```bash
-nix run .#devenv-up
+devenv up
+```
+
+Finally, in a seperate process, run the bot:
+
+```bash
 cargo run --release
 ```
 
