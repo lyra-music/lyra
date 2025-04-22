@@ -4,11 +4,12 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
+        SlashCtx,
         macros::{bad, out},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
-    component::tuning::{check_user_is_dj_and_require_unsuppressed_player, UpdateFilter},
+    component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     error::CommandResult,
 };
 
@@ -95,7 +96,7 @@ impl BotSlashCommand for On {
         ) else {
             bad!(
                 format!(
-                    "At least one setting must be changed: Same-channel settings must not all be `{}`, and cross-channel settings must not all be `{}`", 
+                    "At least one setting must be changed: Same-channel settings must not all be `{}`, and cross-channel settings must not all be `{}`",
                     SetChannelMix::DEFAULT_SAME_CHANNEL,
                     SetChannelMix::DEFAULT_CROSS_CHANNEL,
                 ),

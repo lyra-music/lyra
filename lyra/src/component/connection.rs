@@ -1,31 +1,38 @@
 mod join;
 mod leave;
 
-pub use join::{auto as auto_join, Join};
+pub use join::{Join, auto as auto_join};
 pub use leave::Leave;
 use lyra_ext::{iso8601_time, unix_time};
 
 use std::sync::Arc;
 
-use twilight_cache_inmemory::{model::CachedVoiceState, InMemoryCache};
+use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
 use twilight_gateway::MessageSender;
 use twilight_http::Client;
-use twilight_mention::Mention;
+use twilight_mention::{
+    Mention,
+    timestamp::{Timestamp, TimestampStyle},
+};
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker},
 };
 
 use self::join::JoinedChannel;
 use crate::{
+    LavalinkAndGuildIdAware, LavalinkAware,
     command::require,
     component::connection::{
         join::JoinedChannelType,
-        leave::{disconnect, pre_disconnect_cleanup, LeaveResponse},
+        leave::{LeaveResponse, disconnect, disconnect_cleanup},
     },
     core::{
+        r#const::{
+            connection::{self as const_connection, INACTIVITY_TIMEOUT},
+            exit_code::NOTICE,
+        },
         model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
-        r#const::{connection as const_connection, exit_code::NOTICE},
         traced,
     },
     error::{
@@ -34,9 +41,8 @@ use crate::{
             HandleVoiceStateUpdateError, MatchStateChannelIdError, StartInactivityTimeoutError,
         },
     },
-    gateway::{voice, GuildIdAware, SenderAware},
+    gateway::{GuildIdAware, SenderAware, voice},
     lavalink::Lavalink,
-    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 pub fn users_in_voice(cx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
@@ -57,12 +63,15 @@ struct InactivityTimeoutContext {
     guild_id: Id<GuildMarker>,
 }
 
-impl InactivityTimeoutContext {
-    fn new_via(cx: &(impl OwnedBotStateAware + SenderAware + GuildIdAware)) -> Self {
+impl<T> From<&T> for InactivityTimeoutContext
+where
+    T: OwnedBotStateAware + SenderAware + GuildIdAware,
+{
+    fn from(value: &T) -> Self {
         Self {
-            inner: cx.bot_owned(),
-            sender: cx.sender().clone(),
-            guild_id: cx.guild_id(),
+            inner: value.bot_owned(),
+            sender: value.sender().clone(),
+            guild_id: value.guild_id(),
         }
     }
 }
@@ -97,8 +106,6 @@ impl GuildIdAware for InactivityTimeoutContext {
     }
 }
 
-impl LavalinkAndGuildIdAware for InactivityTimeoutContext {}
-
 async fn start_inactivity_timeout(
     ctx: InactivityTimeoutContext,
     channel_id: Id<ChannelMarker>,
@@ -122,7 +129,7 @@ async fn start_inactivity_timeout(
         return Ok(());
     };
     connection.notify_change();
-    pre_disconnect_cleanup(&ctx).await?;
+    disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
     let response = LeaveResponse(channel_id);
@@ -169,7 +176,7 @@ pub async fn handle_voice_state_update(
         Some(old_state) if state.user_id != ctx.bot().user_id() => {
             let old_channel_id = old_state.channel_id();
             if old_channel_id == connected_channel_id
-                && state.channel_id != Some(old_channel_id)
+                && state.channel_id.is_none_or(|id| id != old_channel_id)
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 if let Ok(player) = require::player(ctx) {
@@ -178,10 +185,10 @@ pub async fn handle_voice_state_update(
                         .create_message(text_channel_id)
                         .content("⚡▶ Paused `(Bot is not used by anyone)`")
                         .await?;
-                };
+                }
 
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::new_via(ctx),
+                    InactivityTimeoutContext::from(ctx),
                     connected_channel_id,
                     text_channel_id,
                 ));
@@ -189,7 +196,7 @@ pub async fn handle_voice_state_update(
             return Ok(());
         }
         Some(old_state) if state.channel_id.is_none() => {
-            pre_disconnect_cleanup(ctx).await?;
+            disconnect_cleanup(ctx).await?;
 
             let old_channel_id = old_state.channel_id();
             let response = LeaveResponse(old_channel_id);
@@ -242,9 +249,12 @@ async fn match_state_channel_id(
                 player.update_voice_channel(voice_is_empty).await?;
             }
             let forcefully_moved_notice = if voice_is_empty {
+                let duration = unix_time() + INACTIVITY_TIMEOUT;
+                let timestamp =
+                    Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
                 format!(
-                    "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` <t:{}:R> `)`",
-                    unix_time().as_secs() + u64::from(const_connection::INACTIVITY_TIMEOUT_SECS)
+                    "\n`(Bot was forcefully moved to an empty voice channel, and automatically disconnecting if no one else joins in` {} `)`",
+                    timestamp.mention()
                 )
             } else {
                 String::from("`(Bot was forcefully moved)`")
@@ -284,11 +294,11 @@ async fn match_state_channel_id(
 
             if voice_is_empty {
                 traced::tokio_spawn(start_inactivity_timeout(
-                    InactivityTimeoutContext::new_via(ctx),
+                    InactivityTimeoutContext::from(ctx),
                     channel_id,
                     text_channel_id,
                 ));
-            };
+            }
             Ok(())
         }
         Some(_) | None => Ok(()),

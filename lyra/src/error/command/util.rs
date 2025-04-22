@@ -1,5 +1,5 @@
 use thiserror::Error;
-use twilight_model::id::{marker::MessageMarker, Id};
+use twilight_model::id::{Id, marker::MessageMarker};
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -115,9 +115,9 @@ impl AutoJoinAttemptError {
                 ))
             }
             crate::error::component::connection::join::ImplConnectToError::UnrecognisedConnection(_) => {
-                // SAFETY: if an auto-join was performed, then the `require::in_voice(_)` call was unsuccessful,
+                // if an auto-join was performed, then the `require::in_voice(_)` call was unsuccessful,
                 // which is impossible as this error will only be raised if there is an unrecognised connection found.
-                unsafe { std::hint::unreachable_unchecked() }
+                unreachable!()
             },
             crate::error::component::connection::join::ImplConnectToError::CheckUserAllowed(e) => {
                 Self::from_check_user_allowed(e)

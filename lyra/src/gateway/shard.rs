@@ -4,7 +4,7 @@ use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::{
-    core::model::{BotState, BotStateRef},
+    core::model::{BotState, BotStateRef, DatabaseAware},
     error::gateway::ProcessResult,
 };
 
@@ -21,7 +21,7 @@ impl BotState {
         &'a self,
         inner: &'a Ready,
         shard_id: ShardId,
-    ) -> ReadyContext {
+    ) -> ReadyContext<'a> {
         ReadyContext {
             inner,
             shard_id,

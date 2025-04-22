@@ -30,7 +30,7 @@ impl Data {
         }
     }
 
-    fn reset(&mut self, started: Instant) {
+    const fn reset(&mut self, started: Instant) {
         self.most_recent_operation = started;
         self.most_recent_position = started;
         self.paused = false;
@@ -78,6 +78,11 @@ impl TrackTimestamp {
     #[must_use]
     pub const fn paused(&self) -> bool {
         self.data.paused
+    }
+
+    #[must_use]
+    pub const fn speed(&self) -> f64 {
+        self.data.speed
     }
 
     fn apply(&mut self, op: Operation) {

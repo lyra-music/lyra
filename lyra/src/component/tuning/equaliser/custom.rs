@@ -6,7 +6,7 @@ use crate::{
         require,
     },
     component::tuning::{
-        check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser, UpdateFilter,
+        UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
 };
 

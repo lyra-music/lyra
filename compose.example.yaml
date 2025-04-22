@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:17
+    restart: always
+    expose:
+      - 5432
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lyra}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+
+    volumes:
+      - "${DOCKER_POSTGRES_PATH}:/var/lib/postgresql/data"
+    networks:
+      - private
+
+  lavalink:
+    # pin the image version to Lavalink v4
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: lavalink
+    restart: always
+    environment:
+      _JAVA_OPTIONS: -Xmx6G
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: ${SERVER_PORT:-2333}
+      LAVALINK_SERVER_PASSWORD: ${LAVALINK_SERVER_PASSWORD:?err}
+      PLUGINS_LAVASRC_SOURCES_SPOTIFY: ${PLUGINS_LAVASRC_SOURCES_SPOTIFY:-false}
+      PLUGINS_LAVASRC_SPOTIFY_CLIENT_ID: ${PLUGINS_LAVASRC_SPOTIFY_CLIENT_ID}
+      PLUGINS_LAVASRC_SPOTIFY_CLIENT_SECRET: ${PLUGINS_LAVASRC_SPOTIFY_CLIENT_SECRET}
+      PLUGINS_LAVASRC_SOURCES_DEEZER: ${PLUGINS_LAVASRC_SOURCES_DEEZER:-false}
+      PLUGINS_LAVASRC_DEEZER_MASTER_DECRYPTION_KEY: ${PLUGINS_LAVASRC_DEEZER_MASTER_DECRYPTION_KEY}
+    volumes:
+      # mount application.yml from the same directory or use environment variables
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
+      # persist plugins between restarts, make sure to set the correct permissions (user: 322, group: 322)
+      - "${DOCKER_LAVALINK_PLUGINS_PATH}:/opt/Lavalink/plugins/"
+    networks:
+      - private
+    expose:
+      - ${SERVER_PORT:-2333}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-H", "Authorization: ${LAVALINK_SERVER_PASSWORD}", "http://localhost:2333/version"]
+      interval: 60s
+      start_period: 10s
+      timeout: 10s
+      retries: 5
+
+  lyra:
+    build:
+      dockerfile: Dockerfile
+      args:
+        - DOCKER_BUILD_TYPE=${DOCKER_BUILD_TYPE:-release}
+    environment:
+      SQLX_OFFLINE: true
+      DATABASE_URL: ${DATABASE_URL}
+      BOT_TOKEN: ${BOT_TOKEN:?err}
+      SERVER_ADDRESS: lavalink
+      SERVER_PORT: ${SERVER_PORT:-2333}
+      LAVALINK_SERVER_PASSWORD: ${LAVALINK_SERVER_PASSWORD:?err}
+      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
+    depends_on:
+      lavalink:
+        condition: service_healthy
+        restart: true
+      db:
+        condition: service_started
+        restart: true
+    restart: always
+    networks:
+      - private
+
+networks:
+  private:
+    external: false

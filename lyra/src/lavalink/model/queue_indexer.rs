@@ -2,9 +2,10 @@ use std::{collections::HashSet, ops::RangeBounds};
 
 use itertools::Itertools;
 use lyra_ext::iter::{chunked_range::chunked_range, multi_interleave::multi_interleave};
-use rand::{seq::SliceRandom, Rng};
-use twilight_model::id::{marker::UserMarker, Id};
+use rand::{Rng, seq::SliceRandom};
+use twilight_model::id::{Id, marker::UserMarker};
 
+#[derive(Clone, Copy)]
 pub enum IndexerType {
     Standard,
     Fair,
@@ -74,11 +75,11 @@ impl FairIndexer {
         }
     }
 
-    fn iter_bucket_lens(&self) -> impl Iterator<Item = usize> + Clone + '_ {
+    fn iter_bucket_lens(&self) -> impl Iterator<Item = usize> + Clone + use<'_> {
         self.inner.iter().map(|(_, l)| l).copied()
     }
 
-    fn iter_bucket_ranges(&self) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+    fn iter_bucket_ranges(&self) -> impl Iterator<Item = std::ops::Range<usize>> + use<'_> {
         self.inner.iter().scan(self.starting_index, |i, (_, l)| {
             let j = *i;
             *i += l;
@@ -86,7 +87,7 @@ impl FairIndexer {
         })
     }
 
-    fn iter_indices(&self) -> impl Iterator<Item = usize> + '_ {
+    fn iter_indices(&self) -> impl Iterator<Item = usize> + use<'_> {
         multi_interleave(chunked_range(self.starting_index, self.iter_bucket_lens()))
     }
 
@@ -130,7 +131,7 @@ impl ShuffledIndexer {
     pub(super) fn new(size: usize, starting_index: usize) -> Self {
         let mut rest = (0..size).collect::<Vec<_>>();
         let mut next = rest.drain(starting_index + 1..).collect::<Vec<_>>();
-        next.shuffle(&mut rand::thread_rng());
+        next.shuffle(&mut rand::rng());
         rest.extend(next);
 
         Self(rest)
@@ -144,9 +145,9 @@ impl ShuffledIndexer {
         let old_len = self.0.len();
         self.0.reserve(additional);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         (0..additional)
-            .map(|d| rng.gen_range(current_index + 1..=old_len + d))
+            .map(|d| rng.random_range(current_index + 1..=old_len + d))
             .zip(old_len..old_len + additional)
             .for_each(|(i, e)| self.0.insert(i, e));
     }

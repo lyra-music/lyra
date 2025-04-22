@@ -2,69 +2,68 @@ mod ctx;
 
 use std::sync::Arc;
 
+use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::interaction::{
-        application_command::{CommandData, CommandDataOption},
         Interaction, InteractionDataResolved,
+        application_command::{CommandData, CommandDataOption},
+        message_component::MessageComponentInteractionData,
     },
     channel::Channel,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, GenericMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, GenericMarker, UserMarker},
     },
     user::User as TwilightUser,
 };
 
-use crate::error::{command::AutocompleteResult, CommandResult};
+use crate::error::{CommandResult, command::AutocompleteResult};
 
 pub use self::ctx::{
-    Autocomplete as AutocompleteCtx, CommandDataAware, Ctx, Guild as GuildCtx,
-    GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx,
-    RespondViaMessage, RespondViaModal, Slash as SlashCtx, User,
+    Autocomplete as AutocompleteCtx, CommandDataAware, Component as ComponentCtx, Ctx,
+    Guild as GuildCtx, GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind,
+    Message as MessageCtx, RespondViaMessage, RespondViaModal, Slash as SlashCtx, User,
 };
 
 pub trait NonPingInteraction {
-    unsafe fn author_unchecked(&self) -> &TwilightUser;
-    unsafe fn author_id_unchecked(&self) -> Id<UserMarker> {
-        // SAFETY: interaction type is not `Ping`, so an author exists
-        let author = unsafe { self.author_unchecked() };
-        author.id
+    fn author_expected(&self) -> &TwilightUser;
+    fn author_id_expected(&self) -> Id<UserMarker> {
+        self.author_expected().id
     }
-    unsafe fn channel_unchecked(&self) -> &Channel;
-    unsafe fn channel_id_unchecked(&self) -> Id<ChannelMarker> {
-        // SAFETY: interaction type is not `Ping`, so a channel exists
-        let channel = unsafe { self.channel_unchecked() };
-        channel.id
+    fn channel_expected(&self) -> &Channel;
+    fn channel_id_expected(&self) -> Id<ChannelMarker> {
+        self.channel_expected().id
     }
 }
 
 impl NonPingInteraction for Interaction {
-    unsafe fn author_unchecked(&self) -> &TwilightUser {
-        // SAFETY: interaction type is not `Ping`, so an author exists
-        unsafe { self.author().unwrap_unchecked() }
+    fn author_expected(&self) -> &TwilightUser {
+        self.author()
+            .expect("non-ping interactions should have an author")
     }
 
-    unsafe fn channel_unchecked(&self) -> &Channel {
-        // SAFETY: interaction type is not `Ping`, so channel exists
-        unsafe { self.channel.as_ref().unwrap_unchecked() }
+    fn channel_expected(&self) -> &Channel {
+        self.channel
+            .as_ref()
+            .expect("non-ping interactions should have a channel")
     }
 }
 
 pub trait GuildInteraction {
-    unsafe fn member_unchecked(&self) -> &PartialMember;
-    unsafe fn author_permissions_unchecked(&self) -> Permissions {
-        // SAFETY: interaction invoked in a guild, so member exists
-        let member = unsafe { self.member_unchecked() };
-        // SAFETY: member was sent from an interaction, so permissions is sent
-        unsafe { member.permissions.unwrap_unchecked() }
+    fn member_expected(&self) -> &PartialMember;
+    fn author_permissions_expected(&self) -> Permissions {
+        self.member_expected()
+            .permissions
+            .expect("member object sent from an interaction should have permissions")
     }
 }
 
 impl GuildInteraction for Interaction {
-    unsafe fn member_unchecked(&self) -> &PartialMember {
-        // SAFETY: interaction invoekd in a guild, so member exists
-        unsafe { self.member.as_ref().unwrap_unchecked() }
+    fn member_expected(&self) -> &PartialMember {
+        self.member
+            .as_ref()
+            .expect("interactions invoked in a guild should have a member")
     }
 }
 
@@ -89,23 +88,19 @@ impl PartialCommandData {
 
 #[non_exhaustive]
 pub enum PartialInteractionData {
-    Command(PartialCommandData),
-    _Other,
+    Command(Box<PartialCommandData>),
+    Component(Box<MessageComponentInteractionData>),
 }
 
-pub trait CommandInfoAware {
-    fn name() -> &'static str;
-}
-
-pub trait BotSlashCommand: CommandInfoAware {
+pub trait BotSlashCommand: CreateCommand {
     async fn run(self, ctx: SlashCtx) -> CommandResult;
 }
 
-pub trait BotUserCommand: CommandInfoAware {
+pub trait BotUserCommand: CreateCommand {
     async fn run(ctx: User) -> CommandResult;
 }
 
-pub trait BotMessageCommand: CommandInfoAware {
+pub trait BotMessageCommand: CreateCommand {
     async fn run(ctx: MessageCtx) -> CommandResult;
 }
 

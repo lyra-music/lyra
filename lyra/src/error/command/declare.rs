@@ -11,7 +11,7 @@ pub enum CommandExecuteError {
     #[error(transparent)]
     Command(#[from] super::Error),
     #[error("unknown command: {:?}", .0)]
-    UnknownCommand(PartialCommandData),
+    UnknownCommand(Box<PartialCommandData>),
 }
 
 pub enum FlattenedUntilUserNotAllowedCommandExecuteError {
@@ -49,5 +49,5 @@ pub enum AutocompleteExecuteError {
     #[error(transparent)]
     Autocomplete(#[from] super::AutocompleteError),
     #[error("unknown autocomplete: {:?}", .0)]
-    UnknownAutocomplete(PartialCommandData),
+    UnknownAutocomplete(Box<PartialCommandData>),
 }

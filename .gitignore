@@ -4,6 +4,7 @@ target
 
 lavalink/plugins
 lavalink/Lavalink.jar
+lavalink/version.txt
 
 # Devenv
 .devenv
@@ -13,3 +14,9 @@ lavalink/Lavalink.jar
 
 # pre-commit
 .pre-commit-config.yaml
+
+# Docker compose
+compose.yaml
+
+# Default Docker volume mounts
+data

@@ -1,5 +1,7 @@
 use std::{
     collections::HashMap,
+    future::Future,
+    pin::Pin,
     sync::{LazyLock, OnceLock},
 };
 
@@ -10,9 +12,8 @@ use twilight_model::application::{
 
 use crate::{
     command::{
-        check,
-        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, CommandInfoAware},
-        AutocompleteCtx, MessageCtx, SlashCtx,
+        AutocompleteCtx, MessageCtx, SlashCtx, check,
+        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand},
     },
     component::{
         config::Config,
@@ -35,6 +36,7 @@ macro_rules! count {
 
 macro_rules! declare_slash_commands {
     ($( $raw_cmd: ident ),* $(,)? ) => {
+        const SLASH_COMMANDS_N: usize = count!($($raw_cmd)*);
         ::paste::paste! {
             struct SlashCommandMap {
                 $([<_ $raw_cmd:snake>]: Command,)*
@@ -49,40 +51,40 @@ macro_rules! declare_slash_commands {
             }
         });
 
-        type SlashCommands = [Command; count!($($raw_cmd)*)];
+        type SlashCommands = [Command; SLASH_COMMANDS_N];
 
-        pub static SLASH_COMMANDS: LazyLock<SlashCommands> = LazyLock::new(|| {
+        #[inline]
+        fn slash_commands() -> SlashCommands {
             ::paste::paste! {
-                [$(SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(),)*]
+                [ $( SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
             }
-        });
+        }
 
-        pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
-
-        $(
-            impl CommandInfoAware for $raw_cmd {
-                fn name() -> &'static str {
-                    ::paste::paste! {
-                        &SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].name
+        // using a hashmap should significantly improve command respond times
+        type Callback = &'static (dyn Fn(SlashCtx, CommandData) ->
+            Pin<Box<dyn Future<Output = Result<(), CommandExecuteError>> + Send>> + Send + Sync);
+        static SLASH_COMMANDS_CALLBACK: LazyLock<HashMap<&'static str, Callback>> = LazyLock::new(|| {
+            HashMap::from(
+                ::paste::paste! {[$({
+                    #[lavalink_rs::hook]
+                    async fn callback(ctx: SlashCtx, data: CommandData) -> Result<(), CommandExecuteError> {
+                        Ok(<$raw_cmd>::from_interaction(data.into())?.run(ctx).await?)
                     }
-                }
-            }
-        )*
+
+                    ($raw_cmd::NAME, &callback as Callback)
+                },)*]}
+            )
+        });
 
         impl SlashCtx {
             pub async fn execute(self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
-                match data.name {
-                    $(
-                        ref n if n == <$raw_cmd>::name() => {
-                            return Ok(<$raw_cmd>::from_interaction(data.into())?.run(self).await?);
-                        }
-                    )*
-                    _ => {
-                        let cmd_data = self.into_command_data();
-                        return Err(CommandExecuteError::UnknownCommand(cmd_data))
-                    }
+                if let Some(callback) = SLASH_COMMANDS_CALLBACK.get(&*data.name) {
+                    Ok(callback(self, data).await?)
+                } else {
+                    let cmd_data = self.into_command_data();
+                    return Err(CommandExecuteError::UnknownCommand(cmd_data))
                 }
             }
         }
@@ -91,6 +93,7 @@ macro_rules! declare_slash_commands {
 
 macro_rules! declare_message_commands {
     ($( $raw_cmd: ident ),* $(,)? ) => {
+        const MESSAGE_COMMANDS_N: usize = count!($($raw_cmd)*);
         ::paste::paste! {
             struct MessageCommandMap {
                 $([<_ $raw_cmd:snake>]: Command,)*
@@ -105,31 +108,23 @@ macro_rules! declare_message_commands {
             }
         });
 
-        type MessageCommands = [Command; count!($($raw_cmd)*)];
+        type MessageCommands = [Command; MESSAGE_COMMANDS_N];
 
-        pub static MESSAGE_COMMANDS: LazyLock<MessageCommands> = LazyLock::new(|| {
+        #[inline]
+        fn message_commands() -> MessageCommands {
             ::paste::paste! {
-                [$(MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(),)*]
+                [ $( MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
             }
-        });
-
-        $(
-            impl CommandInfoAware for $raw_cmd {
-                fn name() -> &'static str {
-                    ::paste::paste! {
-                        &MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].name
-                    }
-                }
-            }
-        )*
+        }
 
         impl MessageCtx {
             pub async fn execute(self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
+                // there aren't as much message commands, so this should be fast enough
                 match data.name {
                     $(
-                        n if n == <$raw_cmd>::name() => {
+                        n if n == <$raw_cmd>::NAME => {
                             return Ok(<$raw_cmd>::run(self).await?);
                         }
                     )*
@@ -149,7 +144,7 @@ macro_rules! declare_autocomplete {
             pub async fn execute(self, data: CommandData) -> Result<(), AutocompleteExecuteError> {
                 match data.name {
                     $(
-                        ref n if n == <$raw_cmd>::name() => {
+                        ref n if n == <$raw_cmd>::NAME => {
                             return Ok(<$raw_autocomplete>::from_interaction(data.into())?.execute(self).await?);
                         }
                     )*
@@ -188,6 +183,7 @@ declare_slash_commands![
     Skip,
     Back,
 ];
+
 declare_message_commands![AddToQueue,];
 
 declare_autocomplete![
@@ -197,3 +193,20 @@ declare_autocomplete![
     Move => MoveAutocomplete,
     Jump => JumpAutocomplete,
 ];
+
+pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
+
+const COMMANDS_N: usize = SLASH_COMMANDS_N + MESSAGE_COMMANDS_N;
+type Commands = [Command; COMMANDS_N];
+
+#[inline]
+pub fn commands() -> Commands {
+    let a = slash_commands();
+    let b = message_commands();
+
+    std::array::from_fn(|i| match i {
+        0..SLASH_COMMANDS_N => a[i].clone(),
+        SLASH_COMMANDS_N..COMMANDS_N => b[i - SLASH_COMMANDS_N].clone(),
+        _ => unreachable!(),
+    })
+}

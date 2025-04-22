@@ -1,5 +1,6 @@
 mod connection;
 mod correct_info;
+mod now_playing;
 mod pitch;
 mod queue;
 mod queue_indexer;
@@ -13,32 +14,43 @@ use lavalink_rs::{
     player_context::PlayerContext,
 };
 use lyra_ext::time::track_timestamp::TrackTimestamp;
+use moka::future::Cache;
 use sqlx::{Pool, Postgres};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker, MessageMarker},
 };
 
 use crate::{
     command::require::{InVoice, PartialInVoice},
-    core::{model::HttpAware, r#const},
-    error::UnrecognisedConnection,
+    core::{
+        r#const,
+        model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
+    },
+    error::{
+        UnrecognisedConnection,
+        lavalink::{NewNowPlayingMessageError, UpdateNowPlayingMessageError},
+    },
     gateway::GuildIdAware,
 };
 
 use self::connection::{ConnectionRef, ConnectionRefMut};
 
 pub use self::{
-    connection::{wait_for_with, Connection, Event, EventRecvResult},
+    connection::{Connection, Event, EventRecvResult, wait_for_with},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
+    now_playing::{
+        Data as NowPlayingData, Message as NowPlayingMessage, Update as NowPlayingDataUpdate,
+    },
     pitch::Pitch,
     queue::{Item as QueueItem, Queue, RepeatMode},
     queue_indexer::IndexerType,
 };
 
-type PlayerData = RwLock<RawPlayerData>;
+pub type PlayerData = RwLock<RawPlayerData>;
 pub type OwnedPlayerData = Arc<PlayerData>;
 pub type PlayerDataRead<'a> = RwLockReadGuard<'a, RawPlayerData>;
 pub type PlayerDataWrite<'a> = RwLockWriteGuard<'a, RawPlayerData>;
@@ -53,6 +65,10 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.lavalink().get_player_context(self.guild_id())
     }
 
+    fn get_player_data(&self) -> Option<OwnedPlayerData> {
+        self.get_player().map(|player| player.data_unwrapped())
+    }
+
     fn get_connection(&self) -> Option<ConnectionRef> {
         self.lavalink().get_connection(self.guild_id())
     }
@@ -60,7 +76,15 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
     fn get_connection_mut(&self) -> Option<ConnectionRefMut> {
         self.lavalink().get_connection_mut(self.guild_id())
     }
+
+    /// # Errors
+    /// when an unrecognised connection was found
+    fn try_get_connection(&self) -> Result<ConnectionRef, UnrecognisedConnection> {
+        self.lavalink().try_get_connection(self.guild_id())
+    }
 }
+
+impl<T> ClientAndGuildIdAware for T where T: ClientAware + GuildIdAware {}
 
 type ClientRefAndGuildId<'a> = (&'a Lavalink, Id<GuildMarker>);
 
@@ -69,12 +93,12 @@ impl ClientAware for ClientRefAndGuildId<'_> {
         self.0
     }
 }
+
 impl GuildIdAware for ClientRefAndGuildId<'_> {
     fn guild_id(&self) -> Id<GuildMarker> {
         self.1
     }
 }
-impl ClientAndGuildIdAware for ClientRefAndGuildId<'_> {}
 
 pub struct RawPlayerData {
     queue: Queue,
@@ -82,17 +106,20 @@ pub struct RawPlayerData {
     pitch: Pitch,
     track_timestamp: TrackTimestamp,
     text_channel_id: Id<ChannelMarker>,
+    now_playing_message: Option<NowPlayingMessage>,
 }
+
+pub type UpdateNowPlayingMessageResult = Result<(), UpdateNowPlayingMessageError>;
 
 impl RawPlayerData {
     pub fn new(text_channel_id: Id<ChannelMarker>) -> Self {
         Self {
             text_channel_id,
-            // SAFETY: `100` is non-zero
-            volume: unsafe { NonZeroU16::new_unchecked(100) },
+            volume: NonZeroU16::new(100).expect("100 must be non-zero"),
             pitch: Pitch::new(),
             queue: Queue::new(),
             track_timestamp: TrackTimestamp::new(),
+            now_playing_message: None,
         }
     }
 
@@ -106,7 +133,7 @@ impl RawPlayerData {
     }
 
     #[inline]
-    pub fn queue_mut(&mut self) -> &mut Queue {
+    pub const fn queue_mut(&mut self) -> &mut Queue {
         &mut self.queue
     }
 
@@ -115,12 +142,12 @@ impl RawPlayerData {
     }
 
     #[inline]
-    pub fn set_volume(&mut self, volume: NonZeroU16) {
+    pub const fn set_volume(&mut self, volume: NonZeroU16) {
         self.volume = volume;
     }
 
     #[inline]
-    pub fn pitch_mut(&mut self) -> &mut Pitch {
+    pub const fn pitch_mut(&mut self) -> &mut Pitch {
         &mut self.pitch
     }
 
@@ -144,6 +171,11 @@ impl RawPlayerData {
     }
 
     #[inline]
+    pub const fn speed(&self) -> f64 {
+        self.track_timestamp.speed()
+    }
+
+    #[inline]
     pub fn set_speed(&mut self, multiplier: f64) {
         self.track_timestamp.set_speed(multiplier);
     }
@@ -152,8 +184,86 @@ impl RawPlayerData {
         self.text_channel_id
     }
 
-    pub fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
+    pub const fn set_text_channel_id(&mut self, text_channel_id: Id<ChannelMarker>) {
         self.text_channel_id = text_channel_id;
+    }
+
+    pub const fn now_playing_message_id(&self) -> Option<Id<MessageMarker>> {
+        match self.now_playing_message {
+            Some(ref msg) => Some(msg.id()),
+            None => None,
+        }
+    }
+
+    #[inline]
+    pub const fn take_now_playing_message(&mut self) -> Option<NowPlayingMessage> {
+        self.now_playing_message.take()
+    }
+
+    #[inline]
+    pub async fn new_now_playing_message(
+        &mut self,
+        http: Arc<Client>,
+        data: NowPlayingData,
+    ) -> Result<(), NewNowPlayingMessageError> {
+        self.now_playing_message =
+            Some(NowPlayingMessage::new(http, data, self.text_channel_id).await?);
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_timestamp(
+        &mut self,
+    ) -> UpdateNowPlayingMessageResult {
+        let timestamp = self.timestamp();
+        if let Some(ref mut msg) = self.now_playing_message {
+            msg.update_timestamp(timestamp);
+            msg.apply_update().await?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    async fn update_and_apply_now_playing_data(
+        &mut self,
+        update: NowPlayingDataUpdate,
+    ) -> UpdateNowPlayingMessageResult {
+        let timestamp = self.timestamp();
+        if let Some(ref mut msg) = self.now_playing_message {
+            msg.update(update);
+            msg.update_timestamp(timestamp);
+            msg.apply_update().await?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn set_repeat_mode_then_update_and_apply_to_now_playing(
+        &mut self,
+        mode: RepeatMode,
+    ) -> UpdateNowPlayingMessageResult {
+        self.queue_mut().set_repeat_mode(mode);
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Repeat(mode))
+            .await
+    }
+
+    #[inline]
+    pub async fn set_indexer_then_update_and_apply_to_now_playing(
+        &mut self,
+        kind: IndexerType,
+    ) -> UpdateNowPlayingMessageResult {
+        self.queue_mut().set_indexer_type(kind);
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Indexer(kind))
+            .await
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_pause(
+        &mut self,
+        paused: bool,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Paused(paused))
+            .await
     }
 }
 
@@ -259,10 +369,8 @@ pub trait DelegateMethods {
             }
             twilight_gateway::Event::VoiceStateUpdate(e) => {
                 self.handle_voice_state_update(
-                    // SAFETY: this bot cannot join DM voice calls,
-                    //         meaning all voice states will be from a guild voice channel,
-                    //         so `e.guild_id` is present
-                    unsafe { e.guild_id.unwrap_unchecked() },
+                    e.guild_id
+                        .expect("bots should currently only be able to join guild voice channels"),
                     e.channel_id,
                     e.user_id,
                     e.session_id.clone(),
@@ -356,16 +464,16 @@ impl Lavalink {
             .ok_or(UnrecognisedConnection)
     }
 
-    pub fn connection_from(&self, cx: &impl GetConnection) -> ConnectionRef {
-        // SAFETY: because the caller has an instance of `InVoice`,
-        //         this proves that there is a voice connection currently.
-        unsafe { self.connections.get(&cx.guild_id()).unwrap_unchecked() }
+    pub fn connection_from(&self, cx: &impl ConnectionAware) -> ConnectionRef {
+        self.connections
+            .get(&cx.guild_id())
+            .expect("connection-aware contexts must represent a valid voice connection")
     }
 
-    pub fn connection_mut_from(&self, cx: &impl GetConnection) -> ConnectionRefMut {
-        // SAFETY: because the caller has an instance of `InVoice`,
-        //         this proves that there is a voice connection currently.
-        unsafe { self.connections.get_mut(&cx.guild_id()).unwrap_unchecked() }
+    pub fn connection_mut_from(&self, cx: &impl ConnectionAware) -> ConnectionRefMut {
+        self.connections
+            .get_mut(&cx.guild_id())
+            .expect("connection-aware contexts must represent to a valid voice connection")
     }
 
     pub fn get_connection_mut(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRefMut> {
@@ -378,6 +486,13 @@ impl Lavalink {
         guild_id: impl Into<lavalink_rs::prelude::GuildId> + Send,
     ) -> LavalinkResult<()> {
         self.inner.delete_player(guild_id).await
+    }
+
+    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + use<'_> {
+        self.inner
+            .players
+            .iter()
+            .filter_map(|p| p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()))
     }
 }
 
@@ -437,16 +552,14 @@ pub trait UnwrappedData {
 impl UnwrappedData for PlayerContext {
     type Data = OwnedPlayerData;
     fn data_unwrapped(&self) -> Self::Data {
-        // SAFETY: Player data exists of type `Arc<RwLock<PlayerData>>`
-        unsafe { self.data().unwrap_unchecked() }
+        self.data().expect("player data must exists")
     }
 }
 
 impl UnwrappedData for LavalinkClient {
     type Data = OwnedClientData;
     fn data_unwrapped(&self) -> Self::Data {
-        // SAFETY: Lavalink data exists of type `Arc<ClientData>`
-        unsafe { self.data().unwrap_unchecked() }
+        self.data().expect("lavalink data must exists")
     }
 }
 
@@ -468,14 +581,18 @@ impl UnwrappedPlayerInfoUri for TrackInfo {
     }
 }
 
-pub trait GetConnection: GuildIdAware {}
+pub trait ConnectionAware: GuildIdAware {}
 
-impl GetConnection for InVoice<'_> {}
-impl GetConnection for PartialInVoice {}
+impl ConnectionAware for InVoice<'_> {}
+impl ConnectionAware for PartialInVoice {}
+
+pub type ArtworkCache = Cache<(Box<str>, usize), Arc<[u32]>>;
 
 pub struct ClientData {
-    http: Arc<Client>,
     db: Pool<Postgres>,
+    http: Arc<Client>,
+    cache: Arc<InMemoryCache>,
+    artwork_cache: ArtworkCache,
 }
 
 impl HttpAware for ClientData {
@@ -484,12 +601,35 @@ impl HttpAware for ClientData {
     }
 }
 
+impl OwnedHttpAware for ClientData {
+    fn http_owned(&self) -> Arc<Client> {
+        self.http.clone()
+    }
+}
+
+impl CacheAware for ClientData {
+    fn cache(&self) -> &InMemoryCache {
+        &self.cache
+    }
+}
+
+impl DatabaseAware for ClientData {
+    fn db(&self) -> &Pool<Postgres> {
+        &self.db
+    }
+}
+
 impl ClientData {
-    pub const fn new(http: Arc<Client>, db: Pool<Postgres>) -> Self {
-        Self { http, db }
+    pub fn new(http: Arc<Client>, cache: Arc<InMemoryCache>, db: Pool<Postgres>) -> Self {
+        Self {
+            http,
+            cache,
+            db,
+            artwork_cache: Cache::new(10_000),
+        }
     }
 
-    pub const fn db(&self) -> &Pool<Postgres> {
-        &self.db
+    pub const fn artwork_cache(&self) -> &ArtworkCache {
+        &self.artwork_cache
     }
 }

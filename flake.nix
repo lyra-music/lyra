@@ -33,7 +33,10 @@
     devShells =
       forEachSystem
       (system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit systems;
+          config.allowUnfree = true;
+        };
       in {
         default = devenv.lib.mkShell {
           inherit inputs pkgs;
@@ -50,20 +53,19 @@
                 codespell
                 act
                 sqlx-cli
-                pgcli
+                # pgcli
                 cargo-edit
               ];
 
               # https://devenv.sh/scripts/
               # scripts.hello.exec = "";
 
-              enterShell = ''
-                ./scripts/get-lavalink
-              '';
+              # enterShell = ''
+              # '';
 
               # https://devenv.sh/tests/
-              enterTest = ''
-              '';
+              # enterTest = ''
+              # '';
 
               # https://devenv.sh/services/
               services.postgres = {
@@ -99,14 +101,43 @@
               # pre-commit.hooks.shellcheck.enable = true;
 
               # https://devenv.sh/processes/
-              processes.lavalink.exec = "scripts/lavalink";
+              processes.lavalink = {
+                #process-compose = {};
+                exec = ''
+                  LAVALINK_DIR="$PWD/lavalink"
+                  mkdir -p "$LAVALINK_DIR"
 
-              processes.database-setup.exec = ''
-                while ! "./scripts/database"
-                do
-                  :
-                done
-              '';
+                  META_FILE="$LAVALINK_DIR/version.txt"
+                  FILE="$LAVALINK_DIR/Lavalink.jar"
+
+                  # Get the latest Lavalink release metadata from GitHub API
+                  LATEST_JSON=$(curl -s https://api.github.com/repos/lavalink-devs/Lavalink/releases/latest)
+                  LATEST_VERSION=$(echo "$LATEST_JSON" | grep '"tag_name":' | cut -d '"' -f 4)
+                  LATEST_URL=$(echo "$LATEST_JSON" | grep "browser_download_url" | grep "Lavalink.jar" | cut -d '"' -f 4)
+
+                  NEED_DOWNLOAD=1
+
+                  if [ -f "$META_FILE" ]; then
+                    CURRENT_VERSION=$(cat "$META_FILE")
+                    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ] && [ -f "$FILE" ]; then
+                      echo "Lavalink is up to date (version $CURRENT_VERSION)."
+                      NEED_DOWNLOAD=0
+                    fi
+                  fi
+
+                  if [ "$NEED_DOWNLOAD" -eq 1 ]; then
+                    echo "Downloading Lavalink $LATEST_VERSION..."
+                    curl -Lo "$FILE" "$LATEST_URL"
+                    echo "$LATEST_VERSION" > "$META_FILE"
+                  fi
+
+                  set -a # automatically export all variables
+                  source .env
+                  set +a
+
+                  cd lavalink && java -jar Lavalink.jar
+                '';
+              };
 
               # See full reference at https://devenv.sh/reference/options/
               # dotenv.enable = true;

@@ -1,25 +1,23 @@
 use std::fmt::{Display, Write};
 
-use twilight_http::{request::application::interaction::UpdateResponse, Response};
+use twilight_http::Response;
+use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::{command::CommandOptionChoice, interaction::Interaction},
     channel::{
-        message::{component::ActionRow, AllowedMentions, Embed, MessageFlags},
         Message,
+        message::{AllowedMentions, Embed, MessageFlags, component::ActionRow},
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{CommandMarker, InteractionMarker, MessageMarker},
         Id,
+        marker::{CommandMarker, InteractionMarker, MessageMarker},
     },
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    command::{
-        declare::{MESSAGE_COMMANDS, POPULATED_COMMANDS_MAP, SLASH_COMMANDS},
-        model::CommandInfoAware,
-    },
+    command::declare::{POPULATED_COMMANDS_MAP, commands},
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
 };
 
@@ -86,15 +84,13 @@ impl Interface<'_> {
         self.inner.0.response(interaction_token).await
     }
 
-    fn update(&self) -> UpdateResponse<'_> {
-        self.inner.0.update_response(self.interaction_token())
-    }
-
     pub async fn update_no_components_embeds(
         &self,
         content: impl Into<String> + Send,
     ) -> MessageRespondResult {
-        self.update()
+        self.inner
+            .0
+            .update_response(self.interaction_token())
             .components(None)
             .embeds(None)
             .content(Some(&content.into()))
@@ -152,7 +148,7 @@ impl Interface<'_> {
         custom_id: impl Into<String> + Send,
         title: impl Into<String> + Send,
         text_inputs: impl IntoIterator<Item = impl Into<twilight_model::channel::message::Component>>
-            + Send,
+        + Send,
     ) -> UnitRespondResult {
         let data = InteractionResponseDataBuilder::new()
             .custom_id(custom_id)
@@ -366,7 +362,7 @@ impl<'a> Client<'a> {
     pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
         let commands = self
             .0
-            .set_global_commands(&[SLASH_COMMANDS.as_slice(), MESSAGE_COMMANDS.as_slice()].concat())
+            .set_global_commands(&commands())
             .await?
             .models()
             .await?;
@@ -381,9 +377,9 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
-    pub fn populated_command<T: CommandInfoAware>(
-    ) -> &'static twilight_model::application::command::Command {
-        let name = T::name();
+    pub fn populated_command<T: CreateCommand>()
+    -> &'static twilight_model::application::command::Command {
+        let name = T::NAME;
         POPULATED_COMMANDS_MAP
             .get()
             .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
@@ -391,7 +387,7 @@ impl<'a> Client<'a> {
             .unwrap_or_else(|| panic!("command not found: {name}"))
     }
 
-    pub fn mention_command<T: CommandInfoAware>() -> MentionCommand {
+    pub fn mention_command<T: CreateCommand>() -> MentionCommand {
         let cmd = Self::populated_command::<T>();
 
         let name = cmd.name.clone().into();

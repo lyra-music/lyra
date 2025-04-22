@@ -4,17 +4,17 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         macros::{bad, out, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     component::queue::normalize_queue_position,
     core::model::CacheAware,
-    error::{command::AutocompleteResult, CommandResult},
+    error::{CommandResult, command::AutocompleteResult},
     lavalink::CorrectTrackInfo,
-    LavalinkAndGuildIdAware,
 };
 
 enum MoveAutocompleteOptionType {
@@ -29,7 +29,6 @@ struct MoveAutocompleteOptions {
     kind: MoveAutocompleteOptionType,
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_move_choices(
     options: &MoveAutocompleteOptions,
     cx: &(impl LavalinkAndGuildIdAware + CacheAware + Sync),
@@ -65,7 +64,7 @@ async fn generate_move_choices(
         }
     };
 
-    match options.focused.parse::<i64>() {
+    let choices = match options.focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -93,7 +92,9 @@ async fn generate_move_choices(
             &excluded,
             cx,
         ),
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]
@@ -121,9 +122,7 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 MoveAutocompleteOptionType::PositionFocusedTrackCompleted(i),
             ),
-            // SAFETY: only one autocomplete options can be focused at a time,
-            //         so this branch is unreachable
-            _ => unsafe { std::hint::unreachable_unchecked() },
+            _ => panic!("not exactly one autocomplete option focused"),
         };
 
         let options = MoveAutocompleteOptions {
@@ -148,7 +147,6 @@ pub struct Move {
 }
 
 impl BotSlashCommand for Move {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -171,7 +169,10 @@ impl BotSlashCommand for Move {
 
         if self.track == self.position {
             bad!(
-                format!("Invalid new position: {}; New position must be different from the old position", self.position),
+                format!(
+                    "Invalid new position: {}; New position must be different from the old position",
+                    self.position
+                ),
                 ctx
             );
         }
@@ -182,17 +183,18 @@ impl BotSlashCommand for Move {
             self.position.unsigned_abs() as usize,
         );
 
-        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let position = unsafe { NonZeroUsize::new_unchecked(position_usize) };
+        let position =
+            NonZeroUsize::new(position_usize).expect("new track position must be non-zero");
         let track = &queue[position];
         check::track_is_users(track, position, in_voice_with_user)?;
 
-        // SAFETY: `self.track as usize` is in range [1, +inf), so it is non-zero
-        let track_position = unsafe { NonZeroUsize::new_unchecked(track_usize) };
+        let track_position =
+            NonZeroUsize::new(track_usize).expect("old track position must be non-zero");
         let queue_position = queue.position();
 
-        // SAFETY: `track_position.get() - 1` has been validated to be in-bounds, so this unwrap is safe
-        let track = unsafe { queue.remove(track_position.get() - 1).unwrap_unchecked() };
+        let track = queue
+            .remove(track_position.get() - 1)
+            .expect("new track position must be in-bounds");
         let track_title = track.data().info.corrected_title();
         let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
 
@@ -207,6 +209,7 @@ impl BotSlashCommand for Move {
         };
 
         queue.insert(insert_position, track);
+        drop(data_w);
 
         out!(message, ctx);
     }

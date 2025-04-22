@@ -2,13 +2,14 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{bad, out},
-        model::BotSlashCommand,
-        require, SlashCtx,
+        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        require,
+        util::controller_fmt,
     },
     error::CommandResult,
-    lavalink::IndexerType,
+    lavalink::{IndexerType, OwnedPlayerData},
 };
 
 /// Toggles queue shuffling
@@ -24,31 +25,46 @@ impl BotSlashCommand for Shuffle {
         let data = player.data();
 
         let data_r = data.read().await;
-        let queue = require::queue_not_empty(&data_r)?;
-        let indexer_type = queue.indexer_type();
+        require::queue_not_empty(&data_r)?;
         drop(data_r);
 
-        match indexer_type {
-            IndexerType::Shuffled => {
-                data.write()
-                    .await
-                    .queue_mut()
-                    .set_indexer_type(IndexerType::Standard);
-                out!("**` ⮆ `** Disabled shuffle", ctx);
-            }
-            IndexerType::Fair => {
-                bad!(
-                    "Cannot enable shuffle as fair queue is currently enabled",
-                    ctx
-                );
-            }
-            IndexerType::Standard => {
-                data.write()
-                    .await
-                    .queue_mut()
-                    .set_indexer_type(IndexerType::Shuffled);
-                out!("🔀 Enabled shuffle", ctx);
-            }
+        Ok(shuffle(data, &mut ctx, false).await?)
+    }
+}
+
+pub async fn shuffle(
+    data: OwnedPlayerData,
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    via_controller: bool,
+) -> Result<(), crate::error::component::queue::ShuffleError> {
+    let indexer_type = data.read().await.queue().indexer_type();
+    match indexer_type {
+        IndexerType::Shuffled => {
+            data.write()
+                .await
+                .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
+                .await?;
+
+            let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle");
+            out!(content, ?ctx);
+            Ok(())
+        }
+        IndexerType::Fair => {
+            bad!(
+                // The shuffle button on the playback controller will be disabled, so no need to use `controller_fmt` here
+                "Cannot enable shuffle as fair queue is currently enabled",
+                ctx
+            );
+        }
+        IndexerType::Standard => {
+            data.write()
+                .await
+                .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Shuffled)
+                .await?;
+
+            let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle");
+            out!(content, ?ctx);
+            Ok(())
         }
     }
 }

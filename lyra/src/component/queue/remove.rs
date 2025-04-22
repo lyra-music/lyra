@@ -8,17 +8,16 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     core::model::CacheAware,
-    error::{command::AutocompleteResult, CommandResult},
-    LavalinkAndGuildIdAware,
+    error::{CommandResult, command::AutocompleteResult},
 };
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_choices(
     focused: &str,
     finished: Vec<i64>,
@@ -40,7 +39,7 @@ async fn generate_remove_choices(
 
     let queue_iter = queue.iter_positions_and_items();
 
-    match focused.parse::<i64>() {
+    let choices = match focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -50,7 +49,9 @@ async fn generate_remove_choices(
         Err(_) => {
             super::generate_position_choices_from_fuzzy_match(focused, queue_iter, &excluded, cx)
         }
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]
@@ -82,16 +83,13 @@ impl BotAutocomplete for Autocomplete {
             })
             .copied()
             .collect::<Vec<_>>();
-        // SAFETY: exactly one autocomplete option is focused, so finding will always be successful
-        let focused = unsafe {
-            tracks
-                .into_iter()
-                .find_map(|a| match a {
-                    AutocompleteValue::Focused(i) => Some(i),
-                    _ => None,
-                })
-                .unwrap_unchecked()
-        };
+        let focused = tracks
+            .into_iter()
+            .find_map(|a| match a {
+                AutocompleteValue::Focused(i) => Some(i),
+                _ => None,
+            })
+            .expect("exactly one autocomplete option should be focused");
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
         Ok(ctx.autocomplete(choices).await?)

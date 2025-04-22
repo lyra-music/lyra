@@ -4,17 +4,17 @@ use serde::Deserialize;
 #[serde(rename_all = "camelCase")]
 pub struct PluginTrackInfo {
     /// The name of the album
-    album_name: Option<String>,
+    pub album_name: Option<String>,
     /// The url of the album art
-    album_art_url: Option<String>,
+    pub album_art_url: Option<String>,
     /// The url of the artist
-    artist_url: Option<String>,
+    pub artist_url: Option<String>,
     /// The url of the artist artwork
-    artist_artwork_uri: Option<String>,
+    pub artist_artwork_url: Option<String>,
     /// The url of the preview
-    preview_url: Option<String>,
+    pub preview_url: Option<String>,
     /// Whether the track is a preview
-    is_preview: bool,
+    pub is_preview: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -22,20 +22,20 @@ pub struct PluginTrackInfo {
 pub struct PluginPlaylistInfo {
     /// The type of the playlist
     #[serde(rename = "type")]
-    kind: PlaylistType,
+    pub kind: PlaylistType,
     /// The url of the playlist
-    url: Option<String>,
+    pub url: Option<String>,
     /// The url of the playlist artwork
-    artwork_url: Option<String>,
+    pub artwork_url: Option<String>,
     /// The author of the playlist
-    author: Option<String>,
+    pub author: Option<String>,
     /// The total number of tracks in the playlist
-    total_tracks: Option<usize>,
+    pub total_tracks: Option<usize>,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-enum PlaylistType {
+pub enum PlaylistType {
     /// The playlist is an album
     Album,
     /// The playlist is a playlist

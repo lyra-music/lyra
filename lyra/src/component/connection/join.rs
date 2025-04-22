@@ -3,46 +3,45 @@ use std::{borrow::Cow, fmt::Display, sync::Arc};
 use lyra_ext::{iso8601_time, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
-use twilight_mention::Mention;
+use twilight_mention::{
+    Mention,
+    timestamp::{Timestamp, TimestampStyle},
+};
 use twilight_model::{
     application::interaction::InteractionChannel,
     channel::ChannelType,
     gateway::payload::outgoing::UpdateVoiceState,
     guild::Permissions,
     id::{
-        marker::{ChannelMarker, GuildMarker, MessageMarker},
         Id,
+        marker::{ChannelMarker, GuildMarker, MessageMarker},
     },
 };
 
 use crate::{
+    LavalinkAware,
     command::{
-        check,
+        SlashCtx, check,
         macros::{bad, cant, nope, note, note_fol, out_or_fol, sus_fol},
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
         require::{self, InVoiceCachedVoiceState},
-        SlashCtx,
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
-        model::{
-            AuthorIdAware, BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware,
-        },
-        r#const::connection::INACTIVITY_TIMEOUT_SECS,
+        r#const::connection::INACTIVITY_TIMEOUT,
+        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
         traced,
     },
     error::{
-        self,
+        self, Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
         component::connection::join::{
             AutoJoinError, ConnectToError, ConnectToNewError, DeleteEmptyVoiceNoticeError,
             Error as JoinError, GetUsersVoiceChannelError, HandleResponseError, ImplAutoJoinError,
             ImplConnectToError, ImplJoinError, Pfe,
         },
-        Cache as CacheError, CommandResult, UserNotInVoice as UserNotInVoiceError,
     },
     gateway::{GuildIdAware, SenderAware},
     lavalink::Connection,
-    LavalinkAware,
 };
 
 pub(super) enum Response {
@@ -104,7 +103,7 @@ type GetUsersVoiceChannelResult =
 fn get_users_voice_channel(ctx: &GuildCtx<impl CtxKind>) -> GetUsersVoiceChannelResult {
     let channel_id = ctx
         .cache()
-        .voice_state(ctx.author_id(), ctx.guild_id())
+        .voice_state(ctx.user_id(), ctx.guild_id())
         .ok_or(UserNotInVoiceError)?
         .channel_id();
     let voice = ctx.cache().channel(channel_id).ok_or(CacheError)?;
@@ -135,7 +134,7 @@ fn check_user_is_stage_manager(
 ) -> Result<(), error::UserNotStageManager> {
     if channel_type == ChannelType::GuildStageVoice {
         check::user_is_stage_manager(ctx)?;
-    };
+    }
     Ok(())
 }
 
@@ -242,9 +241,12 @@ async fn impl_connect_to(
             let _ = ctx
                 .bot()
                 .standby()
-                .wait_for_event(move |e: &Event| match e {
-                    Event::VoiceServerUpdate(v) => v.guild_id == guild_id,
-                    _ => false,
+                .wait_for_event(move |e: &Event| {
+                    if let Event::VoiceServerUpdate(v) = e {
+                        v.guild_id == guild_id
+                    } else {
+                        false
+                    }
                 })
                 .await;
             tracing::trace!("voice server update received");
@@ -349,13 +351,15 @@ async fn handle_response(
 
     if empty {
         let text_channel_id = ctx.channel_id();
+        let duration = unix_time() + INACTIVITY_TIMEOUT;
+        let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
         let empty_voice_notice_txt = format!(
-            "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in <t:{}:R>.",
-            unix_time().as_secs() + u64::from(INACTIVITY_TIMEOUT_SECS)
+            "Joined an empty voice channel. The bot will automatically disconnects if no one else joins in {}.",
+            timestamp.mention()
         );
 
         traced::tokio_spawn(start_inactivity_timeout(
-            super::InactivityTimeoutContext::new_via(ctx),
+            super::InactivityTimeoutContext::from(&*ctx),
             joined.id,
             text_channel_id,
         ));
@@ -395,7 +399,7 @@ pub async fn join(
 
 /// Joins a voice/stage channel
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "join", dm_permission = false)]
+#[command(name = "join", contexts = "guild")]
 pub struct Join {
     /// Which channel? (if not given, your currently connected channel)
     #[command(channel_types = "guild_voice guild_stage_voice")]

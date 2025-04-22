@@ -1,5 +1,6 @@
 mod autocomplete;
 mod command_data;
+mod component;
 mod menu;
 mod message;
 mod modal;
@@ -7,7 +8,7 @@ mod modal;
 use std::{marker::PhantomData, sync::Arc};
 
 use tokio::sync::oneshot;
-use twilight_cache_inmemory::{model::CachedMember, InMemoryCache, Reference};
+use twilight_cache_inmemory::{InMemoryCache, Reference, model::CachedMember};
 use twilight_gateway::{Latency, MessageSender};
 use twilight_http::Client as HttpClient;
 use twilight_model::{
@@ -15,24 +16,24 @@ use twilight_model::{
     gateway::payload::incoming::InteractionCreate,
     guild::{PartialMember, Permissions},
     id::{
-        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
     },
     user::User as TwilightUser,
 };
 
 use crate::{
+    LavalinkAware,
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
     core::model::{
-        AuthorIdAware, AuthorPermissionsAware, BotState, BotStateAware, CacheAware, HttpAware,
-        InteractionInterface, OwnedBotState, OwnedBotStateAware,
+        BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, InteractionInterface,
+        OwnedBotState, OwnedBotStateAware, PartialMemberAware, UserAware, UserPermissionsAware,
     },
     error::{
-        command::RespondError, core::DeserializeBodyFromHttpError, Cache, CacheResult, NotInGuild,
+        Cache, CacheResult, NotInGuild, command::RespondError, core::DeserialiseBodyFromHttpError,
     },
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
-    LavalinkAndGuildIdAware, LavalinkAware,
 };
 
 use super::PartialInteractionData;
@@ -139,23 +140,13 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         }
     }
 
-    pub fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
-        self.bot.db()
-    }
-
     #[inline]
     pub fn channel_id(&self) -> Id<ChannelMarker> {
         self.channel().id
     }
 
     pub fn channel(&self) -> &Channel {
-        // SAFETY: Interaction type is not `Ping`, so `channel` is present.
-        unsafe { self.inner.channel_unchecked() }
-    }
-
-    pub fn author(&self) -> &TwilightUser {
-        // SAFETY: Interaction type is not `Ping`, so `author()` is present.
-        unsafe { self.inner.author_unchecked() }
+        self.inner.channel_expected()
     }
 
     pub fn interaction(&self) -> &InteractionCreate {
@@ -166,35 +157,26 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         &self.inner.token
     }
 
-    pub async fn interface(&self) -> Result<InteractionInterface, DeserializeBodyFromHttpError> {
+    pub async fn interface(&self) -> Result<InteractionInterface, DeserialiseBodyFromHttpError> {
         Ok(self.bot.interaction().await?.interfaces(&self.inner))
     }
 
-    pub unsafe fn guild_id_unchecked(&self) -> Id<TwilightGuildMarker> {
-        // SAFETY: this interaction was invoked in a guild,
-        //         so `self.inner.guild_id` is present
-        unsafe { self.get_guild_id().unwrap_unchecked() }
+    pub fn guild_id_expected(&self) -> Id<TwilightGuildMarker> {
+        self.get_guild_id()
+            .expect("interactions invoked in a guild must have a guild id")
     }
 
-    pub unsafe fn member_unchecked(&self) -> &PartialMember {
-        // SAFETY: this interaction was invoked in a guild,
-        //         so `self.inner.member` is present
-        unsafe { self.inner.member.as_ref().unwrap_unchecked() }
+    pub fn member_expected(&self) -> &PartialMember {
+        self.inner
+            .member
+            .as_ref()
+            .expect("interactions invoked in a guild must have a member")
     }
 
-    pub unsafe fn bot_permissions_unchecked(&self) -> Permissions {
-        // SAFETY: this interaction was invoked in a guild
-        //         so `self.inner.app_permissions` is present
-        unsafe { self.inner.app_permissions.unwrap_unchecked() }
-    }
-
-    pub unsafe fn author_permissions_unchecked(&self) -> Permissions {
-        // SAFETY: this interaction was invoked in a guild,
-        //         so `self.inner.member` is present.
-        let member = unsafe { self.member_unchecked() };
-        // SAFETY: This member object is sent in an interaction,
-        //         so `permissions` is present
-        unsafe { member.permissions.unwrap_unchecked() }
+    pub fn author_permissions_expected(&self) -> Permissions {
+        self.member_expected()
+            .permissions
+            .expect("member object sent by interactions must have permissions")
     }
 }
 
@@ -205,16 +187,10 @@ impl<T: Kind> Ctx<T, GuildMarker> {
             .ok_or(Cache)
     }
 
-    pub fn member(&self) -> &PartialMember {
-        // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
-        //          so `member` is present
-        unsafe { self.member_unchecked() }
-    }
-
     pub fn bot_permissions(&self) -> Permissions {
-        // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
-        //          so `app_permissions` is present
-        unsafe { self.bot_permissions_unchecked() }
+        self.inner
+            .app_permissions
+            .expect("interactions invoked in a guild must have app permissions")
     }
 
     pub fn bot_permissions_for(&self, channel_id: Id<ChannelMarker>) -> CacheResult<Permissions> {
@@ -293,7 +269,11 @@ impl<T: Kind, U: Location> LavalinkAware for Ctx<T, U> {
     }
 }
 
-impl<T: Kind> LavalinkAndGuildIdAware for Guild<T> {}
+impl<T: Kind, U: Location> DatabaseAware for Ctx<T, U> {
+    fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
+        self.bot.db()
+    }
+}
 
 impl<T: Kind, U: Location> OptionallyGuildIdAware for Ctx<T, U> {
     fn get_guild_id(&self) -> Option<Id<TwilightGuildMarker>> {
@@ -301,26 +281,30 @@ impl<T: Kind, U: Location> OptionallyGuildIdAware for Ctx<T, U> {
     }
 }
 
-impl<T: Kind, U: Location> AuthorIdAware for Ctx<T, U> {
-    fn author_id(&self) -> Id<UserMarker> {
-        self.author().id
+impl<T: Kind, U: Location> UserAware for Ctx<T, U> {
+    #[inline]
+    fn user(&self) -> &TwilightUser {
+        self.inner.author_expected()
     }
 }
 
 impl<T: Kind> GuildIdAware for Ctx<T, GuildMarker> {
     #[inline]
     fn guild_id(&self) -> Id<TwilightGuildMarker> {
-        // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
-        //         so `self.guild_id_unchecked()` is safe.
-        unsafe { self.guild_id_unchecked() }
+        self.guild_id_expected()
     }
 }
 
-impl<T: Kind> AuthorPermissionsAware for Ctx<T, GuildMarker> {
-    fn author_permissions(&self) -> Permissions {
-        // SAFETY: `Ctx<_, Guild>` is proven to be of an interaction that was invoked in a guild,
-        //          so `self.author_permissions_unchecked()` is safe.
-        unsafe { self.author_permissions_unchecked() }
+impl<T: Kind> PartialMemberAware for Ctx<T, GuildMarker> {
+    #[inline]
+    fn member(&self) -> &PartialMember {
+        self.member_expected()
+    }
+}
+
+impl<T: Kind> UserPermissionsAware for Ctx<T, GuildMarker> {
+    fn user_permissions(&self) -> Permissions {
+        self.author_permissions_expected()
     }
 }
 
@@ -337,27 +321,18 @@ impl<'a, T: Kind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
 
 impl<T: Kind> GuildIdAware for GuildRef<'_, T> {
     fn guild_id(&self) -> Id<TwilightGuildMarker> {
-        // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
-        //         proving that this was an interaction invoked in a guild,
-        //         so `self.0.guild_id_unchecked()` is safe.
-        unsafe { self.0.guild_id_unchecked() }
+        self.0.guild_id_expected()
     }
 }
 
 impl<T: Kind> GuildRef<'_, T> {
     pub fn member(&self) -> &PartialMember {
-        // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
-        //          proving that this was an interaction invoked in a guild,
-        //          so `self.0.member_unchecked()` is safe.
-        unsafe { self.0.member_unchecked() }
+        self.0.member_expected()
     }
 }
 
-impl<T: Kind> AuthorPermissionsAware for GuildRef<'_, T> {
-    fn author_permissions(&self) -> Permissions {
-        // SAFETY: `self.0.get_guild_id()` is proven to be present from `Self::try_from`,
-        //          proving that this was an interaction invoked in a guild,
-        //          so `self.0.author_permissions_unchecked()` is safe.
-        unsafe { self.0.author_permissions_unchecked() }
+impl<T: Kind> UserPermissionsAware for GuildRef<'_, T> {
+    fn user_permissions(&self) -> Permissions {
+        self.0.author_permissions_expected()
     }
 }

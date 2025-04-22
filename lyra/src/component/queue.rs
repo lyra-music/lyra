@@ -15,14 +15,14 @@ use lyra_ext::{
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
+pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 #[allow(clippy::module_name_repetitions)]
 pub use play::AddToQueue;
 pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
-pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
-pub use repeat::Repeat;
-pub use shuffle::Shuffle;
+pub use repeat::{Repeat, get_next_repeat_mode, repeat};
+pub use shuffle::{Shuffle, shuffle};
 
 use std::{collections::HashSet, num::NonZeroUsize, time::Duration};
 
@@ -37,12 +37,12 @@ use crate::{
         require::PlayerInterface,
     },
     core::{
-        model::{CacheAware, InteractionClient},
         r#const::{
             discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
+        model::{CacheAware, InteractionClient},
     },
-    error::{component::queue::RemoveTracksError, PositionOutOfRange as PositionOutOfRangeError},
+    error::{PositionOutOfRange as PositionOutOfRangeError, component::queue::RemoveTracksError},
     lavalink::{CorrectTrackInfo, QueueItem},
 };
 
@@ -260,7 +260,6 @@ async fn remove(
     impl_remove(positions, removed, queue_cleared, ctx, player).await
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
@@ -273,25 +272,20 @@ async fn impl_remove(
     let queue = data_w.queue_mut();
 
     let removed_len = removed.len();
-    let removed_text = match removed_len {
-        0 => String::new(),
-        1..=ADD_TRACKS_WRAP_LIMIT => removed
-            .into_iter()
-            .map(|t| format!("`{}`", t.into_data().info.corrected_title()))
-            .collect::<Box<[_]>>()
-            .pretty_join_with_and(),
-        _ => format!("`{removed_len} tracks`"),
+    let (minus, removed_text) = match removed_len {
+        0 => unreachable!(),
+        1..=ADD_TRACKS_WRAP_LIMIT => (
+            "**`ー`**",
+            removed
+                .into_iter()
+                .map(|t| format!("`{}`", t.into_data().info.corrected_title()))
+                .collect::<Box<[_]>>()
+                .pretty_join_with_and(),
+        ),
+        _ => ("**`≡-`**", format!("`{removed_len} tracks`")),
     };
-    let minus = match removed_len {
-        // SAFETY: `/remove` always remove at least one track after input positions have been validated,
-        //         so this branch is unreachable
-        0 => unsafe { std::hint::unreachable_unchecked() },
-        1 => "**`ー`**",
-        _ => "**`≡-`**",
-    };
-
-    // SAFETY: `queue.index() + 1` is non-zero
-    let current = unsafe { NonZeroUsize::new_unchecked(queue.index() + 1) };
+    let current =
+        NonZeroUsize::new(queue.index() + 1).expect("1-indexed queue index must be non-zero");
     let before_current = positions.partition_point(|&i| i < current);
     *queue.index_mut() -= positions[..before_current].len();
 
@@ -306,6 +300,7 @@ async fn impl_remove(
             player.acquire_advance_lock_and_stop_with(queue).await?;
         }
     }
+    drop(data_w);
 
     out!(format!("{} Removed {}", minus, removed_text), ?ctx);
 

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use image::{imageops::FilterType, DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, imageops::FilterType};
 
 pub trait LimitFileSize {
     fn limit_file_size(&self, limit: u32) -> Cow<DynamicImage>;

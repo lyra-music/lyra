@@ -2,15 +2,11 @@ use std::sync::OnceLock;
 
 use twilight_model::channel::message::EmojiReactionType;
 
-use crate::error::core::DeserializeBodyFromHttpError;
-
-use super::BotState;
+use crate::{core::model::HttpAware, error::core::DeserialiseBodyFromHttpError};
 
 macro_rules! generate_emojis {
     ($ (($name: ident, $default: expr)) ,* $(,)? ) => {$(
-        pub async fn $name(
-            bot: &BotState,
-        ) -> Result<&'static EmojiReactionType, DeserializeBodyFromHttpError> {
+        pub async fn $name(cx: &(impl HttpAware + Sync)) -> Result<&'static EmojiReactionType, DeserialiseBodyFromHttpError> {
             ::paste::paste! {
                 static [<$name:upper>]: OnceLock<EmojiReactionType> = OnceLock::new();
                 if let Some(emoji) = [<$name:upper>].get() {
@@ -18,7 +14,7 @@ macro_rules! generate_emojis {
                 }
             }
 
-            let emojis = bot.application_emojis().await?;
+            let emojis = crate::core::r#static::application::emojis(cx).await?;
             let emoji = emojis.iter().find(|e| e.name == stringify!($name));
             let reaction = emoji.map_or(
                 {
@@ -38,7 +34,7 @@ macro_rules! generate_emojis {
 }
 
 generate_emojis![
-    (shuffle_off, "🔀"),
+    (shuffle_off, "⬅️"),
     (shuffle_on, "🔀"),
     (previous, "⏮️"),
     (play, "▶️"),

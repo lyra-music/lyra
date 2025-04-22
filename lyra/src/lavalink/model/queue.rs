@@ -1,9 +1,9 @@
-use std::{collections::VecDeque, num::NonZeroUsize};
+use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use tokio::sync::Notify;
-use twilight_model::id::{marker::UserMarker, Id};
+use twilight_model::id::{Id, marker::UserMarker};
 
 use super::queue_indexer::{Indexer, IndexerType};
 
@@ -48,12 +48,17 @@ impl std::fmt::Display for RepeatMode {
 #[derive(Debug)]
 pub struct Item {
     track: TrackData,
+    enqueued: Duration,
     pub(super) requester: Id<UserMarker>,
 }
 
 impl Item {
-    const fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
-        Self { track, requester }
+    fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
+        Self {
+            track,
+            requester,
+            enqueued: lyra_ext::unix_time(),
+        }
     }
 
     pub const fn requester(&self) -> Id<UserMarker> {
@@ -62,6 +67,10 @@ impl Item {
 
     pub const fn data(&self) -> &TrackData {
         &self.track
+    }
+
+    pub const fn enqueued(&self) -> Duration {
+        self.enqueued
     }
 
     pub fn into_data(self) -> TrackData {
@@ -90,8 +99,7 @@ impl Queue {
 
     fn position_from(&self, current: Option<&Item>) -> NonZeroUsize {
         let d = usize::from(current.is_some() || self.index == 0);
-        // SAFETY: `self.index + d` is non-zero
-        unsafe { NonZeroUsize::new_unchecked(self.index + d) }
+        NonZeroUsize::new(self.index + d).expect("normalised queue position must be non-zero")
     }
 
     pub fn position(&self) -> NonZeroUsize {
@@ -102,7 +110,7 @@ impl Queue {
         self.index
     }
 
-    pub fn index_mut(&mut self) -> &mut usize {
+    pub const fn index_mut(&mut self) -> &mut usize {
         &mut self.index
     }
 
@@ -137,7 +145,7 @@ impl Queue {
     pub fn dequeue<'a>(
         &'a mut self,
         positions: &'a [NonZeroUsize],
-    ) -> impl Iterator<Item = Item> + 'a {
+    ) -> impl Iterator<Item = Item> + use<'a> {
         let iter_indices = positions.iter().map(|p| p.get() - 1);
         self.indexer.dequeue(iter_indices.clone());
         iter_indices.rev().filter_map(|i| self.inner.remove(i))
@@ -149,15 +157,15 @@ impl Queue {
         self.indexer.clear();
     }
 
-    pub fn drain(
+    pub fn drain<T: std::ops::RangeBounds<usize> + Iterator<Item = usize> + Clone>(
         &mut self,
-        indices: impl std::ops::RangeBounds<usize> + Iterator<Item = usize> + Clone,
-    ) -> impl Iterator<Item = Item> + '_ {
+        indices: T,
+    ) -> impl Iterator<Item = Item> + use<'_, T> {
         self.indexer.drain(indices.clone());
         self.inner.drain(indices)
     }
 
-    pub fn drain_all(&mut self) -> impl Iterator<Item = Item> + '_ {
+    pub fn drain_all(&mut self) -> impl Iterator<Item = Item> + use<'_> {
         self.reset();
         self.inner.drain(..)
     }
@@ -171,7 +179,7 @@ impl Queue {
         self.repeat_mode
     }
 
-    pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
+    pub const fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
     }
 

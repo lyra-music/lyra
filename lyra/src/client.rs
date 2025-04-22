@@ -9,7 +9,7 @@ fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
 #[tracing::instrument(err)]
 pub async fn run() -> Result<(), super::error::Run> {
     color_eyre::install()?;
-    dotenvy::dotenv()?;
+    dotenvy::dotenv().ok();
 
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -18,6 +18,10 @@ pub async fn run() -> Result<(), super::error::Run> {
                 .from_env_lossy(),
         )
         .init();
+
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .map_err(crate::error::InstallDefaultCryptoProvider)?;
 
     Ok(super::runner::start().await?)
 }

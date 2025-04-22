@@ -1,17 +1,18 @@
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
+        SlashCtx,
         check::{self, ResolveWithPoll, StartPoll},
         macros::out_or_upd,
-        model::BotSlashCommand,
+        model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
         poll::Topic,
-        require, SlashCtx,
+        require,
+        util::controller_fmt,
     },
-    error::CommandResult,
-    gateway::GuildIdAware,
-    lavalink::{DelegateMethods, Event, RepeatMode as LavalinkRepeatMode},
-    LavalinkAware,
+    error::{CommandResult, component::queue::RepeatError},
+    lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
 
 #[derive(CommandOption, CreateOption)]
@@ -45,16 +46,11 @@ pub struct Repeat {
 impl BotSlashCommand for Repeat {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let guild_id = ctx.guild_id();
         let mode = {
             if let Some(mode) = self.mode {
                 mode.into()
             } else {
-                let mode = match ctx.lavalink().get_player_data(guild_id) {
-                    Some(data) => data.read().await.queue().repeat_mode(),
-                    None => LavalinkRepeatMode::Off,
-                };
-                mode.next()
+                get_next_repeat_mode(&ctx).await
             }
         };
 
@@ -72,12 +68,32 @@ impl BotSlashCommand for Repeat {
             .and_then_start(&mut ctx)
             .await?;
 
-        ctx.lavalink()
-            .try_get_connection(guild_id)?
-            .dispatch(Event::QueueRepeat);
-        data.write().await.queue_mut().set_repeat_mode(mode);
-
-        let txt = &format!("{} {}", mode.emoji(), mode);
-        out_or_upd!(txt, ctx);
+        Ok(repeat(&mut ctx, data, mode, false).await?)
     }
+}
+
+pub async fn get_next_repeat_mode(ctx: &GuildCtx<impl CtxKind>) -> LavalinkRepeatMode {
+    let mode = match ctx.get_player_data() {
+        Some(data) => data.read().await.queue().repeat_mode(),
+        None => LavalinkRepeatMode::Off,
+    };
+    mode.next()
+}
+
+pub async fn repeat(
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    data: OwnedPlayerData,
+    mode: LavalinkRepeatMode,
+    via_controller: bool,
+) -> Result<(), RepeatError> {
+    ctx.try_get_connection()?.dispatch(Event::QueueRepeat);
+    data.write()
+        .await
+        .set_repeat_mode_then_update_and_apply_to_now_playing(mode)
+        .await?;
+
+    let message = format!("{} {}", mode.emoji(), mode);
+    let content = controller_fmt(ctx, via_controller, &message);
+    out_or_upd!(content, ?ctx);
+    Ok(())
 }

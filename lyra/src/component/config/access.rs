@@ -6,15 +6,13 @@ mod view;
 use bitflags::bitflags;
 use const_str::concat as const_str_concat;
 use itertools::Itertools;
-use lyra_ext::{
-    logical_bind::LogicalBind, num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay,
-};
+use lyra_ext::{logical_bind::LogicalBind, num::u64_to_i64_truncating};
 use sqlx::{Pool, Postgres};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
 use twilight_model::id::{
-    marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker},
     Id,
+    marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker},
 };
 
 pub use self::{
@@ -42,7 +40,7 @@ impl Calculator {
                  in_access_controls,
                  access_mode,
              }| {
-                access_mode.map_or(true, |access_mode| access_mode == in_access_controls)
+                access_mode.is_none_or(|access_mode| access_mode == in_access_controls)
             },
         )
     }
@@ -75,10 +73,8 @@ impl CalculatorBuilder {
             .bind(id)
             .fetch_one(&db)
             .await?
-            .0;
-
-            // SAFETY: `SELECT EXISTS ...` is always non-null
-            let in_access_controls = unsafe { in_access_controls.unwrap_unchecked() };
+            .0
+            .expect("sql existence queries must be non-null");
 
             let (access_mode,) = sqlx::query_as::<_, (Option<bool>,)>(&format!(
                 "SELECT {column} FROM guild_configs WHERE id = $1"
@@ -183,13 +179,15 @@ impl TryFrom<AccessCategoryFlags> for AccessCategoryFlag {
     type Error = AccessCategoryFlags;
 
     fn try_from(value: AccessCategoryFlags) -> Result<Self, Self::Error> {
-        if value.iter().count() != 1 {
-            return Err(value);
+        match value.bits() {
+            x if x == Self::Users as u8 => Ok(Self::Users),
+            x if x == Self::Roles as u8 => Ok(Self::Roles),
+            x if x == Self::Threads as u8 => Ok(Self::Threads),
+            x if x == Self::TextChannels as u8 => Ok(Self::TextChannels),
+            x if x == Self::VoiceChannels as u8 => Ok(Self::VoiceChannels),
+            x if x == Self::CategoryChannels as u8 => Ok(Self::CategoryChannels),
+            _ => Err(value),
         }
-
-        // SAFETY: `value` is guruanteed to only have one flag,
-        //         so this transmute is safe
-        Ok(unsafe { std::mem::transmute::<u8, Self>(value.bits()) })
     }
 }
 
@@ -232,8 +230,6 @@ bitflags! {
             | Self::ALL_CHANNELS.bits();
     }
 }
-
-impl FlagsDisplay for AccessCategoryFlags {}
 
 impl From<AccessCategory> for AccessCategoryFlags {
     fn from(category: AccessCategory) -> Self {

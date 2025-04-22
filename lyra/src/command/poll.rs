@@ -1,7 +1,7 @@
 use std::{
     collections::{
-        hash_map::{DefaultHasher, Entry},
         HashMap, HashSet,
+        hash_map::{DefaultHasher, Entry},
     },
     hash::{Hash, Hasher},
     time::Duration,
@@ -10,17 +10,17 @@ use std::{
 use futures::StreamExt;
 use itertools::Itertools;
 use lyra_ext::rgb_hex::{hex_to_rgb, rgb_to_hex};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use twilight_model::{
     application::interaction::{Interaction, InteractionData},
     channel::message::{
-        component::{ActionRow, Button, ButtonStyle},
         Component, Embed, EmojiReactionType,
+        component::{ActionRow, Button, ButtonStyle},
     },
     guild::Permissions,
     id::{
-        marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
         Id,
+        marker::{ChannelMarker, MessageMarker, UserMarker},
     },
 };
 use twilight_util::builder::embed::{
@@ -28,27 +28,26 @@ use twilight_util::builder::embed::{
 };
 
 use crate::{
+    LavalinkAware,
     command::macros::{caut, hid, nope},
     core::{
-        model::{AuthorIdAware, BotStateAware, CacheAware, HttpAware},
         r#const::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },
+        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
     },
     error::{
-        command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
         Cache as CacheError,
+        command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
     },
-    gateway::GuildIdAware,
     lavalink::{Event, EventRecvResult},
-    LavalinkAware,
 };
 
 use super::{
     model::{GuildCtx, GuildInteraction, NonPingInteraction, RespondViaMessage},
     require::PartialInVoice,
-    util::{AvatarUrlAware, DefaultAvatarUrlAware, GuildAvatarUrlAware, MessageLinkAware},
+    util::{GuildIdAndDisplayAvatarUrlAware, GuildIdAndDisplayNameAware, MessageLinkAware},
 };
 
 #[derive(Hash)]
@@ -113,8 +112,8 @@ impl Voter {
     }
 }
 
-impl crate::core::model::AuthorPermissionsAware for Voter {
-    fn author_permissions(&self) -> Permissions {
+impl crate::core::model::UserPermissionsAware for Voter {
+    fn user_permissions(&self) -> Permissions {
         self.permissions
     }
 }
@@ -124,11 +123,7 @@ pub struct Vote(bool);
 
 impl Vote {
     const fn value(self) -> isize {
-        if self.0 {
-            1
-        } else {
-            -1
-        }
+        if self.0 { 1 } else { -1 }
     }
 }
 
@@ -196,17 +191,13 @@ struct WaitForPollActionsContext<'a> {
 }
 
 fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAction {
-    // SAFETY: interaction is not of type `Ping`, so author exists
-    let user_id = unsafe { inter.author_id_unchecked() };
+    let user_id = inter.author_id_expected();
 
     let Some(InteractionData::MessageComponent(ref component)) = inter.data else {
-        // SAFETY: interaction is of type `MessageComponent`,
-        //         so interaction data must also be of type `MessageComponent`
-        unsafe { std::hint::unreachable_unchecked() }
+        unreachable!()
     };
 
-    // SAFETY: interaction invoked in a guild, so author permissions exists
-    let voter_permissions = unsafe { inter.author_permissions_unchecked() };
+    let voter_permissions = inter.author_permissions_expected();
 
     match (
         super::check::is_user_dj(&Voter::new(voter_permissions)),
@@ -220,26 +211,6 @@ fn handle_interactions(inter: Interaction, upvote_button_id: &String) -> PollAct
             interaction: inter,
         },
     }
-}
-
-fn get_author_info(
-    guild_id: Id<GuildMarker>,
-    ctx: &GuildCtx<impl RespondViaMessage>,
-) -> (&str, String) {
-    let author_name = ctx
-        .member()
-        .nick
-        .as_deref()
-        .or_else(|| ctx.author().global_name.as_deref())
-        .unwrap_or_else(|| &ctx.author().name);
-
-    let author_icon = ctx
-        .member()
-        .avatar_url(guild_id)
-        .or_else(|| ctx.author().avatar_url())
-        .unwrap_or_else(|| ctx.author().default_avatar_url());
-
-    (author_name, author_icon)
 }
 
 fn generate_embed(
@@ -266,7 +237,7 @@ fn generate_embed(
 
 fn generate_upvote_button_id_and_row() -> (String, Component) {
     let (upvote_button_id, downvote_button_id): (String, _) = {
-        let mut button_id_iter = rand::thread_rng()
+        let mut button_id_iter = rand::rng()
             .sample_iter(&Alphanumeric)
             .take(200)
             .map(char::from);
@@ -456,14 +427,13 @@ pub async fn start(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     in_voice: &PartialInVoice,
 ) -> Result<Resolution, StartPollError> {
-    let guild_id = ctx.guild_id();
-
-    let (author_name, author_icon) = get_author_info(guild_id, ctx);
+    let author_name = ctx.guild_display_name();
+    let author_icon = ctx.guild_display_avatar_url();
     let embed_latent = generate_latent_embed_colours();
     let (upvote_button_id, row) = generate_upvote_button_id_and_row();
 
     let users_in_voice = get_users_in_voice(ctx, in_voice)?;
-    let votes = HashMap::from([(ctx.author_id(), Vote(true))]);
+    let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
     #[allow(clippy::cast_precision_loss)]
     let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;

@@ -29,6 +29,28 @@ pub mod play {
     }
 }
 
+pub mod repeat {
+    #[derive(thiserror::Error, Debug)]
+    #[error(transparent)]
+    pub enum Error {
+        UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
+        Respond(#[from] crate::error::command::RespondError),
+        UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
+    }
+}
+
+pub mod shuffle {
+    #[derive(thiserror::Error, Debug)]
+    #[error(transparent)]
+    pub enum Error {
+        Respond(#[from] crate::error::command::RespondError),
+        UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
+    }
+}
+
+pub use repeat::Error as RepeatError;
+pub use shuffle::Error as ShuffleError;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -40,5 +62,5 @@ pub enum RemoveTracksError {
     #[error(transparent)]
     Followup(#[from] crate::error::command::FollowupError),
     #[error(transparent)]
-    DeserializeBodyFromHttp(#[from] crate::error::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
 }

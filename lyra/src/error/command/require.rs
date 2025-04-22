@@ -13,3 +13,12 @@ pub enum InVoiceWithSomeoneElseError {
     Cache(#[from] crate::error::Cache),
     InVoiceWithoutSomeoneElse(#[from] crate::error::InVoiceWithoutSomeoneElse),
 }
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum SeekToWithError {
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
+}
+
+pub type SetPauseWithError = SeekToWithError;

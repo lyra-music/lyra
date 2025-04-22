@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, sync::Arc};
+use std::sync::Arc;
 
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
@@ -13,39 +13,40 @@ use twilight_model::{
 
 use super::model::Process;
 use crate::{
+    CommandError, LavalinkAware,
     command::{
+        AutocompleteCtx, MessageCtx, SlashCtx,
         macros::{
             bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
             note, out_upd, sus, sus_fol,
         },
-        model::NonPingInteraction,
+        model::{ComponentCtx, NonPingInteraction},
         require,
         util::MessageLinkAware,
-        AutocompleteCtx, MessageCtx, SlashCtx,
     },
     component::{connection::Join, queue::Play},
     core::{
+        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
         model::{
             BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
             UnitRespondResult,
         },
-        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
+        r#static::component::NowPlayingButtonType,
     },
     error::{
+        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
+        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
+        Suppressed as SuppressedError,
         command::{
+            Fe,
             check::{
                 AlternateVoteResponse, AnotherPollOngoingError, PollLossError, PollLossErrorKind,
             },
             declare::{CommandExecuteError, Fuunacee},
             util::AutoJoinSuppressedError,
-            Error as CommandError, Fe,
         },
         gateway::{ProcessError, ProcessResult},
-        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
-        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
-        Suppressed as SuppressedError,
     },
-    LavalinkAware,
 };
 
 pub(super) struct Context {
@@ -74,16 +75,10 @@ impl BotState {
 impl Process for Context {
     async fn process(self) -> ProcessResult {
         match self.inner.kind {
-            // SAFETY: `self.inner.kind` is `ApplicationCommand`, so this is safe
-            InteractionType::ApplicationCommand => unsafe { self.process_as_app_command() }.await,
-            InteractionType::ApplicationCommandAutocomplete => {
-                // SAFETY: `self.inner.kind` is `ApplicationCommandAutocomplete`, so this is safe
-                unsafe { self.process_as_autocomplete() }.await
-            }
-            // SAFETY: `self.inner.kind` is `MessageComponent`, so this is safe
-            InteractionType::MessageComponent => unsafe { self.process_as_component() }.await,
-            // SAFETY: `self.inner.kind` is `ModalSubmit`, so this is safe
-            InteractionType::ModalSubmit => unsafe { self.process_as_modal() }.await,
+            InteractionType::ApplicationCommand => self.process_as_app_command().await,
+            InteractionType::ApplicationCommandAutocomplete => self.process_as_autocomplete().await,
+            InteractionType::MessageComponent => self.process_as_component().await,
+            InteractionType::ModalSubmit => self.process_as_modal().await,
             InteractionType::Ping => Ok(()), // ignored
             _ => unimplemented!(),
         }
@@ -91,20 +86,17 @@ impl Process for Context {
 }
 
 impl Context {
-    async unsafe fn process_as_app_command(mut self) -> ProcessResult {
+    async fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
         let i = bot.interaction().await?.interfaces(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ApplicationCommand`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
-            unsafe { std::hint::unreachable_unchecked() }
+            unreachable!()
         };
 
         let name = data.name.clone().into();
         let inner_guild_id = self.inner.guild_id;
-        // SAFETY: interaction type is not `Ping`, so `channel` is present
-        let channel_id = unsafe { self.inner.channel_id_unchecked() };
+        let channel_id = self.inner.channel_id_expected();
         let (tx, mut rx) = oneshot::channel::<()>();
 
         let result = match data.kind {
@@ -157,31 +149,30 @@ impl Context {
             }
             Fuunacee::Command => {
                 let CommandExecuteError::Command(error) = source else {
-                    // SAFETY: `source.flatten_until_user_not_allowed_as()` is `Fuunacee::Command(_)`,
-                    //         so the unflattened source error must be `CommandExecuteError::Command(_)`
-                    unsafe { unreachable_unchecked() }
+                    unreachable!()
                 };
                 match_error(error, name, acknowledged, i).await
             }
             _ => {
-                crit!(format!(
-                    "Something unexpectedly went wrong: ```rs\n{source:#?}``` Please report this to the bot developers."
-                ), ?i);
+                crit!(
+                    format!(
+                        "Something unexpectedly went wrong: ```rs\n{source:#?}``` Please report this to the bot developers."
+                    ),
+                    ?i
+                );
                 Err(ProcessError::CommandExecute { name, source })
             }
         }
     }
 
-    async unsafe fn process_as_autocomplete(mut self) -> ProcessResult {
+    async fn process_as_autocomplete(mut self) -> ProcessResult {
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ApplicationCommandAutocomplete`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ApplicationCommand(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
 
         let name = data.name.clone().into();
         let (tx, _) = oneshot::channel::<()>();
-        let Err(source) = <AutocompleteCtx>::from_partial_data(
+        let Err(source) = AutocompleteCtx::from_partial_data(
             self.inner,
             &data,
             self.bot,
@@ -198,25 +189,79 @@ impl Context {
         Err(ProcessError::AutocompleteExecute { name, source })
     }
 
-    #[allow(clippy::unused_async)]
-    async unsafe fn process_as_component(mut self) -> ProcessResult {
+    async fn process_as_component(mut self) -> ProcessResult {
         let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `MessageComponent`,
-            //         so `self.inner.data.take()` will always be `InteractionData::MessageComponent(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         tracing::trace!(?data);
-        // TODO: implement controller
+
+        let ctx = ComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender);
+        let Ok(mut ctx) = require::guild(ctx) else {
+            return Ok(());
+        };
+        let Ok(player) = require::player(&ctx) else {
+            return Ok(());
+        };
+
+        let player_data = player.data();
+        let player_data_r = player_data.read().await;
+        let now_playing_message_id = player_data_r.now_playing_message_id();
+        if now_playing_message_id.is_none_or(|id| id != ctx.message().id) {
+            return Ok(());
+        }
+        let Some(current_track_title) = player_data_r
+            .queue()
+            .current()
+            .map(|item| item.data().info.title.clone())
+        else {
+            return Ok(());
+        };
+        drop(player_data_r);
+
+        let Some(now_playing_button) = ctx.take_custom_id_into_now_playing_button_type() else {
+            return Ok(());
+        };
+        match now_playing_button {
+            NowPlayingButtonType::Shuffle => {
+                crate::component::queue::shuffle(player_data.clone(), &mut ctx, true).await?;
+            }
+            NowPlayingButtonType::Previous => {
+                crate::component::playback::back(
+                    Some(current_track_title),
+                    player,
+                    player_data.clone(),
+                    &mut ctx,
+                    true,
+                )
+                .await?;
+            }
+            NowPlayingButtonType::PlayPause => {
+                crate::component::playback::play_pause(player, player_data.clone(), &mut ctx, true)
+                    .await?;
+            }
+            NowPlayingButtonType::Next => {
+                crate::component::playback::skip(
+                    &current_track_title,
+                    player,
+                    player_data.clone(),
+                    &mut ctx,
+                    true,
+                )
+                .await?;
+            }
+            NowPlayingButtonType::Repeat => {
+                let mode = crate::component::queue::get_next_repeat_mode(&ctx).await;
+                crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true).await?;
+            }
+        }
 
         Ok(())
     }
 
     #[allow(clippy::unused_async)]
-    async unsafe fn process_as_modal(mut self) -> ProcessResult {
+    async fn process_as_modal(mut self) -> ProcessResult {
         let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
-            // SAFETY: interaction is of type `ModalSubmit`,
-            //         so `self.inner.data.take()` will always be `InteractionData::ModalSubmit(_)`
-            unsafe { unreachable_unchecked() }
+            unreachable!()
         };
         tracing::trace!(?data);
 
@@ -380,7 +425,10 @@ async fn match_autojoin_attempt_failed(
             );
         }
         AutoJoinAttemptFailedError::UserNotAllowed(_) => {
-            nope_or_fol!("Attempting to join your currently connected channel failed as you are not allowed to use the bot here.", ia);
+            nope_or_fol!(
+                "Attempting to join your currently connected channel failed as you are not allowed to use the bot here.",
+                ia
+            );
         }
         AutoJoinAttemptFailedError::Forbidden(e) => {
             cant_or_fol!(
@@ -392,7 +440,10 @@ async fn match_autojoin_attempt_failed(
             );
         }
         AutoJoinAttemptFailedError::UserNotStageManager(_) => {
-            nope_or_fol!("Attempting to join your currently connected stage failed as you are not a **Stage Manager**.", ia);
+            nope_or_fol!(
+                "Attempting to join your currently connected stage failed as you are not a **Stage Manager**.",
+                ia
+            );
         }
     }
 }
@@ -428,25 +479,42 @@ async fn match_another_poll_ongoing(
 
     match error.alternate_vote {
         Some(AlternateVoteResponse::Casted) => {
-            note!(format!("The ongoing poll at {message_link} may resolve this. Your vote has automatically been casted."), i);
+            note!(
+                format!(
+                    "The ongoing poll at {message_link} may resolve this. Your vote has automatically been casted."
+                ),
+                i
+            );
         }
         Some(AlternateVoteResponse::DjCasted) => {
-            hid!("Superseded the ongoing poll at {message_link} to win.", i);
+            hid!(
+                format!("Superseded the ongoing poll at {message_link} to win."),
+                i
+            );
         }
         Some(AlternateVoteResponse::CastDenied) => {
             nope!(
-                format!("The ongoing poll at {message_link} may resolve this, although you are not eligible to cast a vote there."),
+                format!(
+                    "The ongoing poll at {message_link} may resolve this, although you are not eligible to cast a vote there."
+                ),
                 i
             );
         }
         Some(AlternateVoteResponse::CastedAlready(casted)) => {
             caut!(
-                format!("The ongoing poll at {message_link} may resolve this, although you've already casted a vote: **{casted}**."),
+                format!(
+                    "The ongoing poll at {message_link} may resolve this, although you've already casted a vote: **{casted}**."
+                ),
                 i
             );
         }
         None => {
-            sus!(format!("Another poll is needed to resolve that. Please resolve the ongoing poll at {message_link} first."), i);
+            sus!(
+                format!(
+                    "Another poll is needed to resolve that. Please resolve the ongoing poll at {message_link} first."
+                ),
+                i
+            );
         }
     }
 }

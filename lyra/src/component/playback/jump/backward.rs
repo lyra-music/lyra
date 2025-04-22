@@ -17,7 +17,6 @@ pub struct Backward {
 }
 
 impl BotSlashCommand for Backward {
-    #[allow(clippy::significant_drop_tightening)]
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
@@ -26,8 +25,9 @@ impl BotSlashCommand for Backward {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        let current_track = require::current_track(queue)?;
-        check::current_track_is_users(&current_track, in_voice_with_user)?;
+        if let Ok(current_track) = require::current_track(queue) {
+            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        }
 
         #[allow(clippy::cast_possible_truncation)]
         let tracks = self.tracks.unsigned_abs() as usize;
@@ -53,6 +53,7 @@ impl BotSlashCommand for Backward {
         player.context.play_now(track).await?;
 
         *queue.index_mut() = index;
+        drop(data_w);
         out!(txt, ctx);
     }
 }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use twilight_gateway::{Event, Latency, MessageSender, ShardId};
 
-use super::{model::Process, LastCachedStates};
+use super::{LastCachedStates, model::Process};
 use crate::{core::model::BotState, error::gateway::ProcessResult};
 
 pub async fn process(

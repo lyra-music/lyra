@@ -8,30 +8,20 @@ use std::{
 };
 
 use twilight_model::{
-    channel::{message::MessageFlags, ChannelType},
+    channel::{ChannelType, message::MessageFlags},
     guild::Permissions,
-    id::{marker::ChannelMarker, Id},
+    id::{Id, marker::ChannelMarker},
 };
 
 use crate::{
+    LavalinkAware,
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
-        model::{
-            AuthorIdAware,
-            AuthorPermissionsAware,
-            BotState,
-            // CacheAware,
-            OwnedBotStateAware,
-        },
+        model::{BotState, DatabaseAware, OwnedBotStateAware, UserIdAware, UserPermissionsAware},
         traced,
     },
     error::{
-        // self,
-        command::check::{
-            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
-            UserOnlyInError,
-        },
         Cache,
         InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError,
@@ -40,6 +30,11 @@ use crate::{
         UserNotAllowed as UserNotAllowedError,
         UserNotDj as UserNotDjError,
         UserNotStageManager as UserNotStageManagerError,
+        // self,
+        command::check::{
+            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
+            UserOnlyInError,
+        },
     },
     gateway::GuildIdAware,
     lavalink::{
@@ -50,13 +45,12 @@ use crate::{
         // PlayerAware,
         QueueItem,
     },
-    LavalinkAware,
 };
 
 use super::{
     model::{GuildCtx, RespondViaMessage},
     poll::{self, Resolution as PollResolution, Topic as PollTopic},
-    require::{self, someone_else_in, CurrentTrack, InVoice, PartialInVoice},
+    require::{self, CurrentTrack, InVoice, PartialInVoice, someone_else_in},
 };
 
 pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissions::MUTE_MEMBERS);
@@ -69,19 +63,19 @@ pub const STAGE_MANAGER_PERMISSIONS: Permissions = Permissions::MANAGE_CHANNELS
 
 pub fn does_user_have_permissions(
     permissions: Permissions,
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> bool {
-    let author_permissions = ctx.author_permissions();
+    let author_permissions = ctx.user_permissions();
     author_permissions.contains(permissions)
         || author_permissions.contains(Permissions::ADMINISTRATOR)
 }
 
 #[inline]
-pub fn is_user_dj(ctx: &impl AuthorPermissionsAware) -> bool {
+pub fn is_user_dj(ctx: &impl UserPermissionsAware) -> bool {
     does_user_have_permissions(DJ_PERMISSIONS, ctx)
 }
 
-pub fn user_is_dj(ctx: &impl AuthorPermissionsAware) -> Result<(), UserNotDjError> {
+pub fn user_is_dj(ctx: &impl UserPermissionsAware) -> Result<(), UserNotDjError> {
     if !is_user_dj(ctx) {
         return Err(UserNotDjError);
     }
@@ -89,7 +83,7 @@ pub fn user_is_dj(ctx: &impl AuthorPermissionsAware) -> Result<(), UserNotDjErro
 }
 
 pub fn user_is_access_manager(
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> Result<(), UserNotAccessManagerError> {
     if !does_user_have_permissions(ACCESS_MANAGER_PERMISSIONS, ctx) {
         return Err(UserNotAccessManagerError);
@@ -98,7 +92,7 @@ pub fn user_is_access_manager(
 }
 
 pub fn user_is_stage_manager(
-    ctx: &impl AuthorPermissionsAware,
+    ctx: &impl UserPermissionsAware,
 ) -> Result<(), UserNotStageManagerError> {
     if !does_user_have_permissions(STAGE_MANAGER_PERMISSIONS, ctx) {
         return Err(UserNotStageManagerError);
@@ -117,14 +111,15 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
 
     let channel = ctx.channel();
     let mut access_calculator_builder = CalculatorBuilder::new(weak.guild_id(), ctx.db().clone())
-        .user(ctx.author_id())
+        .user(ctx.user_id())
         .roles(weak.member().roles.iter());
     match channel.kind {
         ChannelType::PublicThread
         | ChannelType::PrivateThread
         | ChannelType::AnnouncementThread => {
-            // SAFETY: `channel.kind` is of type threads, so `parent_id` is present
-            let parent_id = unsafe { channel.parent_id.unwrap_unchecked() };
+            let parent_id = channel
+                .parent_id
+                .expect("channel of thread types should have a parent");
             access_calculator_builder = access_calculator_builder
                 .thread(channel.id)
                 .text_channel(parent_id);
@@ -142,7 +137,7 @@ pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserA
                     access_calculator_builder.category_channel(category_channel_id);
             }
         }
-    };
+    }
 
     let user_allowed_to_use_commands = access_calculator_builder.build().await?.calculate();
     if !user_allowed_to_use_commands {
@@ -172,7 +167,7 @@ pub async fn user_allowed_to_use(
 
     if !allowed_to_use_channel {
         return Err(UserNotAllowedError.into());
-    };
+    }
     Ok(())
 }
 
@@ -210,7 +205,7 @@ pub struct PollStarterInfo {
 
 type InVoiceWithUserOnlyResult = Result<(), check::UserOnlyInError>;
 
-impl<'a> InVoiceWithUserResult<'a> {
+impl InVoiceWithUserResult<'_> {
     pub fn only(self) -> InVoiceWithUserOnlyResult {
         if matches!(self.kind, InVoiceWithUserResultKind::UserIsDj) {
             return Ok(());
@@ -223,7 +218,7 @@ impl<'a> InVoiceWithUserResult<'a> {
 pub trait ResolveWithPoll {
     type Error;
     fn or_else_try_resolve_with(self, topic: PollTopic)
-        -> Result<Option<PollStarter>, Self::Error>;
+    -> Result<Option<PollStarter>, Self::Error>;
 }
 
 impl ResolveWithPoll for InVoiceWithUserOnlyResult {
@@ -251,23 +246,18 @@ impl ResolveWithPoll for InVoiceWithUserOnlyResult {
     }
 }
 
-pub trait StartPoll {
+pub trait StartPoll: Sized {
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
-    ) -> Result<(), check::HandlePollError>
-    where
-        Self: Sized;
+    ) -> Result<(), check::HandlePollError>;
 }
 
 impl StartPoll for Option<PollStarter> {
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
-    ) -> Result<(), check::HandlePollError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), check::HandlePollError> {
         let Some(PollStarter(info)) = self else {
             return Ok(());
         };
@@ -765,7 +755,7 @@ async fn handle_poll(
                 }
                 .into());
             }
-            connection.dispatch(Event::AlternateVoteCast(ctx.author_id().into()));
+            connection.dispatch(Event::AlternateVoteCast(ctx.user_id().into()));
 
             let mut rx = connection.subscribe();
 

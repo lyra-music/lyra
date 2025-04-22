@@ -1,14 +1,17 @@
-use image::DynamicImage;
+use image::{DynamicImage, ImageResult};
 use kmeans_colors::Sort;
-use palette::{cast::from_component_slice, FromColor, IntoColor, Lab, Srgb, Srgba};
+use palette::{FromColor, IntoColor, Lab, Srgb, Srgba, cast::from_component_slice};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-pub trait DominantPalette {
-    fn dominant_palette(&self, palette_size: usize) -> Vec<Srgb<u8>>;
+pub type DominantColour = Srgb<u8>;
+pub type DominantPalette = Vec<DominantColour>;
+
+pub trait Get {
+    fn get_dominant_palette(&self, palette_size: usize) -> DominantPalette;
 }
 
-impl DominantPalette for DynamicImage {
-    fn dominant_palette(&self, palette_size: usize) -> Vec<Srgb<u8>> {
+impl Get for DynamicImage {
+    fn get_dominant_palette(&self, palette_size: usize) -> DominantPalette {
         const MAX_ITERATIONS: usize = usize::MAX;
         const RESIZE: u32 = 1 << 7;
         const RANDOM_SEED: u64 = 0;
@@ -26,23 +29,19 @@ impl DominantPalette for DynamicImage {
             .map(|x| x.into_format::<_, f32>().into_color())
             .collect::<Vec<Lab>>();
 
-        // SAFETY: `0..RUNS` is a non-empty iterator,
-        //         so unwrapping `.max_by(...)` is safe
-        let result = unsafe {
-            (0..RUNS)
-                .map(|i| {
-                    kmeans_colors::get_kmeans_hamerly(
-                        palette_size,
-                        MAX_ITERATIONS,
-                        COVERAGE,
-                        false,
-                        &lab,
-                        RANDOM_SEED + u64::from(i),
-                    )
-                })
-                .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
-                .unwrap_unchecked()
-        };
+        let result = (0..RUNS)
+            .map(|i| {
+                kmeans_colors::get_kmeans_hamerly(
+                    palette_size,
+                    MAX_ITERATIONS,
+                    COVERAGE,
+                    false,
+                    &lab,
+                    RANDOM_SEED + u64::from(i),
+                )
+            })
+            .max_by(|k1, k2| k1.score.total_cmp(&k2.score))
+            .expect("number of runs must be non-zero");
 
         let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
         res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));
@@ -54,11 +53,27 @@ impl DominantPalette for DynamicImage {
     }
 }
 
+/// # Errors
+/// When loading the images from bytes failed
+pub fn from_bytes(bytes: &[u8], palette_size: usize) -> ImageResult<DominantPalette> {
+    let image = image::load_from_memory(bytes)?;
+
+    Ok(image.get_dominant_palette(palette_size))
+}
+
+#[must_use]
+pub fn normalise(dominant_palette: DominantPalette) -> Vec<u32> {
+    dominant_palette
+        .into_iter()
+        .map(|c| c.into_u32::<palette::rgb::channels::Rgba>() >> 8)
+        .collect()
+}
+
 #[cfg(test)]
 mod test {
     use rstest::rstest;
 
-    use crate::image::dominant_palette::DominantPalette;
+    use crate::image::dominant_palette::Get;
 
     const TEST_RESOURCES_PATH: &str = "src/image/test";
 
@@ -71,17 +86,17 @@ mod test {
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_1.jpg"),
         2,
-        &[(93, 108, 132).into(), (131, 43, 145).into()]
+        &[(63, 51, 99).into(), (149, 168, 180).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         3,
-        &[(63, 60, 69).into(), (134, 94, 94).into(), (188, 157, 135).into()]
+        &[(126, 92, 92).into(), (57, 57, 67).into(), (188, 155, 133).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         4,
-        &[(98, 75, 83).into(), (149, 107, 101).into(), (192, 162, 138).into(), (47, 53, 62).into()]
+        &[(55, 54, 65).into(), (114, 92, 93).into(), (189, 158, 136).into(), (155, 91, 90).into()]
     )]
     fn dominant_palette(
         #[case] input_path: &str,
@@ -89,6 +104,6 @@ mod test {
         #[case] expected: &[palette::rgb::Srgb<u8>],
     ) {
         let image = image::open(input_path).unwrap_or_else(|e| panic!("{e:#?}"));
-        assert_eq!(image.dominant_palette(input_palette_size), expected);
+        assert_eq!(image.get_dominant_palette(input_palette_size), expected);
     }
 }

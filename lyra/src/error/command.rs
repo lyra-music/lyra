@@ -8,13 +8,13 @@ pub mod util;
 #[error("creating a response failed: {}", .0)]
 pub enum RespondError {
     TwilightHttp(#[from] twilight_http::Error),
-    DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
 }
 
 #[derive(thiserror::Error, Debug)]
 #[error("creating a followup failed: {}", .0)]
 pub enum FollowupError {
-    DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     Followup(#[from] super::core::FollowupError),
 }
 
@@ -47,7 +47,7 @@ pub enum Error {
     Join(#[from] super::component::connection::join::ResidualError),
     Leave(#[from] super::component::connection::leave::ResidualError),
     Play(#[from] super::component::queue::play::Error),
-    DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     RemoveTracks(#[from] super::component::queue::RemoveTracksError),
     TwilightHttp(#[from] twilight_http::Error),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
@@ -59,6 +59,11 @@ pub enum Error {
     NotPlaying(#[from] super::NotPlaying),
     Paused(#[from] super::Paused),
     UnrecognisedConnection(#[from] super::UnrecognisedConnection),
+    PlayPause(#[from] super::component::playback::PlayPauseError),
+    Repeat(#[from] super::component::queue::RepeatError),
+    Shuffle(#[from] super::component::queue::ShuffleError),
+    UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
+    SeekToWith(#[from] require::SeekToWithError),
 }
 
 pub enum FlattenedError<'a> {
@@ -98,6 +103,7 @@ pub enum FlattenedError<'a> {
     NoPlayer,
     NotInGuild,
     UnrecognisedConnection,
+    TimestampParse,
 }
 
 pub use FlattenedError as Fe;
@@ -118,11 +124,11 @@ impl<'a> Fe<'a> {
     }
 
     const fn from_deserialize_body_from_http_error(
-        error: &'a super::core::DeserializeBodyFromHttpError,
+        error: &'a super::core::DeserialiseBodyFromHttpError,
     ) -> Self {
         match error {
-            super::core::DeserializeBodyFromHttpError::TwilightHttp(_) => Self::TwilightHttp,
-            super::core::DeserializeBodyFromHttpError::DeserializeBody(_) => Self::DeserializeBody,
+            super::core::DeserialiseBodyFromHttpError::TwilightHttp(_) => Self::TwilightHttp,
+            super::core::DeserialiseBodyFromHttpError::DeserializeBody(_) => Self::DeserializeBody,
         }
     }
 
@@ -190,7 +196,7 @@ impl<'a> Fe<'a> {
         match error {
             poll::WaitForVotesError::TwilightHttp(_) => Self::TwilightHttp,
             poll::WaitForVotesError::EventRecv(_) => Self::EventRecv,
-            poll::WaitForVotesError::DeserializeBodyFromHttp(e) => {
+            poll::WaitForVotesError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
             poll::WaitForVotesError::UpdateEmbed(e) => Self::from_update_embed(e),
@@ -215,7 +221,7 @@ impl<'a> Fe<'a> {
             check::HandlePollError::PollLoss(e) => Self::PollLoss(e),
             check::HandlePollError::PollVoided(e) => Self::PollVoided(e),
             check::HandlePollError::StartPoll(e) => Self::from_start_poll(e),
-            check::HandlePollError::DeserializeBodyFromHttp(e) => {
+            check::HandlePollError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
         }
@@ -235,7 +241,7 @@ impl<'a> Fe<'a> {
     const fn from_respond(error: &'a RespondError) -> Self {
         match error {
             RespondError::TwilightHttp(_) => Self::TwilightHttp,
-            RespondError::DeserializeBodyFromHttp(e) => {
+            RespondError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
         }
@@ -243,7 +249,7 @@ impl<'a> Fe<'a> {
 
     const fn from_followup(error: &'a FollowupError) -> Self {
         match error {
-            FollowupError::DeserializeBodyFromHttp(e) => {
+            FollowupError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
             FollowupError::Followup(e) => Self::from_core_followup_error(e),
@@ -379,13 +385,13 @@ impl<'a> Fe<'a> {
     }
 
     const fn from_pre_disconnect_cleanup(
-        error: &'a super::component::connection::leave::PreDisconnectCleanupError,
+        error: &'a super::component::connection::leave::DisconnectCleanupError,
     ) -> Self {
         match error {
-            super::component::connection::leave::PreDisconnectCleanupError::EventSend(_) => {
+            super::component::connection::leave::DisconnectCleanupError::EventSend(_) => {
                 Self::EventSend
             }
-            super::component::connection::leave::PreDisconnectCleanupError::Lavalink(_) => {
+            super::component::connection::leave::DisconnectCleanupError::Lavalink(_) => {
                 Self::Lavalink
             }
         }
@@ -405,7 +411,7 @@ impl<'a> Fe<'a> {
             super::component::connection::leave::ResidualError::CheckUserOnlyIn(e) => {
                 Self::from_check_user_only_in(e)
             }
-            super::component::connection::leave::ResidualError::PreDisconnectCleanupError(e) => {
+            super::component::connection::leave::ResidualError::DisconnectCleanupError(e) => {
                 Self::from_pre_disconnect_cleanup(e)
             }
         }
@@ -518,14 +524,83 @@ impl<'a> Fe<'a> {
             super::component::queue::RemoveTracksError::Lavalink(_) => Self::Lavalink,
             super::component::queue::RemoveTracksError::Respond(e) => Self::from_respond(e),
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
-            super::component::queue::RemoveTracksError::DeserializeBodyFromHttp(e) => {
+            super::component::queue::RemoveTracksError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
             }
         }
     }
+
+    const fn from_play_pause(error: &'a super::component::playback::PlayPauseError) -> Self {
+        match error {
+            super::component::playback::PlayPauseError::Lavalink(_) => Self::Lavalink,
+            super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
+            super::component::playback::PlayPauseError::SetPauseWith(e) => {
+                Self::from_set_pause_with(e)
+            }
+        }
+    }
+
+    const fn from_repeat(error: &'a super::component::queue::RepeatError) -> Self {
+        match error {
+            super::component::queue::RepeatError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            }
+            super::component::queue::RepeatError::Respond(e) => Self::from_respond(e),
+            super::component::queue::RepeatError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+        }
+    }
+
+    const fn from_shuffle(error: &'a super::component::queue::ShuffleError) -> Self {
+        match error {
+            super::component::queue::ShuffleError::Respond(e) => Self::from_respond(e),
+            super::component::queue::ShuffleError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+        }
+    }
+
+    const fn from_update_now_playing_message(
+        error: &'a super::lavalink::UpdateNowPlayingMessageError,
+    ) -> Self {
+        match error {
+            super::lavalink::UpdateNowPlayingMessageError::TwilightHttp(_) => Self::TwilightHttp,
+            super::lavalink::UpdateNowPlayingMessageError::BuildNowPlayingEmbed(e) => {
+                Self::from_build_now_playing_embed(e)
+            }
+            super::lavalink::UpdateNowPlayingMessageError::DeserialiseBodyFromHttp(e) => {
+                Self::from_deserialize_body_from_http_error(e)
+            }
+        }
+    }
+
+    const fn from_build_now_playing_embed(
+        error: &'a super::lavalink::BuildNowPlayingEmbedError,
+    ) -> Self {
+        match error {
+            super::lavalink::BuildNowPlayingEmbedError::ImageSourceUrl(_) => Self::ImageSourceUrl,
+            super::lavalink::BuildNowPlayingEmbedError::TimestampParse(_) => Self::TimestampParse,
+        }
+    }
+
+    const fn from_seek_to_with(error: &'a require::SeekToWithError) -> Self {
+        match error {
+            require::SeekToWithError::Lavalink(_) => Self::Lavalink,
+            require::SeekToWithError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+        }
+    }
+
+    #[inline]
+    const fn from_set_pause_with(error: &'a require::SetPauseWithError) -> Self {
+        Self::from_seek_to_with(error)
+    }
 }
 
 impl Error {
+    #[must_use]
     pub const fn flatten_as(&self) -> Fe<'_> {
         match self {
             Self::UserNotAccessManager(_) => Fe::UserNotAccessManager,
@@ -557,10 +632,15 @@ impl Error {
             Self::Join(e) => Fe::from_join_residual(e),
             Self::Leave(e) => Fe::from_leave_residual(e),
             Self::Play(e) => Fe::from_play(e),
-            Self::DeserializeBodyFromHttp(e) => Fe::from_deserialize_body_from_http_error(e),
+            Self::DeserialiseBodyFromHttp(e) => Fe::from_deserialize_body_from_http_error(e),
             Self::RemoveTracks(e) => Fe::from_remove_tracks(e),
             Self::CheckUserOnlyIn(e) => Fe::from_check_user_only_in(e),
             Self::HandlePoll(e) => Fe::from_handle_poll(e),
+            Self::PlayPause(e) => Fe::from_play_pause(e),
+            Self::Repeat(e) => Fe::from_repeat(e),
+            Self::Shuffle(e) => Fe::from_shuffle(e),
+            Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
+            Self::SeekToWith(e) => Fe::from_seek_to_with(e),
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc};
 
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
@@ -14,7 +14,7 @@ use crate::{
     core::model::OwnedBotState,
 };
 
-use super::{autocomplete::Marker, AppCtxKind, AppCtxMarker, Ctx, Kind, Location};
+use super::{AppCtxKind, AppCtxMarker, Ctx, Kind, Location, autocomplete::Marker};
 
 pub trait Aware: Kind {}
 impl<T: AppCtxKind> Aware for AppCtxMarker<T> {}
@@ -30,8 +30,8 @@ impl<T: Aware> Ctx<T> {
         acknowledgement: oneshot::Sender<()>,
     ) -> Self {
         Self {
-            data: Some(PartialInteractionData::Command(PartialCommandData::new(
-                data,
+            data: Some(PartialInteractionData::Command(Box::new(
+                PartialCommandData::new(data),
             ))),
             inner,
             bot,
@@ -46,25 +46,16 @@ impl<T: Aware> Ctx<T> {
 }
 
 impl<T: Aware, U: Location> Ctx<T, U> {
-    pub fn command_data(&self) -> &PartialCommandData {
-        // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-        //         so `self.data` is present
-        let data = unsafe { self.data.as_ref().unwrap_unchecked() };
-        let PartialInteractionData::Command(data) = data else {
-            // SAFETY:
-            unsafe { unreachable_unchecked() }
+    pub const fn command_data(&self) -> &PartialCommandData {
+        let Some(PartialInteractionData::Command(data)) = self.data.as_ref() else {
+            unreachable!()
         };
         data
     }
 
-    pub fn into_command_data(self) -> PartialCommandData {
-        // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-        //         so `self.data` is present
-        let data = unsafe { self.data.unwrap_unchecked() };
-        let PartialInteractionData::Command(command_data) = data else {
-            // SAFETY: `self` is `Ctx<impl CommandDataAware, _>`,
-            //         so `data` will always be `PartialInteractionData::Command(_)`
-            unsafe { unreachable_unchecked() }
+    pub fn into_command_data(self) -> Box<PartialCommandData> {
+        let Some(PartialInteractionData::Command(command_data)) = self.data else {
+            unreachable!()
         };
         command_data
     }
@@ -75,12 +66,14 @@ impl<T: Aware, U: Location> Ctx<T, U> {
             command_data_options: &[CommandDataOption],
         ) -> Vec<Arc<str>> {
             match command_data_options {
-                [CommandDataOption {
-                    name,
-                    value:
-                        CommandOptionValue::SubCommand(command_data_options)
-                        | CommandOptionValue::SubCommandGroup(command_data_options),
-                }] => {
+                [
+                    CommandDataOption {
+                        name,
+                        value:
+                            CommandOptionValue::SubCommand(command_data_options)
+                            | CommandOptionValue::SubCommandGroup(command_data_options),
+                    },
+                ] => {
                     names.push(name.clone().into());
                     recurse_through_names(names, command_data_options)
                 }

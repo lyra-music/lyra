@@ -13,7 +13,7 @@ where
     code: bool,
 }
 
-impl<'a, T> Display for PrettyFlagsDisplayer<'a, T>
+impl<T> Display for PrettyFlagsDisplayer<'_, T>
 where
     T: Flags,
 {
@@ -50,6 +50,8 @@ pub trait FlagsDisplay: Flags {
     }
 }
 
+impl<T: Flags> FlagsDisplay for T {}
+
 #[cfg(test)]
 mod test {
     use bitflags::bitflags;
@@ -70,8 +72,6 @@ mod test {
             const ALL = Self::ONE.bits() | Self::ANOTHER_ONE.bits() | Self::EVEN_ANOTHER_ONE.bits();
         }
     }
-
-    impl FlagsDisplay for TestFlag {}
 
     #[rstest]
     #[case(TestFlag::empty(), "")]
@@ -102,8 +102,6 @@ mod test {
             const ALL = Self::TWO.bits() | Self::OTHER_TWO.bits() | Self::OTHER_TWO_ELSE.bits();
         }
     }
-
-    impl FlagsDisplay for TestFlag2 {}
 
     #[rstest]
     #[case(TestFlag2::empty(), "")]

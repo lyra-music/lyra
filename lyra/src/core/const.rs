@@ -60,11 +60,12 @@ pub mod metadata {
         let rdr = include_str!("../../../assets/lyra2-ascii.ans");
         let mut wtr = Vec::new();
 
-        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS is valid");
+        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS must be valid");
         ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
-            .expect("searching is infallible");
-        // SAFETY: since `rdr` is utf-8, `wtr` must also be utf-8
-        unsafe { String::from_utf8_unchecked(wtr).leak() }
+            .expect("searching must be infallible");
+        String::from_utf8(wtr)
+            .expect("interpolated banner must be utf-8")
+            .leak()
     });
 }
 
@@ -74,6 +75,7 @@ pub mod connection {
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
     pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
+    pub const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64);
     pub const CHANGED_TIMEOUT: Duration = Duration::from_millis(250);
     pub const GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
     pub const INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
@@ -84,8 +86,8 @@ pub mod misc {
     use std::time::Duration;
 
     pub const ADD_TRACKS_WRAP_LIMIT: usize = 3;
-    pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT_SECS: u8 = 30;
 
+    pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT: Duration = Duration::from_secs(30);
     pub const WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
     pub const DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
     pub const QUEUE_ADVANCE_LOCKED_TIMEOUT: Duration = Duration::from_millis(250);

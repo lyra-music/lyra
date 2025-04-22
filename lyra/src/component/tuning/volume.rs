@@ -13,8 +13,7 @@ pub(super) const fn volume_emoji(percent: Option<NonZeroU16>) -> &'static str {
         return "🔇";
     };
     match percent.get() {
-        // SAFETY: `percent` is `NonZeroU16`, so this branch is unreachable
-        0 => unsafe { std::hint::unreachable_unchecked() },
+        0 => unreachable!(),
         1..=33 => "🔈",
         34..=66 => "🔉",
         67..=100 => "🔊",

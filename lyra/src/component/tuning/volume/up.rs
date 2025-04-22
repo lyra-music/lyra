@@ -3,16 +3,17 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
+    LavalinkAware,
     command::{
+        SlashCtx,
         macros::{note, out},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
     component::tuning::check_user_is_dj_and_require_player,
     core::model::{BotStateAware, HttpAware},
     error::CommandResult,
     gateway::GuildIdAware,
-    LavalinkAware,
 };
 
 /// Increase the playback volume
@@ -26,8 +27,7 @@ pub struct Up {
 
 impl BotSlashCommand for Up {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
-        // SAFETY: `1_000` is non-zero
-        const MAX_PERCENT: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1_000) };
+        const MAX_PERCENT: NonZeroU16 = NonZeroU16::new(1_000).expect("`1_000 is non-zero");
 
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_player(&ctx)?;
@@ -47,8 +47,7 @@ impl BotSlashCommand for Up {
 
             (
                 String::from("Muted"),
-                // SAFETY: `percent_u16` is in range [1, 1_000], so it is non-zero
-                unsafe { NonZeroU16::new_unchecked(percent_u16) },
+                NonZeroU16::new(percent_u16).expect("percent should be non-zero"),
             )
         } else {
             let old_percent = data.read().await.volume();

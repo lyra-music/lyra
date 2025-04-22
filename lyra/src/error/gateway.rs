@@ -5,7 +5,7 @@ pub enum ProcessError {
     #[error(transparent)]
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
     #[error(transparent)]
-    DeserializeBodyFromHttp(#[from] super::core::DeserializeBodyFromHttpError),
+    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     #[error(transparent)]
     Http(#[from] twilight_http::Error),
     #[error(transparent)]
@@ -24,6 +24,14 @@ pub enum ProcessError {
     PlaybackHandleVoiceStateUpdate(#[from] super::component::playback::HandleVoiceStateUpdateError),
     #[error(transparent)]
     Respond(#[from] super::command::RespondError),
+    #[error(transparent)]
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    #[error(transparent)]
+    PlayPause(#[from] super::component::playback::PlayPauseError),
+    #[error(transparent)]
+    Repeat(#[from] super::component::queue::RepeatError),
+    #[error(transparent)]
+    Shuffle(#[from] super::component::queue::ShuffleError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]
     CommandExecute {
         name: Box<str>,

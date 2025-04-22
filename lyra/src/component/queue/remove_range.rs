@@ -8,16 +8,16 @@ use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateComm
 use twilight_model::application::command::CommandOptionChoice;
 
 use crate::{
+    LavalinkAndGuildIdAware,
     command::{
-        check,
+        AutocompleteCtx, SlashCtx, check,
         macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
-        require, AutocompleteCtx, SlashCtx,
+        require,
     },
     component::queue::Remove,
     core::model::{CacheAware, InteractionClient},
-    error::{command::AutocompleteResult, CommandResult},
-    LavalinkAndGuildIdAware,
+    error::{CommandResult, command::AutocompleteResult},
 };
 
 enum RemoveRangeAutocompleteOptionsType {
@@ -32,7 +32,6 @@ struct RemoveRangeAutocompleteOptions {
     kind: RemoveRangeAutocompleteOptionsType,
 }
 
-#[allow(clippy::significant_drop_tightening)]
 async fn generate_remove_range_autocomplete_choices(
     options: &RemoveRangeAutocompleteOptions,
     cx: &(impl CacheAware + LavalinkAndGuildIdAware + Sync),
@@ -69,7 +68,7 @@ async fn generate_remove_range_autocomplete_choices(
         }
     };
 
-    match options.focused.parse::<i64>() {
+    let choices = match options.focused.parse::<i64>() {
         Ok(input) => {
             super::generate_position_choices_from_input(input, queue_len, queue_iter, &excluded, cx)
         }
@@ -97,7 +96,9 @@ async fn generate_remove_range_autocomplete_choices(
             &excluded,
             cx,
         ),
-    }
+    };
+    drop(data_r);
+    choices
 }
 
 #[derive(CommandModel)]
@@ -125,9 +126,7 @@ impl BotAutocomplete for Autocomplete {
                 focused,
                 RemoveRangeAutocompleteOptionsType::EndFocusedStartCompleted(i),
             ),
-            // SAFETY: only one autocomplete options can be focused at a time,
-            //         so this branch is unreachable
-            _ => unsafe { std::hint::unreachable_unchecked() },
+            _ => panic!("not exactly one autocomplete option focused"),
         };
 
         let options = RemoveRangeAutocompleteOptions {

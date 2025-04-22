@@ -7,7 +7,7 @@ use twilight_model::{
 
 use super::model::Process;
 use crate::{
-    core::model::{BotState, BotStateRef},
+    core::model::{BotState, BotStateRef, DatabaseAware},
     error::gateway::ProcessResult,
 };
 
@@ -19,16 +19,6 @@ pub(super) struct CreateContext<'a> {
 
 impl CreateContext<'_> {
     async fn increment_guild_count(&self) -> Result<(), sqlx::Error> {
-        /* FIXME: wait until twilight stop deserializing missing `Guild::unavailable` to false:
-           https://github.com/twilight-rs/twilight/issues/2372
-        */
-        if let GuildCreate::Available(Guild {
-            unavailable: false, ..
-        }) = self.inner
-        {
-            return Ok(());
-        }
-
         sqlx::query!(
             "INSERT INTO guild_configs
                 (id)
@@ -49,14 +39,29 @@ impl CreateContext<'_> {
 
 impl Process for CreateContext<'_> {
     async fn process(self) -> ProcessResult {
-        self.increment_guild_count().await?;
+        // these are all theoretical GuildCreate objects based on their availability:
+        // * GuildCreate::Available(Guild { unavailable: None, .. })                current user joined a guild
+        // * GuildCreate::Available(Guild { unavailable: Some(false), .. })         a guild became available
+        // * GuildCreate::Available(Guild { unavailable: Some(true), .. })          (can't-happen: deserialised as #5)
+        // * GuildCreate::Unavailable(UnavailableGuild { unavailable: false, .. })  (can't-happen: deserialised as #2)
+        // * GuildCreate::Unavailable(UnavailableGuild { unavailable: true, .. })   current user joined an unavailable guild
+        //
+        // only variants #1 and #5 are of interest, so just early returning upon #2 is sufficient
+        if let GuildCreate::Available(Guild {
+            unavailable: Some(false),
+            ..
+        }) = self.inner
+        {
+            return Ok(());
+        }
 
+        self.increment_guild_count().await?;
         Ok(())
     }
 }
 
 pub(super) struct DeleteContext<'a> {
-    _inner: &'a GuildDelete,
+    inner: &'a GuildDelete,
     shard_id: ShardId,
     bot: BotStateRef<'a>,
 }
@@ -66,7 +71,7 @@ impl BotState {
         &'a self,
         inner: &'a GuildCreate,
         shard_id: ShardId,
-    ) -> CreateContext {
+    ) -> CreateContext<'a> {
         CreateContext {
             inner,
             shard_id,
@@ -78,9 +83,9 @@ impl BotState {
         &'a self,
         inner: &'a GuildDelete,
         shard_id: ShardId,
-    ) -> DeleteContext {
+    ) -> DeleteContext<'a> {
         DeleteContext {
-            _inner: inner,
+            inner,
             shard_id,
             bot: self,
         }
@@ -95,8 +100,17 @@ impl DeleteContext<'_> {
 
 impl Process for DeleteContext<'_> {
     async fn process(self) -> ProcessResult {
-        self.decrement_guild_count();
+        // these are all theoretical GuildDelete objects based on their availability:
+        // * GuildDelete { unavailable: None, .. }          current user left a guild
+        // * GuildDelete { unavailable: Some(false), .. }   (undocumented: possibly akin to #1)
+        // * GuildDelete { unavailable: Some(true), .. }    a guild became unavailable
+        //
+        // only variants #1 and possibly #2 are of interest, so just early returning upon #3 is sufficient
+        if self.inner.unavailable == Some(true) {
+            return Ok(());
+        }
 
+        self.decrement_guild_count();
         Ok(())
     }
 }

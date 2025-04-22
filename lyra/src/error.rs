@@ -10,8 +10,8 @@ pub use command::Result as CommandResult;
 use thiserror::Error;
 use twilight_mention::Mention;
 use twilight_model::id::{
-    marker::{ChannelMarker, UserMarker},
     Id,
+    marker::{ChannelMarker, UserMarker},
 };
 
 use crate::command::require::PartialInVoice;
@@ -86,7 +86,7 @@ impl std::fmt::Display for PrettyInVoiceWithSomeoneElseDisplayer<'_> {
         write!(
             f,
             "There are someone else in {}; You need to be a ***DJ*** to do that.",
-            self.0 .0.channel_id().mention(),
+            self.0.0.channel_id().mention(),
         )
     }
 }
@@ -202,8 +202,13 @@ pub struct PrettifiedTimestampParse;
 pub enum Run {
     ColorEyre(#[from] color_eyre::Report),
     Dotenvy(#[from] dotenvy::Error),
-    StartError(#[from] runner::StartError),
+    Start(#[from] runner::StartError),
+    InstallDefaultCryptoProvider(#[from] InstallDefaultCryptoProvider),
 }
+
+#[derive(Error, Debug)]
+#[error("error installing default crypto provider: {:?}", .0)]
+pub struct InstallDefaultCryptoProvider(pub std::sync::Arc<rustls::crypto::CryptoProvider>);
 
 #[derive(Error, Debug)]
 #[error("not in a guild")]

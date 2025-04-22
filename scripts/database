@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-cd ./database && cargo sqlx database setup

@@ -1,5 +1,5 @@
 use twilight_model::{
-    application::interaction::{modal::ModalInteractionData, InteractionData},
+    application::interaction::{InteractionData, modal::ModalInteractionData},
     channel::message::Component,
 };
 
@@ -19,9 +19,7 @@ impl RespondVia for ComponentMarker {}
 impl<U: Location> Ctx<Marker, U> {
     pub fn submit_data(&self) -> &ModalInteractionData {
         let Some(InteractionData::ModalSubmit(ref data)) = self.inner.data else {
-            // SAFETY: `self` is `Ctx<ModalMarker, _>`,
-            //         so `self.inner.data` will always be `InteractionData::ModalSubmit(_)`
-            unsafe { std::hint::unreachable_unchecked() }
+            unreachable!()
         };
         data
     }

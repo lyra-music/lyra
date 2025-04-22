@@ -5,23 +5,24 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::Mention;
 use twilight_model::{
     gateway::payload::outgoing::UpdateVoiceState,
-    id::{marker::ChannelMarker, Id},
+    id::{Id, marker::ChannelMarker},
 };
 
 use crate::{
+    LavalinkAware,
     command::{
-        check,
+        SlashCtx, check,
         macros::{caut, out},
         model::{BotSlashCommand, CtxKind, GuildCtx},
-        require, SlashCtx,
+        require,
     },
+    core::model::HttpAware,
     error::{
-        component::connection::leave::{self, PreDisconnectCleanupError},
         CommandResult,
+        component::connection::leave::{self, DisconnectCleanupError},
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::Event,
-    LavalinkAware,
+    lavalink::{DelegateMethods, Event, UnwrappedData, delete_now_playing_message},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -39,15 +40,18 @@ pub(super) fn disconnect(cx: &(impl SenderAware + GuildIdAware)) -> Result<(), C
     Ok(())
 }
 
-pub(super) async fn pre_disconnect_cleanup(
-    cx: &(impl GuildIdAware + LavalinkAware + Sync),
-) -> Result<(), PreDisconnectCleanupError> {
+pub(super) async fn disconnect_cleanup(
+    cx: &(impl HttpAware + GuildIdAware + LavalinkAware + Sync),
+) -> Result<(), DisconnectCleanupError> {
     let guild_id = cx.guild_id();
     let lavalink = cx.lavalink();
 
     if let Some(connection) = lavalink.get_connection(guild_id) {
         connection.dispatch(Event::QueueClear);
-    };
+    }
+    if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
+        delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
+    }
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;
 
@@ -64,7 +68,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
 
     connection.notify_change();
     drop(connection);
-    pre_disconnect_cleanup(ctx).await?;
+    disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 
     let response = LeaveResponse(channel_id);

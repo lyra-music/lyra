@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use lyra_ext::num::u64_to_i64_truncating;
-use sqlx::{postgres::PgQueryResult, Pool, Postgres};
+use sqlx::{Pool, Postgres, postgres::PgQueryResult};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{
     CommandModel, CommandOption, CreateCommand, CreateOption, ResolvedMentionable,
@@ -11,20 +11,20 @@ use twilight_model::{
     application::interaction::InteractionChannel,
     channel::ChannelType,
     id::{
-        marker::{ChannelMarker, GenericMarker},
         Id,
+        marker::{ChannelMarker, GenericMarker},
     },
 };
 
 use super::AccessCategoryFlag;
 use crate::{
     command::{
-        check,
+        SlashCtx, check,
         macros::{out, sus},
         model::BotSlashCommand,
-        require, SlashCtx,
+        require,
     },
-    core::r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+    core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
     error::CommandResult,
     gateway::GuildIdAware,
 };
