@@ -9,7 +9,6 @@ env:
 
 jobs:
   push-to-ghcr:
-    if: github.actor == github.repository_owner
     name: Push to Github Container Registry
     runs-on: ubuntu-latest
     permissions:
