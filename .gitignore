@@ -4,6 +4,7 @@ target
 
 lavalink/plugins
 lavalink/Lavalink.jar
+lavalink/version.txt
 
 # Devenv
 .devenv

@@ -69,21 +69,15 @@ docker compose down
 From the project root, run:
 
 ```bash
-nix develop --impure
+nix develop --impure -c devenv up
 ```
 
-This will download all the dependencies and set up the environment.
+This will download all the dependencies and set up the environment, as well as starting the services required for the bot to function.
 
-Then, to start the services required for the bot to function, run:
-
-```bash
-devenv up
-```
-
-Finally, in a separate process, run the bot:
+Then, run the bot:
 
 ```bash
-cargo run --release
+nix develop --impure -c cargo run --release
 ```
 
 ### Manual (Not recommended)
