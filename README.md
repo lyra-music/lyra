@@ -80,7 +80,7 @@ Then, to start the services required for the bot to function, run:
 devenv up
 ```
 
-Finally, in a seperate process, run the bot:
+Finally, in a separate process, run the bot:
 
 ```bash
 cargo run --release
