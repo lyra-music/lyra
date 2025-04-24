@@ -23,10 +23,6 @@ Then, edit the `.env` file to set your environment variables. The file contains 
 
 ### Docker
 
-> [!WARNING]
-> The project doesn't publish Docker images yet, so you need to build the image yourself.
-> The default compose configuration takes care of this for you, however.
-
 The easiest way to set up Λύρα is to use Docker. Start by creating a copy of the example docker compose file:
 
 ```bash

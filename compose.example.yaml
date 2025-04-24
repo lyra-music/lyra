@@ -47,10 +47,7 @@ services:
       retries: 5
 
   lyra:
-    build:
-      dockerfile: Dockerfile
-      args:
-        - DOCKER_BUILD_TYPE=${DOCKER_BUILD_TYPE:-release}
+    image: ghcr.io/lyra-music/lyra:latest
     environment:
       SQLX_OFFLINE: true
       DATABASE_URL: ${DATABASE_URL}
