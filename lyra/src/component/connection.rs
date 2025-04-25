@@ -129,6 +129,7 @@ async fn start_inactivity_timeout(
         return Ok(());
     };
     connection.notify_change();
+    drop(connection);
     disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 
