@@ -30,18 +30,19 @@ pub async fn handle_voice_state_update(
 
     tracing::trace!("handling voice state update");
     let text_channel_id = {
-        let Some(connection) = ctx.get_connection() else {
-            tracing::trace!("no active connection");
-            return Ok(());
-        };
-
         if connection_changed {
             tracing::trace!("received connection change notification");
             return Ok(());
         }
+
+        let Ok(head) = ctx.get_conn().get_head().await else {
+            tracing::trace!("no active connection");
+            return Ok(());
+        };
+
         tracing::trace!("no connection change notification");
 
-        connection.text_channel_id
+        head.text_channel_id()
     };
 
     let Ok(player) = require::player(ctx) else {

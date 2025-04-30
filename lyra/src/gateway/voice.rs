@@ -10,7 +10,7 @@ use twilight_model::id::Id;
 use twilight_model::id::marker::GuildMarker;
 
 use crate::{
-    LavalinkAndGuildIdAware, LavalinkAware,
+    LavalinkAware,
     component::{connection, playback, tuning},
     core::model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
     error::gateway::{ProcessError, ProcessResult},

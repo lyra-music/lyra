@@ -739,15 +739,20 @@ async fn handle_poll(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     in_voice: &PartialInVoice,
 ) -> Result<(), check::HandlePollError> {
-    let connection = ctx.lavalink().connection_from(in_voice);
-    if let Some(poll) = connection.poll() {
+    let conn = ctx.lavalink().handle_for(in_voice.guild_id());
+
+    if let Some(poll) = conn
+        .get_poll()
+        .await
+        .expect("in_voice must have connection")
+    {
         let message = poll.message_owned();
 
         let mut s = DefaultHasher::new();
         topic.hash(&mut s);
         if s.finish() == poll.topic_hash() {
             if is_user_dj(ctx) {
-                connection.dispatch(Event::AlternateVoteDjCast);
+                conn.dispatch(Event::AlternateVoteDjCast);
 
                 return Err(check::AnotherPollOngoingError {
                     message: message.clone(),
@@ -755,9 +760,12 @@ async fn handle_poll(
                 }
                 .into());
             }
-            connection.dispatch(Event::AlternateVoteCast(ctx.user_id().into()));
+            conn.dispatch(Event::AlternateVoteCast(ctx.user_id().into()));
 
-            let mut rx = connection.subscribe();
+            let mut rx = conn
+                .subscribe()
+                .await
+                .expect("in_voice must have connection");
 
             if let Some(event) = lavalink::wait_for_with(&mut rx, |e| {
                 matches!(
@@ -793,9 +801,8 @@ async fn handle_poll(
         .into());
     }
 
-    drop(connection);
+    conn.reset_poll();
     let resolution = Box::pin(poll::start(topic, ctx, in_voice)).await;
-    ctx.lavalink().connection_mut_from(in_voice).reset_poll();
     match resolution? {
         PollResolution::UnanimousWin => Ok(()),
         PollResolution::UnanimousLoss => Err(check::PollLossError {

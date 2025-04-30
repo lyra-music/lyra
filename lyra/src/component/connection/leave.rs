@@ -46,9 +46,7 @@ pub(super) async fn disconnect_cleanup(
     let guild_id = cx.guild_id();
     let lavalink = cx.lavalink();
 
-    if let Some(connection) = lavalink.get_connection(guild_id) {
-        connection.dispatch(Event::QueueClear);
-    }
+    lavalink.handle_for(guild_id).dispatch(Event::QueueClear);
     if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
         delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
     }
@@ -62,12 +60,11 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let guild_id = ctx.guild_id();
 
     let in_voice = require::in_voice(ctx)?;
-    let connection = ctx.lavalink().try_get_connection(guild_id)?;
     let channel_id = in_voice.channel_id();
+    let conn = ctx.lavalink().handle_for(guild_id);
+    conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
-
-    connection.notify_change();
-    drop(connection);
+    conn.notify_change().await?;
     disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 

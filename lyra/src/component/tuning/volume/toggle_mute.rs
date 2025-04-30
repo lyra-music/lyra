@@ -1,7 +1,7 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    LavalinkAware,
+    LavalinkAndGuildIdAware,
     command::{SlashCtx, macros::out, model::BotSlashCommand, require},
     component::tuning::unmuting_checks,
     core::model::{BotStateAware, HttpAware},
@@ -20,15 +20,11 @@ impl BotSlashCommand for ToggleMute {
         let _ = unmuting_checks(&ctx)?;
 
         let guild_id = ctx.guild_id();
-        let mut connection = ctx.lavalink().try_get_connection_mut(guild_id)?;
-
-        let mute = !connection.mute;
+        let mute = ctx.get_conn().toggle_mute().await?;
         ctx.http()
             .update_guild_member(guild_id, ctx.bot().user_id())
             .mute(mute)
             .await?;
-        connection.mute = mute;
-        drop(connection);
 
         let message = if mute { "🔇 Muted" } else { "🔊 Unmuted" };
         out!(message, ctx);

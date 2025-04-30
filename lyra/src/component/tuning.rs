@@ -12,7 +12,7 @@ pub use speed::Speed;
 pub use volume::Volume;
 
 use crate::{
-    CommandError, LavalinkAware,
+    CommandError, LavalinkAndGuildIdAware, LavalinkAware,
     command::{
         check,
         model::{CtxKind, GuildCtx},
@@ -76,18 +76,18 @@ impl UpdateFilter for PlayerInterface {
 pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twilight_http::Error> {
     let bot = ctx.bot();
     let guild_id = ctx.guild_id();
-    let lavalink = bot.lavalink();
-    let Some(mut connection) = lavalink.get_connection_mut(guild_id) else {
+    let conn = ctx.get_conn();
+    let Ok(head) = conn.get_head().await else {
         return Ok(());
     };
 
     let state_mute = ctx.inner.mute;
-    if connection.mute != state_mute {
-        connection.mute = state_mute;
+    if head.mute() != state_mute {
+        conn.set_mute(state_mute);
 
         let emoji = volume::volume_emoji(if state_mute {
             None
-        } else if let Some(d) = lavalink.get_player_data(guild_id) {
+        } else if let Some(d) = bot.lavalink().get_player_data(guild_id) {
             Some(d.read().await.volume())
         } else {
             Some(NonZeroU16::new(100).expect("100 must be non-zero"))
@@ -96,7 +96,7 @@ pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twili
 
         tracing::warn!("guild {} {} forcefully", guild_id, describe);
         bot.http()
-            .create_message(connection.text_channel_id)
+            .create_message(head.text_channel_id())
             .content(&format!("{emoji} `(Bot was forcefully {describe})`"))
             .await?;
     }

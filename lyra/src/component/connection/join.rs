@@ -213,10 +213,9 @@ async fn impl_connect_to(
 
     let lavalink = ctx.lavalink();
     let response = if let Some(from) = old_channel_id {
-        let mut connection = lavalink.try_get_connection_mut(guild_id)?;
-        connection.channel_id = channel_id;
-        connection.notify_change();
-        drop(connection);
+        let conn = lavalink.handle_for(guild_id);
+        conn.set_channel(channel_id);
+        conn.notify_change();
         Response::Moved {
             from,
             to: joined,

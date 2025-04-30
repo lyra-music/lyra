@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    LavalinkAndGuildIdAware,
+    LavalinkAware,
     command::{
         check,
         macros::out,
@@ -11,6 +11,7 @@ use crate::{
         require,
     },
     error::CommandResult,
+    gateway::GuildIdAware,
     lavalink::Event,
 };
 
@@ -23,7 +24,6 @@ impl BotSlashCommand for Clear {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice = require::in_voice(&ctx)?.and_unsuppressed()?;
-        let connection = ctx.try_get_connection()?;
         let in_voice_with_user = check::user_in(in_voice)?;
         let player = require::player(&ctx)?;
 
@@ -36,8 +36,10 @@ impl BotSlashCommand for Clear {
 
         player.acquire_advance_lock_and_stop_with(queue).await?;
         drop(data_r);
-        connection.dispatch(Event::QueueClear);
-        drop(connection);
+        ctx.lavalink()
+            .handle_for(ctx.guild_id())
+            .dispatch(Event::QueueClear)
+            .await?;
 
         data.write().await.queue_mut().clear();
         out!("⏹️ Cleared the queue", ctx);
