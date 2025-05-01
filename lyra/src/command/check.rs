@@ -14,7 +14,7 @@ use twilight_model::{
 };
 
 use crate::{
-    LavalinkAware,
+    LavalinkAndGuildIdAware, LavalinkAware,
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
@@ -22,15 +22,10 @@ use crate::{
         traced,
     },
     error::{
-        Cache,
-        InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
-        InVoiceWithoutUser as InVoiceWithoutUserError,
-        NotUsersTrack as NotUsersTrackError,
-        UserNotAccessManager as UserNotAccessManagerError,
-        UserNotAllowed as UserNotAllowedError,
-        UserNotDj as UserNotDjError,
-        UserNotStageManager as UserNotStageManagerError,
-        // self,
+        Cache, InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
+        InVoiceWithoutUser as InVoiceWithoutUserError, NotUsersTrack as NotUsersTrackError,
+        UserNotAccessManager as UserNotAccessManagerError, UserNotAllowed as UserNotAllowedError,
+        UserNotDj as UserNotDjError, UserNotStageManager as UserNotStageManagerError,
         command::check::{
             self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
             UserOnlyInError,
@@ -739,7 +734,7 @@ async fn handle_poll(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     in_voice: &PartialInVoice,
 ) -> Result<(), check::HandlePollError> {
-    let conn = ctx.lavalink().handle_for(in_voice.guild_id());
+    let conn = ctx.get_conn();
 
     if let Some(poll) = conn
         .get_poll()
@@ -801,8 +796,8 @@ async fn handle_poll(
         .into());
     }
 
-    conn.reset_poll();
     let resolution = Box::pin(poll::start(topic, ctx, in_voice)).await;
+    ctx.get_conn().reset_poll();
     match resolution? {
         PollResolution::UnanimousWin => Ok(()),
         PollResolution::UnanimousLoss => Err(check::PollLossError {
