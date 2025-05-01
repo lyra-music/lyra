@@ -21,7 +21,6 @@ vergen-git2 = { version = "1.0.7", features = [
 
 [lints.rust]
 unsafe_code = "forbid"
-async_fn_in_trait = "allow"
 
 [lints.clippy]
 multiple_unsafe_ops_per_block = "forbid"

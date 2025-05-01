@@ -79,6 +79,7 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.get_player().map(|player| player.data_unwrapped())
     }
 
+    #[expect(async_fn_in_trait)]
     async fn has_connection(&self) -> bool {
         self.lavalink().has_connection(self.guild_id()).await
     }

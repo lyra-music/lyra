@@ -14,7 +14,7 @@ use twilight_model::{
 };
 
 use crate::{
-    LavalinkAndGuildIdAware, LavalinkAware,
+    LavalinkAndGuildIdAware,
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
