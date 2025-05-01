@@ -9,7 +9,7 @@ use twilight_model::{
 };
 
 use crate::{
-    LavalinkAware,
+    LavalinkAndGuildIdAware, LavalinkAware,
     command::{
         SlashCtx, check,
         macros::{caut, out},
@@ -61,7 +61,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
 
     let in_voice = require::in_voice(ctx)?;
     let channel_id = in_voice.channel_id();
-    let conn = ctx.lavalink().handle_for(guild_id);
+    let conn = ctx.get_conn();
     conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
     conn.notify_change().await?;
