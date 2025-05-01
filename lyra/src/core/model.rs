@@ -1,15 +1,12 @@
 mod interaction;
 
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::Instant,
-};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use dashmap::DashMap;
 use sqlx::{Pool, Postgres};
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 use twilight_cache_inmemory::{InMemoryCache, model::CachedMember};
 use twilight_gateway::ShardId;
 use twilight_http::Client;
@@ -40,43 +37,100 @@ pub struct Config {
     pub database_url: &'static str,
 }
 
+enum CounterOp {
+    Increment(ShardId),
+    Decrement(ShardId),
+    Set(ShardId, usize),
+    GetTotal(oneshot::Sender<usize>),
+}
+
+struct CounterActor {
+    total: usize,
+    counters: HashMap<ShardId, usize>,
+    receiver: UnboundedReceiver<CounterOp>,
+}
+
+impl CounterActor {
+    fn new(receiver: UnboundedReceiver<CounterOp>) -> Self {
+        Self {
+            total: 0,
+            counters: HashMap::new(),
+            receiver,
+        }
+    }
+
+    async fn run(&mut self) {
+        while let Some(op) = self.receiver.recv().await {
+            match op {
+                CounterOp::Increment(shard_id) => {
+                    *self.counters.entry(shard_id).or_insert(0) += 1;
+                    self.total += 1;
+                }
+                CounterOp::Decrement(shard_id) => {
+                    if let Some(count) = self.counters.get_mut(&shard_id) {
+                        *count -= 1;
+                        self.total -= 1;
+                    }
+                }
+                CounterOp::Set(shard_id, count) => {
+                    let old_count = self.counters.insert(shard_id, count);
+                    if let Some(old_count) = old_count {
+                        self.total += count - old_count;
+                    } else {
+                        self.total += count;
+                    }
+                }
+                CounterOp::GetTotal(sender) => {
+                    let _ = sender.send(self.total);
+                }
+            }
+        }
+    }
+}
+
 struct GuildCounter {
-    total: AtomicUsize,
-    counters: DashMap<ShardId, usize>,
+    sender: Option<UnboundedSender<CounterOp>>,
 }
 
 impl GuildCounter {
     pub fn new() -> Self {
-        Self {
-            total: AtomicUsize::new(0),
-            counters: DashMap::new(),
+        let mut new = Self { sender: None };
+        new.start();
+        new
+    }
+
+    pub fn start(&mut self) {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        self.sender = Some(sender);
+
+        let mut actor = CounterActor::new(receiver);
+        tokio::spawn(async move {
+            actor.run().await;
+        });
+    }
+
+    fn send_op(&self, op: CounterOp) {
+        if let Some(sender) = &self.sender {
+            let _ = sender.send(op);
         }
     }
 
-    pub fn total(&self) -> usize {
-        self.total.load(Ordering::Relaxed)
+    pub async fn read_total(&self) -> usize {
+        let (sender, receiver) = oneshot::channel();
+        self.send_op(CounterOp::GetTotal(sender));
+        receiver.await.unwrap_or(0)
     }
 
     pub fn reset(&self, shard_id: ShardId, guild_count: usize) {
-        let old_shard_guild_count = self.counters.get(&shard_id).map_or(0, |v| *v);
-
-        self.counters.insert(shard_id, guild_count);
-        let _ = self
-            .total
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
-                (guild_count - old_shard_guild_count != 0)
-                    .then_some(n + guild_count - old_shard_guild_count)
-            });
+        self.send_op(CounterOp::Set(shard_id, guild_count));
     }
 
     pub fn increment(&self, shard_id: ShardId) {
-        self.counters.entry(shard_id).and_modify(|v| *v += 1);
-        self.total.fetch_add(1, Ordering::Relaxed);
+        self.send_op(CounterOp::Increment(shard_id));
     }
 
     pub fn decrement(&self, shard_id: ShardId) {
-        self.counters.entry(shard_id).and_modify(|v| *v -= 1);
-        self.total.fetch_sub(1, Ordering::Relaxed);
+        self.send_op(CounterOp::Decrement(shard_id));
     }
 }
 
@@ -86,8 +140,8 @@ pub struct BotInfo {
 }
 
 impl BotInfo {
-    pub fn total_guild_count(&self) -> usize {
-        self.guild_counter.total()
+    pub async fn total_guild_count(&self) -> usize {
+        self.guild_counter.read_total().await
     }
 
     pub fn reset_guild_count(&self, shard_id: ShardId, guild_count: usize) {
