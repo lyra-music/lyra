@@ -95,18 +95,16 @@ impl GuildIdAware for Context {
 
 impl Process for Context {
     async fn process(self) -> ProcessResult {
-        let mut rx = self
-            .get_conn()
-            .subscribe_on_change()
+        let connection_changed = if let Ok(mut rx) = self.get_conn().subscribe_on_change().await {
+            tokio::time::timeout(
+                crate::core::r#const::connection::CHANGED_TIMEOUT,
+                rx.changed(),
+            )
             .await
-            .expect("failed to subscribe to connection change");
-
-        let connection_changed = tokio::time::timeout(
-            crate::core::r#const::connection::CHANGED_TIMEOUT,
-            rx.changed(),
-        )
-        .await
-        .is_ok();
+            .is_ok()
+        } else {
+            false
+        };
 
         tokio::try_join![
             connection::handle_voice_state_update(&self, connection_changed)
