@@ -130,9 +130,7 @@ impl Context {
 
         if let Some(guild_id) = inner_guild_id {
             let lavalink = bot.lavalink();
-            if let Some(mut connection) = lavalink.get_connection_mut(guild_id) {
-                connection.text_channel_id = channel_id;
-            }
+            lavalink.handle_for(guild_id).set_text_channel(channel_id);
             if let Ok(player) = require::player(&(lavalink, guild_id)) {
                 player.data().write().await.set_text_channel_id(channel_id);
             }

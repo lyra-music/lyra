@@ -3,7 +3,7 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    LavalinkAware,
+    LavalinkAndGuildIdAware,
     command::{SlashCtx, macros::out, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     core::model::{BotStateAware, HttpAware},
@@ -45,7 +45,7 @@ impl BotSlashCommand for Down {
                 super::clipping_warning(new_percent),
             )
         } else {
-            ctx.lavalink().try_get_connection_mut(guild_id)?.mute = true;
+            ctx.get_conn().set_mute(true);
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(true)

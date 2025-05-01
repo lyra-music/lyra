@@ -5,8 +5,17 @@ mod pitch;
 mod queue;
 mod queue_indexer;
 
-use std::{num::NonZeroU16, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    num::NonZeroU16,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 
+use connection::ConnectionHead;
+use futures::FutureExt;
 use lavalink_rs::{
     client::LavalinkClient,
     error::LavalinkResult,
@@ -16,7 +25,7 @@ use lavalink_rs::{
 use lyra_ext::time::track_timestamp::TrackTimestamp;
 use moka::future::Cache;
 use sqlx::{Pool, Postgres};
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, broadcast, mpsc, oneshot, watch};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::id::{
@@ -25,7 +34,10 @@ use twilight_model::id::{
 };
 
 use crate::{
-    command::require::{InVoice, PartialInVoice},
+    command::{
+        poll::Poll as PlayerPoll,
+        require::{InVoice, PartialInVoice},
+    },
     core::{
         r#const,
         model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
@@ -36,8 +48,6 @@ use crate::{
     },
     gateway::GuildIdAware,
 };
-
-use self::connection::{ConnectionRef, ConnectionRefMut};
 
 pub use self::{
     connection::{Connection, Event, EventRecvResult, wait_for_with},
@@ -69,18 +79,17 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.get_player().map(|player| player.data_unwrapped())
     }
 
-    fn get_connection(&self) -> Option<ConnectionRef> {
-        self.lavalink().get_connection(self.guild_id())
+    #[expect(async_fn_in_trait)]
+    async fn has_connection(&self) -> bool {
+        self.lavalink().has_connection(self.guild_id()).await
     }
 
-    fn get_connection_mut(&self) -> Option<ConnectionRefMut> {
-        self.lavalink().get_connection_mut(self.guild_id())
+    fn notify_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.lavalink().handle_for(self.guild_id()).notify_change()
     }
 
-    /// # Errors
-    /// when an unrecognised connection was found
-    fn try_get_connection(&self) -> Result<ConnectionRef, UnrecognisedConnection> {
-        self.lavalink().try_get_connection(self.guild_id())
+    fn get_conn(&self) -> ConnectionHandle {
+        self.lavalink().handle_for(self.guild_id())
     }
 }
 
@@ -267,9 +276,321 @@ impl RawPlayerData {
     }
 }
 
+type Response<T> = oneshot::Sender<Result<T, UnrecognisedConnection>>;
+
+enum Instruction {
+    /// Insert a new connection
+    Insert(Id<GuildMarker>, Connection),
+    /// Remove a connection
+    Remove(Id<GuildMarker>),
+    /// Query if a connection exists
+    Exists(Id<GuildMarker>, oneshot::Sender<bool>),
+    /// Dispatch an event to a connection
+    Dispatch(Id<GuildMarker>, Event, Response<()>),
+    /// Subscribe to events from a connection
+    Subscribe(Id<GuildMarker>, Response<broadcast::Receiver<Event>>),
+    /// Notify a connection of a change
+    NotifyChange(Id<GuildMarker>, Response<()>),
+    /// Subscribe to changes from a connection
+    SubscribeOnChange(Id<GuildMarker>, Response<watch::Receiver<()>>),
+    /// Toggle mute
+    ///
+    /// Returns the current mute state if successful
+    ToggleMute(Id<GuildMarker>, Response<bool>),
+    /// Set mute
+    SetMute(Id<GuildMarker>, bool, Response<()>),
+    /// Set the channel for a connection
+    SetChannel(Id<GuildMarker>, Id<ChannelMarker>, Response<()>),
+    /// Set the text channel for a connection
+    SetTextChannel(Id<GuildMarker>, Id<ChannelMarker>, Response<()>),
+    /// Get basic connection info
+    Head(Id<GuildMarker>, Response<ConnectionHead>),
+    /// Get the connection poll info
+    GetPoll(Id<GuildMarker>, Response<Option<PlayerPoll>>),
+    /// Set the connection poll info
+    SetPoll(Id<GuildMarker>, Option<PlayerPoll>, Response<()>),
+}
+
+/// The result of a future that waits for a value to be sent
+pub struct Awaitable<T> {
+    receiver: oneshot::Receiver<T>,
+}
+
+impl<T> Future for Awaitable<T> {
+    type Output = T;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.receiver.poll_unpin(cx) {
+            Poll::Ready(Ok(result)) => Poll::Ready(result),
+            Poll::Ready(Err(_)) => panic!("Actor sent no result (This is a bug)"),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+struct ConnectionsActor {
+    connections: HashMap<Id<GuildMarker>, Connection>,
+    receiver: mpsc::UnboundedReceiver<Instruction>,
+}
+
+impl ConnectionsActor {
+    pub fn new(receiver: mpsc::UnboundedReceiver<Instruction>) -> Self {
+        Self {
+            connections: HashMap::new(),
+            receiver,
+        }
+    }
+
+    fn with_connection<T>(
+        &self,
+        guild_id: Id<GuildMarker>,
+        sender: oneshot::Sender<Result<T, UnrecognisedConnection>>,
+        f: impl FnOnce(&Connection) -> T,
+    ) {
+        if let Some(connection) = self.connections.get(&guild_id) {
+            let result = f(connection);
+            let _ = sender.send(Ok(result));
+        } else {
+            let _ = sender.send(Err(UnrecognisedConnection));
+        }
+    }
+
+    fn with_connection_mut<T>(
+        &mut self,
+        guild_id: Id<GuildMarker>,
+        sender: oneshot::Sender<Result<T, UnrecognisedConnection>>,
+        f: impl FnOnce(&mut Connection) -> T,
+    ) {
+        if let Some(connection) = self.connections.get_mut(&guild_id) {
+            let result = f(connection);
+            let _ = sender.send(Ok(result));
+        } else {
+            let _ = sender.send(Err(UnrecognisedConnection));
+        }
+    }
+
+    pub async fn run(&mut self) {
+        while let Some(instruction) = self.receiver.recv().await {
+            match instruction {
+                Instruction::Insert(guild_id, connection) => {
+                    self.connections.insert(guild_id, connection);
+                }
+                Instruction::Remove(guild_id) => {
+                    self.connections.remove(&guild_id);
+                }
+                Instruction::Exists(guild_id, sender) => {
+                    let exists = self.connections.contains_key(&guild_id);
+                    let _ = sender.send(exists);
+                }
+                Instruction::Dispatch(guild_id, event, sender) => {
+                    self.with_connection(guild_id, sender, |c| c.dispatch(event));
+                }
+                Instruction::Subscribe(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, Connection::subscribe);
+                }
+                Instruction::NotifyChange(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, Connection::notify_change);
+                }
+                Instruction::SubscribeOnChange(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, Connection::subscribe_on_changed);
+                }
+                Instruction::ToggleMute(guild_id, sender) => {
+                    self.with_connection_mut(guild_id, sender, |c| {
+                        c.mute = !c.mute;
+                        c.mute
+                    });
+                }
+                Instruction::SetMute(guild_id, mute, sender) => {
+                    self.with_connection_mut(guild_id, sender, |c| {
+                        c.mute = mute;
+                    });
+                }
+                Instruction::SetChannel(guild_id, channel_id, sender) => {
+                    self.with_connection_mut(guild_id, sender, |c| {
+                        c.channel_id = channel_id;
+                    });
+                }
+                Instruction::SetTextChannel(guild_id, channel_id, sender) => {
+                    self.with_connection_mut(guild_id, sender, |c| {
+                        c.text_channel_id = channel_id;
+                    });
+                }
+                Instruction::Head(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, |c| c.into());
+                }
+                Instruction::GetPoll(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, |c| c.poll().cloned());
+                }
+                Instruction::SetPoll(id, poll, sender) => {
+                    self.with_connection_mut(id, sender, |c| {
+                        c.set_poll(poll);
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Represents a connection to the lavalink server
+pub struct ConnectionHandle<'a> {
+    parent: &'a Lavalink,
+    guild_id: Id<GuildMarker>,
+}
+
+impl ConnectionHandle<'_> {
+    fn send_instruction(&self, instruction: Instruction) {
+        self.parent
+            .sender
+            .as_ref()
+            .expect("Lavalink was not started")
+            .send(instruction)
+            .expect("Lavalink instruction sender must not be closed");
+    }
+
+    fn call_awaitable<T>(
+        &self,
+        f: impl FnOnce(Response<T>) -> Instruction,
+    ) -> Awaitable<Result<T, UnrecognisedConnection>> {
+        let (sender, receiver) = oneshot::channel();
+        self.send_instruction(f(sender));
+        Awaitable { receiver }
+    }
+
+    async fn call_result<T>(
+        &self,
+        f: impl FnOnce(Response<T>) -> Instruction,
+    ) -> Result<T, UnrecognisedConnection> {
+        let (sender, receiver) = oneshot::channel();
+        self.send_instruction(f(sender));
+        receiver
+            .await
+            .expect("Lavalink connection sender must not be closed")
+    }
+
+    pub fn dispatch(&self, event: Event) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::Dispatch(self.guild_id, event, sender))
+    }
+
+    pub fn notify_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::NotifyChange(self.guild_id, sender))
+    }
+
+    pub fn toggle_mute(&self) -> Awaitable<Result<bool, UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::ToggleMute(self.guild_id, sender))
+    }
+
+    pub fn set_mute(&self, mute: bool) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetMute(self.guild_id, mute, sender))
+    }
+
+    pub fn set_channel(
+        &self,
+        channel_id: Id<ChannelMarker>,
+    ) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetChannel(self.guild_id, channel_id, sender))
+    }
+
+    pub fn set_text_channel(
+        &self,
+        channel_id: Id<ChannelMarker>,
+    ) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetTextChannel(self.guild_id, channel_id, sender))
+    }
+
+    pub fn set_poll(&self, poll: PlayerPoll) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetPoll(self.guild_id, Some(poll), sender))
+    }
+
+    pub fn reset_poll(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetPoll(self.guild_id, None, sender))
+    }
+
+    pub async fn get_poll(&self) -> Result<Option<PlayerPoll>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::GetPoll(self.guild_id, sender))
+            .await
+    }
+
+    pub async fn get_head(&self) -> Result<ConnectionHead, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::Head(self.guild_id, sender))
+            .await
+    }
+
+    pub async fn subscribe(&self) -> Result<broadcast::Receiver<Event>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::Subscribe(self.guild_id, sender))
+            .await
+    }
+
+    pub async fn subscribe_on_change(&self) -> Result<watch::Receiver<()>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::SubscribeOnChange(self.guild_id, sender))
+            .await
+    }
+}
+
 pub struct Lavalink {
     inner: LavalinkClient,
-    connections: dashmap::DashMap<Id<GuildMarker>, Connection>,
+    sender: Option<mpsc::UnboundedSender<Instruction>>,
+}
+
+impl Lavalink {
+    pub fn clone_inner(&self) -> LavalinkClient {
+        self.inner.clone()
+    }
+
+    pub fn start(&mut self) {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        self.sender = Some(sender);
+        let mut actor = ConnectionsActor::new(receiver);
+        tokio::spawn(async move {
+            actor.run().await;
+        });
+    }
+
+    fn send_instruction(&self, instruction: Instruction) {
+        self.sender
+            .as_ref()
+            .expect("Lavalink was not started")
+            .send(instruction)
+            .expect("Lavalink instruction sender must not be closed");
+    }
+
+    #[inline]
+    pub const fn handle_for(&self, guild_id: Id<GuildMarker>) -> ConnectionHandle<'_> {
+        ConnectionHandle {
+            parent: self,
+            guild_id,
+        }
+    }
+
+    pub fn new_connection_with(&self, guild_id: Id<GuildMarker>, connection: Connection) {
+        self.send_instruction(Instruction::Insert(guild_id, connection));
+    }
+
+    pub fn drop_connection(&self, guild_id: Id<GuildMarker>) {
+        self.send_instruction(Instruction::Remove(guild_id));
+    }
+
+    pub async fn has_connection(&self, guild_id: Id<GuildMarker>) -> bool {
+        let (sender, receiver) = oneshot::channel();
+        self.send_instruction(Instruction::Exists(guild_id, sender));
+        receiver
+            .await
+            .expect("Lavalink connection sender must not be closed")
+    }
+
+    #[inline]
+    pub async fn delete_player(
+        &self,
+        guild_id: impl Into<lavalink_rs::prelude::GuildId> + Send,
+    ) -> LavalinkResult<()> {
+        self.inner.delete_player(guild_id).await
+    }
+
+    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + use<'_> {
+        self.inner
+            .players
+            .iter()
+            .filter_map(|p| p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()))
+    }
 }
 
 impl DelegateMethods for Lavalink {
@@ -339,10 +660,12 @@ impl DelegateMethods for Lavalink {
 
 impl From<LavalinkClient> for Lavalink {
     fn from(value: LavalinkClient) -> Self {
-        Self {
+        let mut lava = Self {
             inner: value,
-            connections: dashmap::DashMap::new(),
-        }
+            sender: None,
+        };
+        lava.start();
+        lava
     }
 }
 
@@ -427,72 +750,6 @@ pub trait DelegateMethods {
     ) -> Option<OwnedPlayerData> {
         self.get_player_context(guild_id)
             .map(|c| c.data_unwrapped())
-    }
-}
-
-impl Lavalink {
-    pub fn clone_inner(&self) -> LavalinkClient {
-        self.inner.clone()
-    }
-
-    pub fn new_connection_with(&self, guild_id: Id<GuildMarker>, connection: Connection) {
-        self.connections.insert(guild_id, connection);
-    }
-
-    pub fn drop_connection(&self, guild_id: Id<GuildMarker>) {
-        self.connections.remove(&guild_id);
-    }
-
-    pub fn get_connection(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRef> {
-        self.connections.get(&guild_id)
-    }
-
-    #[inline]
-    pub fn try_get_connection(
-        &self,
-        guild_id: Id<GuildMarker>,
-    ) -> Result<ConnectionRef, UnrecognisedConnection> {
-        self.get_connection(guild_id).ok_or(UnrecognisedConnection)
-    }
-
-    #[inline]
-    pub fn try_get_connection_mut(
-        &self,
-        guild_id: Id<GuildMarker>,
-    ) -> Result<ConnectionRefMut, UnrecognisedConnection> {
-        self.get_connection_mut(guild_id)
-            .ok_or(UnrecognisedConnection)
-    }
-
-    pub fn connection_from(&self, cx: &impl ConnectionAware) -> ConnectionRef {
-        self.connections
-            .get(&cx.guild_id())
-            .expect("connection-aware contexts must represent a valid voice connection")
-    }
-
-    pub fn connection_mut_from(&self, cx: &impl ConnectionAware) -> ConnectionRefMut {
-        self.connections
-            .get_mut(&cx.guild_id())
-            .expect("connection-aware contexts must represent to a valid voice connection")
-    }
-
-    pub fn get_connection_mut(&self, guild_id: Id<GuildMarker>) -> Option<ConnectionRefMut> {
-        self.connections.get_mut(&guild_id)
-    }
-
-    #[inline]
-    pub async fn delete_player(
-        &self,
-        guild_id: impl Into<lavalink_rs::prelude::GuildId> + Send,
-    ) -> LavalinkResult<()> {
-        self.inner.delete_player(guild_id).await
-    }
-
-    pub fn iter_player_data(&self) -> impl Iterator<Item = OwnedPlayerData> + use<'_> {
-        self.inner
-            .players
-            .iter()
-            .filter_map(|p| p.value().0.load().as_ref().map(|ctx| ctx.data_unwrapped()))
     }
 }
 

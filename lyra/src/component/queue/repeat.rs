@@ -86,7 +86,7 @@ pub async fn repeat(
     mode: LavalinkRepeatMode,
     via_controller: bool,
 ) -> Result<(), RepeatError> {
-    ctx.try_get_connection()?.dispatch(Event::QueueRepeat);
+    ctx.get_conn().dispatch(Event::QueueRepeat);
     data.write()
         .await
         .set_repeat_mode_then_update_and_apply_to_now_playing(mode)

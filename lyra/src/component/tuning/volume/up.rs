@@ -3,7 +3,7 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    LavalinkAware,
+    LavalinkAndGuildIdAware,
     command::{
         SlashCtx,
         macros::{note, out},
@@ -32,14 +32,15 @@ impl BotSlashCommand for Up {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_player(&ctx)?;
 
-        let lavalink = ctx.lavalink();
         let guild_id = ctx.guild_id();
         let data = player.data();
         #[allow(clippy::cast_possible_truncation)]
         let percent_u16 = self.percent.unwrap_or(10).unsigned_abs() as u16;
 
-        let (old_percent_str, new_percent) = if lavalink.try_get_connection(guild_id)?.mute {
-            lavalink.try_get_connection_mut(guild_id)?.mute = false;
+        let conn = ctx.get_conn();
+
+        let (old_percent_str, new_percent) = if conn.get_head().await?.mute() {
+            conn.set_mute(false);
             ctx.http()
                 .update_guild_member(guild_id, ctx.bot().user_id())
                 .mute(false)

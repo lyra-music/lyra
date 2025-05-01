@@ -1,8 +1,8 @@
 use lyra_ext::nested_transpose::NestedTranspose;
-use tokio::sync::{Notify, broadcast};
+use tokio::sync::{broadcast, watch};
 use twilight_model::id::{
     Id,
-    marker::{ChannelMarker, GuildMarker, UserMarker},
+    marker::{ChannelMarker, UserMarker},
 };
 
 use crate::{command::poll::Poll, core::r#const};
@@ -13,56 +13,94 @@ pub struct Connection {
     pub text_channel_id: Id<ChannelMarker>,
     pub mute: bool,
     poll: Option<Poll>,
-    change: Notify,
+    change: watch::Sender<()>,
     event_sender: broadcast::Sender<Event>,
 }
 
-pub(super) type ConnectionRef<'a> = dashmap::mapref::one::Ref<'a, Id<GuildMarker>, Connection>;
-pub(super) type ConnectionRefMut<'a> =
-    dashmap::mapref::one::RefMut<'a, Id<GuildMarker>, Connection>;
-
 impl Connection {
     pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+        let (change, _) = watch::channel(());
+
         Self {
             channel_id,
             text_channel_id,
             mute: false,
-            change: Notify::new(),
+            change,
             event_sender: broadcast::channel(16).0,
             poll: None,
         }
     }
 
-    pub async fn changed(&self) -> bool {
-        tracing::trace!("waiting for connection change notification");
-        let duration = r#const::connection::CHANGED_TIMEOUT;
-        let future = self.change.notified();
-        tokio::time::timeout(duration, future).await.is_ok()
+    /// Wait until the connection is changed or the timeout is reached.
+    pub fn subscribe_on_changed(&self) -> watch::Receiver<()> {
+        self.change.subscribe()
     }
 
     pub const fn poll(&self) -> Option<&Poll> {
         self.poll.as_ref()
     }
 
-    pub const fn set_poll(&mut self, poll: Poll) {
-        self.poll = Some(poll);
+    pub const fn set_poll(&mut self, poll: Option<Poll>) {
+        self.poll = poll;
     }
 
-    pub const fn reset_poll(&mut self) {
-        self.poll = None;
-    }
-
+    /// Dispatch an event to all subscribers of this connection.
     pub fn dispatch(&self, event: Event) {
         let _ = self.event_sender.send(event);
     }
 
+    /// Notify the connection to trigger a change.
     pub fn notify_change(&self) {
         tracing::trace!("notified connection change");
-        self.change.notify_one();
+        self.change.send(()).ok();
     }
 
+    /// Subscribe to events from this connection.
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.event_sender.subscribe()
+    }
+}
+
+pub struct ConnectionHead {
+    channel_id: Id<ChannelMarker>,
+    text_channel_id: Id<ChannelMarker>,
+    mute: bool,
+}
+
+impl ConnectionHead {
+    #[inline]
+    pub const fn channel_id(&self) -> Id<ChannelMarker> {
+        self.channel_id
+    }
+
+    #[inline]
+    pub const fn text_channel_id(&self) -> Id<ChannelMarker> {
+        self.text_channel_id
+    }
+
+    #[inline]
+    pub const fn mute(&self) -> bool {
+        self.mute
+    }
+}
+
+impl From<Connection> for ConnectionHead {
+    fn from(value: Connection) -> Self {
+        Self {
+            channel_id: value.channel_id,
+            text_channel_id: value.text_channel_id,
+            mute: value.mute,
+        }
+    }
+}
+
+impl From<&Connection> for ConnectionHead {
+    fn from(value: &Connection) -> Self {
+        Self {
+            channel_id: value.channel_id,
+            text_channel_id: value.text_channel_id,
+            mute: value.mute,
+        }
     }
 }
 

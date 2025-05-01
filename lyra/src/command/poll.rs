@@ -41,6 +41,7 @@ use crate::{
         Cache as CacheError,
         command::poll::{GenerateEmbedError, StartPollError, UpdateEmbedError, WaitForVotesError},
     },
+    gateway::GuildIdAware,
     lavalink::{Event, EventRecvResult},
 };
 
@@ -76,7 +77,7 @@ impl std::fmt::Display for Topic {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Poll {
     topic_hash: u64,
     message: super::util::MessageLinkComponent,
@@ -288,13 +289,20 @@ fn generate_latent_embed_colours() -> LatentEmbedColours {
     }
 }
 
-fn get_users_in_voice(
+async fn get_users_in_voice(
     ctx: &GuildCtx<impl RespondViaMessage>,
     in_voice: &PartialInVoice,
 ) -> Result<HashSet<Id<UserMarker>>, CacheError> {
     let users_in_voice = ctx
         .cache()
-        .voice_channel_states(ctx.lavalink().connection_from(in_voice).channel_id)
+        .voice_channel_states(
+            ctx.lavalink()
+                .handle_for(in_voice.guild_id())
+                .get_head()
+                .await
+                .expect("in_voice must have connection")
+                .channel_id(),
+        )
         .ok_or(CacheError)?
         .map(|v| ctx.cache().user(v.user_id()).ok_or(CacheError))
         .filter_map_ok(|u| (!u.bot).then_some(u.id))
@@ -432,7 +440,7 @@ pub async fn start(
     let embed_latent = generate_latent_embed_colours();
     let (upvote_button_id, row) = generate_upvote_button_id_and_row();
 
-    let users_in_voice = get_users_in_voice(ctx, in_voice)?;
+    let users_in_voice = get_users_in_voice(ctx, in_voice).await?;
     let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
     #[allow(clippy::cast_precision_loss)]
@@ -459,7 +467,7 @@ pub async fn start(
     let message_id = message.id();
     {
         ctx.lavalink()
-            .connection_mut_from(in_voice)
+            .handle_for(in_voice.guild_id())
             .set_poll(Poll::new(topic, message.clone()));
     }
     let components = &mut ctx
@@ -537,7 +545,12 @@ async fn wait_for_votes(
     embed_ctx: UpdatePollEmbedContext,
     in_voice: &PartialInVoice,
 ) -> Result<Resolution, WaitForVotesError> {
-    let mut rx = ctx.lavalink().connection_from(in_voice).subscribe();
+    let mut rx = ctx
+        .lavalink()
+        .handle_for(in_voice.guild_id())
+        .subscribe()
+        .await
+        .expect("in_voice must have connection");
     loop {
         let poll_stream = wait_for_poll_actions(&mut rx, &mut poll_ctx);
         match tokio::time::timeout(Duration::from_secs(30), poll_stream).await {
@@ -579,10 +592,9 @@ async fn wait_for_votes(
                     .await?;
                 }
                 PollAction::AlternateCast(user_id) => {
+                    let conn = ctx.lavalink().handle_for(in_voice.guild_id());
                     if !users_in_voice.contains(&user_id) {
-                        ctx.lavalink()
-                            .connection_from(in_voice)
-                            .dispatch(Event::AlternateVoteCastDenied);
+                        conn.dispatch(Event::AlternateVoteCastDenied);
                         continue;
                     }
                     match votes.entry(user_id) {
@@ -590,9 +602,7 @@ async fn wait_for_votes(
                             e.insert(Vote(true));
                         }
                         Entry::Occupied(e) => {
-                            ctx.lavalink()
-                                .connection_from(in_voice)
-                                .dispatch(Event::AlternateVoteCastedAlready(*e.get()));
+                            conn.dispatch(Event::AlternateVoteCastedAlready(*e.get()));
                             continue;
                         }
                     }
