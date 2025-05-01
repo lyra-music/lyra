@@ -127,7 +127,7 @@ async fn start_inactivity_timeout(
 
     if ctx.notify_change().await.is_err() {
         return Ok(());
-    };
+    }
     disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 

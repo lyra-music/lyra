@@ -25,12 +25,7 @@ use lavalink_rs::{
 use lyra_ext::time::track_timestamp::TrackTimestamp;
 use moka::future::Cache;
 use sqlx::{Pool, Postgres};
-use tokio::{
-    sync::{
-        RwLock, RwLockReadGuard, RwLockWriteGuard, broadcast, futures::Notified, mpsc, oneshot,
-    },
-    time::Timeout,
-};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, broadcast, mpsc, oneshot, watch};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::id::{
@@ -295,6 +290,8 @@ enum Instruction {
     Subscribe(Id<GuildMarker>, Response<broadcast::Receiver<Event>>),
     /// Notify a connection of a change
     NotifyChange(Id<GuildMarker>, Response<()>),
+    /// Subscribe to changes from a connection
+    SubscribeOnChange(Id<GuildMarker>, Response<watch::Receiver<()>>),
     /// Toggle mute
     ///
     /// Returns the current mute state if successful
@@ -311,12 +308,10 @@ enum Instruction {
     GetPoll(Id<GuildMarker>, Response<Option<PlayerPoll>>),
     /// Set the connection poll info
     SetPoll(Id<GuildMarker>, Option<PlayerPoll>, Response<()>),
-    /// Wait until a connection changes
-    WaitUntilChanged(Id<GuildMarker>, Response<Timeout<Notified<'static>>>),
 }
 
 /// The result of a future that waits for a value to be sent
-struct Awaitable<T> {
+pub struct Awaitable<T> {
     receiver: oneshot::Receiver<T>,
 }
 
@@ -346,7 +341,7 @@ impl ConnectionsActor {
     }
 
     fn with_connection<T>(
-        &mut self,
+        &self,
         guild_id: Id<GuildMarker>,
         sender: oneshot::Sender<Result<T, UnrecognisedConnection>>,
         f: impl FnOnce(&Connection) -> T,
@@ -390,10 +385,13 @@ impl ConnectionsActor {
                     self.with_connection(guild_id, sender, |c| c.dispatch(event));
                 }
                 Instruction::Subscribe(guild_id, sender) => {
-                    self.with_connection(guild_id, sender, |c| c.subscribe());
+                    self.with_connection(guild_id, sender, Connection::subscribe);
                 }
                 Instruction::NotifyChange(guild_id, sender) => {
-                    self.with_connection(guild_id, sender, |c| c.notify_change());
+                    self.with_connection(guild_id, sender, Connection::notify_change);
+                }
+                Instruction::SubscribeOnChange(guild_id, sender) => {
+                    self.with_connection(guild_id, sender, Connection::subscribe_on_changed);
                 }
                 Instruction::ToggleMute(guild_id, sender) => {
                     self.with_connection_mut(guild_id, sender, |c| {
@@ -427,9 +425,6 @@ impl ConnectionsActor {
                         c.set_poll(poll);
                     });
                 }
-                Instruction::WaitUntilChanged(guild_id, sender) => {
-                    self.with_connection(guild_id, sender, |c| c.on_changed());
-                }
             }
         }
     }
@@ -441,7 +436,7 @@ pub struct ConnectionHandle<'a> {
     guild_id: Id<GuildMarker>,
 }
 
-impl<'a> ConnectionHandle<'a> {
+impl ConnectionHandle<'_> {
     fn send_instruction(&self, instruction: Instruction) {
         self.parent
             .sender
@@ -524,8 +519,8 @@ impl<'a> ConnectionHandle<'a> {
             .await
     }
 
-    pub async fn wait_until_changed(&self) -> Result<bool, UnrecognisedConnection> {
-        self.call_result(|sender| Instruction::WaitUntilChanged(self.guild_id, sender))
+    pub async fn subscribe_on_change(&self) -> Result<watch::Receiver<()>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::SubscribeOnChange(self.guild_id, sender))
             .await
     }
 }
@@ -545,7 +540,7 @@ impl Lavalink {
         self.sender = Some(sender);
         let mut actor = ConnectionsActor::new(receiver);
         tokio::spawn(async move {
-            actor.run();
+            actor.run().await;
         });
     }
 
@@ -558,7 +553,7 @@ impl Lavalink {
     }
 
     #[inline]
-    pub fn handle_for<'a>(&'a self, guild_id: Id<GuildMarker>) -> ConnectionHandle<'a> {
+    pub const fn handle_for(&self, guild_id: Id<GuildMarker>) -> ConnectionHandle<'_> {
         ConnectionHandle {
             parent: self,
             guild_id,
@@ -664,10 +659,12 @@ impl DelegateMethods for Lavalink {
 
 impl From<LavalinkClient> for Lavalink {
     fn from(value: LavalinkClient) -> Self {
-        Self {
+        let mut lava = Self {
             inner: value,
             sender: None,
-        }
+        };
+        lava.start();
+        lava
     }
 }
 

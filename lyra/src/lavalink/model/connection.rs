@@ -1,8 +1,5 @@
 use lyra_ext::nested_transpose::NestedTranspose;
-use tokio::{
-    sync::{Notify, broadcast, futures::Notified},
-    time::Timeout,
-};
+use tokio::sync::{broadcast, watch};
 use twilight_model::id::{
     Id,
     marker::{ChannelMarker, UserMarker},
@@ -16,28 +13,27 @@ pub struct Connection {
     pub text_channel_id: Id<ChannelMarker>,
     pub mute: bool,
     poll: Option<Poll>,
-    change: Notify,
+    change: watch::Sender<()>,
     event_sender: broadcast::Sender<Event>,
 }
 
 impl Connection {
     pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+        let (change, _) = watch::channel(());
+
         Self {
             channel_id,
             text_channel_id,
             mute: false,
-            change: Notify::new(),
+            change,
             event_sender: broadcast::channel(16).0,
             poll: None,
         }
     }
 
     /// Wait until the connection is changed or the timeout is reached.
-    pub fn on_changed<'a>(&'a self) -> Timeout<Notified<'a>> {
-        tracing::trace!("waiting for connection change notification");
-        let duration = r#const::connection::CHANGED_TIMEOUT;
-        let future = self.change.notified();
-        tokio::time::timeout(duration, future)
+    pub fn subscribe_on_changed(&self) -> watch::Receiver<()> {
+        self.change.subscribe()
     }
 
     pub const fn poll(&self) -> Option<&Poll> {
@@ -56,7 +52,7 @@ impl Connection {
     /// Notify the connection to trigger a change.
     pub fn notify_change(&self) {
         tracing::trace!("notified connection change");
-        self.change.notify_one();
+        self.change.send(()).ok();
     }
 
     /// Subscribe to events from this connection.
