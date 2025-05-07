@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use lavalink_rs::error::LavalinkError;
+use lyra_ext::pretty::flags_display::FlagsDisplay;
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
@@ -466,8 +467,9 @@ async fn match_autojoin_attempt_failed(
         AutoJoinAttemptFailedError::Forbidden(e) => {
             cant_or_fol!(
                 format!(
-                    "Attempting to join {} failed due to insufficient permissions.",
-                    e.0.mention()
+                    "**Attempting to join {} failed due to insufficient permissions**: Missing {} permissions.",
+                    e.channel_id.mention(),
+                    e.missing.pretty_display_code()
                 ),
                 ia
             );

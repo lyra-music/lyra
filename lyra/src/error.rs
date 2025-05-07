@@ -56,8 +56,11 @@ pub struct NotInVoice;
 pub struct UserNotInVoice;
 
 #[derive(Error, Debug)]
-#[error("insufficient permissions to connect to voice channel: {}", .0)]
-pub struct ConnectionForbidden(pub Id<ChannelMarker>);
+#[error("insufficient permissions (missing {:?}) to connect to voice channel: {}", .missing, .channel_id)]
+pub struct ConnectionForbidden {
+    pub channel_id: Id<ChannelMarker>,
+    pub missing: twilight_model::guild::Permissions,
+}
 
 #[derive(Error, Debug)]
 #[error("bot is already in voice: {}", .0)]

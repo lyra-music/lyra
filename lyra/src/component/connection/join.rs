@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Display, sync::Arc};
 
-use lyra_ext::{iso8601_time, unix_time};
+use lyra_ext::{iso8601_time, pretty::flags_display::FlagsDisplay, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_mention::{
@@ -198,11 +198,17 @@ async fn impl_connect_to(
     guild_id: Id<GuildMarker>,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ImplConnectToError> {
-    if !ctx
-        .bot_permissions_for(channel_id)?
-        .contains(Permissions::CONNECT)
-    {
-        return Err(error::ConnectionForbidden(channel_id).into());
+    const JOIN_PERMISSIONS: Permissions = Permissions::VIEW_CHANNEL
+        .union(Permissions::CONNECT)
+        .union(Permissions::SPEAK);
+
+    let perms = ctx.bot_permissions_for(channel_id)?;
+    if !perms.contains(JOIN_PERMISSIONS) {
+        return Err(error::ConnectionForbidden {
+            channel_id,
+            missing: JOIN_PERMISSIONS - perms,
+        }
+        .into());
     }
 
     check::user_allowed_to_use(channel_id, channel_parent_id, ctx).await?;
@@ -430,7 +436,11 @@ impl BotSlashCommand for Join {
             }
             Pfe::Forbidden(e) => {
                 cant!(
-                    format!("Insufficient permissions to join {}.", e.0.mention()),
+                    format!(
+                        "**Insufficient permissions to join {}**: Missing {} permissions.",
+                        e.channel_id.mention(),
+                        e.missing.pretty_display_code()
+                    ),
                     ctx
                 );
             }
