@@ -35,12 +35,12 @@ impl BotSlashCommand for FairQueue {
                     .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
                     .await?;
 
-                out!("**` ⮆ `** Disabled fair queue", ?ctx);
+                out!("**` ⮆ `** Disabled fair queue.", ?ctx);
                 Ok(())
             }
             IndexerType::Shuffled => {
                 bad!(
-                    "Cannot enable fair queue as shuffle is currently enabled",
+                    "Cannot enable fair queue as shuffle is currently enabled.",
                     ctx
                 );
             }
@@ -50,7 +50,7 @@ impl BotSlashCommand for FairQueue {
                     .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Fair)
                     .await?;
 
-                out!("⚖️ Enabled fair queue", ?ctx);
+                out!("⚖️ Enabled fair queue.", ?ctx);
                 Ok(())
             }
         }

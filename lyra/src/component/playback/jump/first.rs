@@ -26,18 +26,18 @@ impl BotSlashCommand for First {
         }
         let queue_len = queue.len();
         if queue_len == 1 {
-            bad!("No where else to jump to", ctx);
+            bad!("No where else to jump to.", ctx);
         }
 
         if queue.position().get() == 1 {
-            bad!("Cannot jump to the current track", ctx);
+            bad!("Cannot jump to the current track.", ctx);
         }
 
         queue.downgrade_repeat_mode();
         queue.acquire_advance_lock();
 
         let track = queue[0].data();
-        let txt = format!("⬅️ Jumped to `{}` (`#1`)", track.info.title);
+        let txt = format!("⬅️ Jumped to `{}` (`#1`).", track.info.title);
         player.context.play_now(track).await?;
 
         *queue.index_mut() = 0;

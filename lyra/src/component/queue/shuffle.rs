@@ -45,14 +45,14 @@ pub async fn shuffle(
                 .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
                 .await?;
 
-            let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle");
+            let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle.");
             out!(content, ?ctx);
             Ok(())
         }
         IndexerType::Fair => {
             bad!(
                 // The shuffle button on the playback controller will be disabled, so no need to use `controller_fmt` here
-                "Cannot enable shuffle as fair queue is currently enabled",
+                "Cannot enable shuffle as fair queue is currently enabled.",
                 ctx
             );
         }
@@ -62,7 +62,7 @@ pub async fn shuffle(
                 .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Shuffled)
                 .await?;
 
-            let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle");
+            let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle.");
             out!(content, ?ctx);
             Ok(())
         }

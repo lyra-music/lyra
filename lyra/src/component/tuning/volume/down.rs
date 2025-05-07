@@ -55,7 +55,7 @@ impl BotSlashCommand for Down {
         };
 
         out!(
-            format!("{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}"),
+            format!("{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}."),
             ctx
         );
     }

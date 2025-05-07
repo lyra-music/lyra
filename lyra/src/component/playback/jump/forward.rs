@@ -38,11 +38,11 @@ impl BotSlashCommand for Forward {
         if new_position.get() > queue_len {
             let maximum_jump = queue_len - queue_position.get();
             if maximum_jump == 0 {
-                bad!("No where else to jump to", ctx);
+                bad!("No where else to jump to.", ctx);
             }
             bad!(
                 format!(
-                    "Cannot jump past the end of the queue. Maximum forward jump is {} tracks.",
+                    "**Cannot jump past the end of the queue**; Maximum forward jump is `{} tracks`.",
                     maximum_jump,
                 ),
                 ctx
@@ -57,7 +57,7 @@ impl BotSlashCommand for Forward {
         queue.acquire_advance_lock();
 
         let track = queue[new_position].data();
-        let txt = format!("↪️ Jumped to `{}` (`#{}`)", track.info.title, new_position);
+        let txt = format!("↪️ Jumped to `{}` (`#{}`).", track.info.title, new_position);
         player.context.play_now(track).await?;
 
         *queue.index_mut() = new_position.get() - 1;

@@ -38,7 +38,7 @@ impl BotSlashCommand for To {
         let timestamp_unchecked = self.timestamp;
         let timestamp = if let Ok(secs) = timestamp_unchecked.parse::<f64>() {
             if secs < 0. {
-                bad!("Timestamp as total seconds must be positive", ctx);
+                bad!("Timestamp as total seconds must be positive.", ctx);
             }
 
             Duration::from_secs_f64(secs)
@@ -47,7 +47,8 @@ impl BotSlashCommand for To {
         } else {
             bad!(
                 format!(
-                    "Invalid timestamp: `{}`; Timestamp must either be in the format like 1m23s or 4:56, or as the total seconds like 78s",
+                    "**Invalid timestamp: `{}`**; \
+                    Timestamp must either be in the format like `1m23s` or `4:56`, or as the total seconds like `78s`.",
                     timestamp_unchecked,
                 ),
                 ctx
@@ -57,12 +58,11 @@ impl BotSlashCommand for To {
         let current_track_length = u128::from(current_track.track.data().info.length);
 
         if timestamp.is_zero() {
-            let restart = InteractionClient::mention_command::<Restart>();
-
             bad!(
                 format!(
-                    "Timestamp must not be 0:00. To restart the track, use {} instead.",
-                    restart
+                    "Timestamp must not be 0:00.\n\
+                    -# To restart the track, use {} instead.",
+                    InteractionClient::mention_command::<Restart>()
                 ),
                 ctx
             );
@@ -70,7 +70,7 @@ impl BotSlashCommand for To {
         if timestamp.as_millis() > current_track_length {
             bad!(
                 format!(
-                    "Invalid timestamp: `{}`; Timestamp must be within the track length of `{}`",
+                    "**Invalid timestamp: `{}`**; Timestamp must be within the track length of `{}`.",
                     timestamp.pretty_display(),
                     current_track_length.pretty_display(),
                 ),
@@ -86,7 +86,7 @@ impl BotSlashCommand for To {
             .await?;
         out!(
             format!(
-                "🕹️ ~~`{}`~~ ➜ **`{}`**",
+                "🕹️ ~~`{}`~~ ➜ **`{}`**.",
                 old_position.pretty_display(),
                 timestamp.pretty_display(),
             ),

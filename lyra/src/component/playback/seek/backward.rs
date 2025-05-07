@@ -32,7 +32,7 @@ impl BotSlashCommand for Backward {
 
         let secs = self.seconds.unwrap_or(5.);
         if secs == 0. {
-            bad!("Seconds can not be zero", ctx);
+            bad!("Seconds can not be zero.", ctx);
         }
 
         let old_timestamp = data_r.timestamp();
@@ -45,7 +45,7 @@ impl BotSlashCommand for Backward {
 
         out!(
             format!(
-                "⏪ ~~`{}`~~ ➜ **`{}`**",
+                "⏪ ~~`{}`~~ ➜ **`{}`**.",
                 old_timestamp.pretty_display(),
                 timestamp.pretty_display(),
             ),

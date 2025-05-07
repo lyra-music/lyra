@@ -52,7 +52,7 @@ pub async fn skip(
         player.context.stop_now().await?;
     }
     drop(data_w);
-    let message = format!("⏭️ ~~`{current_track_title}`~~");
+    let message = format!("⏭️ ~~`{current_track_title}`~~.");
     let content = controller_fmt(ctx, via_controller, &message);
     out!(content, ctx);
 }

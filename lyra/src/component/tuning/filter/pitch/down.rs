@@ -29,6 +29,6 @@ impl BotSlashCommand for Down {
         let (old, new) = shift_pitch(&player, -half_tones).await?;
 
         let emoji = new.tier().emoji();
-        out!(format!("{emoji}**`ー`** ~~`{old}`~~ ➜ **`{new}`**"), ctx);
+        out!(format!("{emoji}**`ー`** ~~`{old}`~~ ➜ **`{new}`**."), ctx);
     }
 }

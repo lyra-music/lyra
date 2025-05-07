@@ -90,7 +90,7 @@ impl BotSlashCommand for On {
         let settings = update.settings();
 
         player.update_filter(Some(update)).await?;
-        out!(format!("😶‍🌫️🟢 Enabled low pass ({settings})"), ctx);
+        out!(format!("😶‍🌫️🟢 Enabled low pass ({settings})."), ctx);
     }
 }
 
@@ -105,6 +105,6 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetLowPass>).await?;
-        out!("😶‍🌫️🔴 Disabled low pass", ctx);
+        out!("😶‍🌫️🔴 Disabled low pass.", ctx);
     }
 }

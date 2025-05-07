@@ -83,7 +83,7 @@ impl BotSlashCommand for Leave {
         let mut ctx = require::guild(ctx)?;
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
-                out!(format!("📎 ~~{}~~", voice.mention()), ctx);
+                out!(format!("📎 ~~{}~~.", voice.mention()), ctx);
             }
             Err(e) => match e.match_not_in_voice_into() {
                 leave::NotInVoiceMatchedError::NotInVoice(_) => {

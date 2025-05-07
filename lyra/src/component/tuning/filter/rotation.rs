@@ -82,6 +82,6 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetRotation>).await?;
-        out!("🍳🔴 Disabled rotation", ctx);
+        out!("🍳🔴 Disabled rotation.", ctx);
     }
 }

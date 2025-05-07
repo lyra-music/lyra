@@ -170,7 +170,7 @@ impl BotSlashCommand for Move {
         if self.track == self.position {
             bad!(
                 format!(
-                    "Invalid new position: {}; New position must be different from the old position",
+                    "**Invalid new position: `{}`**; New position must be different from the old position.",
                     self.position
                 ),
                 ctx
@@ -196,7 +196,7 @@ impl BotSlashCommand for Move {
             .remove(track_position.get() - 1)
             .expect("new track position must be in-bounds");
         let track_title = track.data().info.corrected_title();
-        let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**");
+        let message = format!("⤴️ Moved `{track_title}` to position **`{position}`**.");
 
         let insert_position = position.get() - 1;
 

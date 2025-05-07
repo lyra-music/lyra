@@ -90,7 +90,7 @@ pub async fn repeat(
         .set_repeat_mode_then_update_and_apply_to_now_playing(mode)
         .await?;
 
-    let message = format!("{} {}", mode.emoji(), mode);
+    let message = format!("{} {}.", mode.emoji(), mode);
     let content = controller_fmt(ctx, via_controller, &message);
     out_or_upd!(content, ?ctx);
     Ok(())

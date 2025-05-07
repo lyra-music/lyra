@@ -96,7 +96,7 @@ impl BotSlashCommand for On {
         ) else {
             bad!(
                 format!(
-                    "At least one setting must be changed: Same-channel settings must not all be `{}`, and cross-channel settings must not all be `{}`",
+                    "**At least one setting must be changed**: Same-channel settings must not all be `{}`, and cross-channel settings must not all be `{}`.",
                     SetChannelMix::DEFAULT_SAME_CHANNEL,
                     SetChannelMix::DEFAULT_CROSS_CHANNEL,
                 ),
@@ -105,7 +105,7 @@ impl BotSlashCommand for On {
         };
 
         player.update_filter(Some(update)).await?;
-        out!("⚗️🟢 Enabled channel mix)", ctx);
+        out!("⚗️🟢 Enabled channel mix).", ctx);
     }
 }
 
@@ -120,6 +120,6 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetChannelMix>).await?;
-        out!("⚗️🔴 Disabled channel mix", ctx);
+        out!("⚗️🔴 Disabled channel mix.", ctx);
     }
 }

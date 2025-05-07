@@ -809,14 +809,14 @@ pub trait UnwrappedData {
 impl UnwrappedData for PlayerContext {
     type Data = OwnedPlayerData;
     fn data_unwrapped(&self) -> Self::Data {
-        self.data().expect("player data must exists")
+        self.data().expect("player data must exist")
     }
 }
 
 impl UnwrappedData for LavalinkClient {
     type Data = OwnedClientData;
     fn data_unwrapped(&self) -> Self::Data {
-        self.data().expect("lavalink data must exists")
+        self.data().expect("lavalink data must exist")
     }
 }
 
@@ -827,14 +827,11 @@ pub trait UnwrappedPlayerInfoUri {
 
 impl UnwrappedPlayerInfoUri for TrackInfo {
     fn uri_unwrapped(&self) -> &str {
-        self.uri
-            .as_ref()
-            .unwrap_or_else(|| panic!("local tracks are unsupported"))
+        self.uri.as_ref().expect("track must be nonlocal")
     }
 
     fn into_uri_unwrapped(self) -> String {
-        self.uri
-            .unwrap_or_else(|| panic!("local tracks are unsupported"))
+        self.uri.expect("track must be nonlocal")
     }
 }
 

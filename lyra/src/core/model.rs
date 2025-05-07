@@ -351,7 +351,7 @@ impl BotState {
     pub fn user(&self) -> CurrentUser {
         self.cache
             .current_user()
-            .unwrap_or_else(|| panic!("current user isn't in cache"))
+            .expect("current user must be in cache")
     }
 
     #[inline]

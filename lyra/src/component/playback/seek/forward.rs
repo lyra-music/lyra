@@ -33,7 +33,7 @@ impl BotSlashCommand for Forward {
 
         let secs = self.seconds.unwrap_or(10.);
         if secs == 0. {
-            bad!("Seconds must not be zero", ctx);
+            bad!("Seconds must not be zero.", ctx);
         }
 
         let old_timestamp = data_r.timestamp();
@@ -46,7 +46,7 @@ impl BotSlashCommand for Forward {
             let remaining = timestamp.as_millis() - current_track_length;
             bad!(
                 format!(
-                    "Cannot seek past the end of the track. Maximum forward seek is {} seconds.",
+                    "**Cannot seek past the end of the track**; Maximum forward seek is `{} seconds`.",
                     remaining.div_ceil(1_000),
                 ),
                 ctx
@@ -58,7 +58,7 @@ impl BotSlashCommand for Forward {
 
         out!(
             format!(
-                "⏩ ~~`{}`~~ ➜ **`{}`**",
+                "⏩ ~~`{}`~~ ➜ **`{}`**.",
                 old_timestamp.pretty_display(),
                 timestamp.pretty_display(),
             ),

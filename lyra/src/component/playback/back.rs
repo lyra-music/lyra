@@ -55,8 +55,8 @@ pub async fn back(
     let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;
     let message = current_track_title.map_or_else(
-        || format!("⏮️ `{}`", item.data().info.title),
-        |title| format!("⏮️ ~~`{title}`~~",),
+        || format!("⏮️ `{}`.", item.data().info.title),
+        |title| format!("⏮️ ~~`{title}`~~.",),
     );
     drop(data_w);
 

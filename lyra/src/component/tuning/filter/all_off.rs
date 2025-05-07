@@ -43,6 +43,6 @@ impl crate::command::model::BotSlashCommand for AllOff {
         player.update_filter(ResetAllExceptSpeed).await?;
         player.data().write().await.pitch_mut().reset();
 
-        out!("🪄🔴 Disabled all filters", ctx);
+        out!("🪄🔴 Disabled all filters.", ctx);
     }
 }

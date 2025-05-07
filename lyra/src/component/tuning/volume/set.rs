@@ -31,6 +31,6 @@ impl BotSlashCommand for Set {
         let emoji = super::volume_emoji(Some(percent));
         let warning = super::clipping_warning(percent);
 
-        out!(format!("{emoji} `{percent}`%{warning}"), ctx);
+        out!(format!("{emoji} `{percent}`%{warning}."), ctx);
     }
 }

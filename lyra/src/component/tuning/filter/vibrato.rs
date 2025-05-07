@@ -46,7 +46,7 @@ impl BotSlashCommand for On {
         let settings = update.settings();
 
         player.update_filter(Some(update)).await?;
-        out!(format!("🎻🟢 Enabled vibrato ({settings})"), ctx);
+        out!(format!("🎻🟢 Enabled vibrato ({settings})."), ctx);
     }
 }
 
@@ -61,6 +61,6 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetVibrato>).await?;
-        out!("🎻🔴 Disabled vibrato", ctx);
+        out!("🎻🔴 Disabled vibrato.", ctx);
     }
 }

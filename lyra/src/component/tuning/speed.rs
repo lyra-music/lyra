@@ -119,7 +119,7 @@ impl BotSlashCommand for Speed {
 
         let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
         else {
-            bad!("Multiplier must not be zero", ctx);
+            bad!("Multiplier must not be zero.", ctx);
         };
 
         let multiplier = update.multiplier();

@@ -232,7 +232,7 @@ impl BotSlashCommand for MemberRole {
 
         out!(
             format!(
-                "🔐{} {} **`{}`** member(s) or role(s) {} to the guild's access controls{}",
+                "🔐{} {} **`{}`** member(s) or role(s) {} to the guild's access controls{}.",
                 self.action.as_operator_icon(),
                 self.action.as_verb_past(),
                 rows_affected,

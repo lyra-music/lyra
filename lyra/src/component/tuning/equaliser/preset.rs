@@ -41,7 +41,7 @@ impl crate::command::model::BotSlashCommand for Preset {
         player.update_filter(update).await?;
         out!(
             format!(
-                "🎛️🟢 Enabled player equaliser (Preset: **`{}`**)",
+                "🎛️🟢 Enabled player equaliser (Preset: **`{}`**).",
                 preset_name
             ),
             ctx

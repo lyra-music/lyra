@@ -25,6 +25,6 @@ impl BotSlashCommand for Restart {
         player
             .seek_to_with(Duration::ZERO, &mut data.write().await)
             .await?;
-        out!("◀️ Restarted", ctx);
+        out!("◀️ Restarted.", ctx);
     }
 }

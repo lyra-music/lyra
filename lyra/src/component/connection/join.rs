@@ -333,7 +333,7 @@ async fn handle_response(
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
             out_or_fol!(
-                stage_fmt(&format!("🖇️ {}", voice.id.mention()), stage),
+                stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage),
                 ?ctx
             );
             (voice, empty)
@@ -342,7 +342,7 @@ async fn handle_response(
             let stage = matches!(to.kind, JoinedChannelType::Stage);
             out_or_fol!(
                 stage_fmt(
-                    &format!("️📎🖇️ ~~{}~~ ➜ __{}__", from.mention(), to.id.mention()),
+                    &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
                     stage,
                 ),
                 ?ctx
@@ -379,7 +379,7 @@ async fn handle_response(
     let muted = state.mute();
     if muted {
         sus_fol!(
-            "Currently server muted; Some features will be limited.",
+            "**Currently server muted**; Some features will be limited.",
             ?ctx
         );
     }

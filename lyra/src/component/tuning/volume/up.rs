@@ -75,7 +75,7 @@ impl BotSlashCommand for Up {
 
         out!(
             format!(
-                "{emoji}**`＋`** ~~{old_percent_str}~~ ➜ **`{new_percent}%`**{maxed_note}{warning}"
+                "{emoji}**`＋`** ~~{old_percent_str}~~ ➜ **`{new_percent}%`**{maxed_note}{warning}."
             ),
             ctx
         );

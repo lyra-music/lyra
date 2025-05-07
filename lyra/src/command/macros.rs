@@ -176,7 +176,7 @@ generate_hid_or_fol_variants! {
     // note_or_fol => NOTICE,
     // dub_or_fol => DUBIOUS,
     // caut_or_fol => WARNING,
-    what_or_fol => NOT_FOUND,
+    // what_or_fol => NOT_FOUND,
     bad_or_fol => INVALID,
     nope_or_fol => PROHIBITED,
     cant_or_fol => FORBIDDEN,

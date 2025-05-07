@@ -47,7 +47,7 @@ impl BotSlashCommand for Clear {
 
         let (mut ctx, confirmed) = prompt_for_confirmation(ctx).await?;
         if !confirmed {
-            note!("Cancelled executing this command", ctx);
+            note!("Cancelled executing this command.", ctx);
         }
 
         let mut rows_affected = 0;

@@ -26,7 +26,7 @@ impl BotSlashCommand for ToggleMute {
             .mute(mute)
             .await?;
 
-        let message = if mute { "🔇 Muted" } else { "🔊 Unmuted" };
+        let message = if mute { "🔇 Muted." } else { "🔊 Unmuted." };
         out!(message, ctx);
     }
 }

@@ -38,6 +38,6 @@ impl BotSlashCommand for Clear {
         ctx.get_conn().dispatch(Event::QueueClear).await?;
 
         data.write().await.queue_mut().clear();
-        out!("⏹️ Cleared the queue", ctx);
+        out!("⏹️ Cleared the queue.", ctx);
     }
 }

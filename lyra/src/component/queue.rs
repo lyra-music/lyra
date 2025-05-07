@@ -302,7 +302,7 @@ async fn impl_remove(
     }
     drop(data_w);
 
-    out!(format!("{} Removed {}", minus, removed_text), ?ctx);
+    out!(format!("{} Removed {}.", minus, removed_text), ?ctx);
 
     if queue_cleared {
         let clear = InteractionClient::mention_command::<Clear>();

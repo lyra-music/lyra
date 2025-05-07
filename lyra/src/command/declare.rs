@@ -43,7 +43,7 @@ macro_rules! declare_slash_commands {
             }
         }
 
-        static SLASH_COMMANDS_MAP: LazyLock<SlashCommandMap> = LazyLock::new(|| {
+        static SLASH_COMMAND_MAP: LazyLock<SlashCommandMap> = LazyLock::new(|| {
             ::paste::paste! {
                 SlashCommandMap {
                     $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
@@ -56,14 +56,14 @@ macro_rules! declare_slash_commands {
         #[inline]
         fn slash_commands() -> SlashCommands {
             ::paste::paste! {
-                [ $( SLASH_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
+                [ $( SLASH_COMMAND_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
             }
         }
 
         // using a hashmap should significantly improve command respond times
         type Callback = &'static (dyn Fn(SlashCtx, CommandData) ->
             Pin<Box<dyn Future<Output = Result<(), CommandExecuteError>> + Send>> + Send + Sync);
-        static SLASH_COMMANDS_CALLBACK: LazyLock<HashMap<&'static str, Callback>> = LazyLock::new(|| {
+        static SLASH_COMMAND_CALLBACK: LazyLock<HashMap<&'static str, Callback>> = LazyLock::new(|| {
             HashMap::from(
                 ::paste::paste! {[$({
                     #[lavalink_rs::hook]
@@ -80,7 +80,7 @@ macro_rules! declare_slash_commands {
             pub async fn execute(self, data: CommandData) -> Result<(), CommandExecuteError> {
                 check::user_allowed_in(&self).await?;
 
-                if let Some(callback) = SLASH_COMMANDS_CALLBACK.get(&*data.name) {
+                if let Some(callback) = SLASH_COMMAND_CALLBACK.get(&*data.name) {
                     Ok(callback(self, data).await?)
                 } else {
                     let cmd_data = self.into_command_data();
@@ -100,7 +100,7 @@ macro_rules! declare_message_commands {
             }
         }
 
-        static MESSAGE_COMMANDS_MAP: LazyLock<MessageCommandMap> = LazyLock::new(|| {
+        static MESSAGE_COMMAND_MAP: LazyLock<MessageCommandMap> = LazyLock::new(|| {
             ::paste::paste! {
                 MessageCommandMap {
                     $([<_ $raw_cmd:snake>]: <$raw_cmd>::create_command().into(),)*
@@ -113,7 +113,7 @@ macro_rules! declare_message_commands {
         #[inline]
         fn message_commands() -> MessageCommands {
             ::paste::paste! {
-                [ $( MESSAGE_COMMANDS_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
+                [ $( MESSAGE_COMMAND_MAP.[<_ $raw_cmd:snake>].clone(), )* ]
             }
         }
 
@@ -194,7 +194,7 @@ declare_autocomplete![
     Jump => JumpAutocomplete,
 ];
 
-pub static POPULATED_COMMANDS_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
+pub static POPULATED_COMMAND_MAP: OnceLock<HashMap<&'static str, Command>> = OnceLock::new();
 
 const COMMANDS_N: usize = SLASH_COMMANDS_N + MESSAGE_COMMANDS_N;
 type Commands = [Command; COMMANDS_N];

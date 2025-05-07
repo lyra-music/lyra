@@ -102,7 +102,7 @@ impl BotSlashCommand for On {
         let Some(update) = SetDistortion::new(distortion) else {
             bad!(
                 format!(
-                    "At least one setting must be changed: Offset settings must not all be `{}`, and scale settings must not all be `{}`",
+                    "**At least one setting must be changed**: Offset settings must not all be `{}`, and scale settings must not all be `{}`.",
                     SetDistortion::DEFAULT_OFFSET,
                     SetDistortion::DEFAULT_SCALE,
                 ),
@@ -111,7 +111,7 @@ impl BotSlashCommand for On {
         };
 
         player.update_filter(Some(update)).await?;
-        out!(format!("🍭🟢 Enabled distortion"), ctx);
+        out!(format!("🍭🟢 Enabled distortion."), ctx);
     }
 }
 
@@ -126,6 +126,6 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetDistortion>).await?;
-        out!("🍭🔴 Disabled distortion", ctx);
+        out!("🍭🔴 Disabled distortion.", ctx);
     }
 }

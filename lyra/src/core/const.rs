@@ -128,7 +128,7 @@ pub mod exit_code {
     /// A harmless warning
     pub const WARNING: &str = "❗";
     /// Needed information was not found, implying user given an incorrect query
-    pub const NOT_FOUND: &str = "❓";
+    // pub const NOT_FOUND: &str = "❓";
     /// Invalid command usage, implying unmet conditions
     pub const INVALID: &str = "❌";
     /// User lacked sufficient permissions

@@ -34,11 +34,11 @@ impl BotSlashCommand for Backward {
         let queue_index = queue.index();
         let Some(index) = queue_index.checked_sub(tracks) else {
             if queue_index == 0 {
-                bad!("No where else to jump to", ctx);
+                bad!("No where else to jump to.", ctx);
             }
             bad!(
                 format!(
-                    "Cannot jump past the start of the queue. Maximum backward jump is {} tracks.",
+                    "**Cannot jump past the start of the queue**; Maximum backward jump is `{} tracks`.",
                     queue_index,
                 ),
                 ctx
@@ -49,7 +49,7 @@ impl BotSlashCommand for Backward {
         queue.acquire_advance_lock();
 
         let track = queue[index].data();
-        let txt = format!("↩️ Jumped to `{}` (`#{}`)", track.info.title, index + 1);
+        let txt = format!("↩️ Jumped to `{}` (`#{}`).", track.info.title, index + 1);
         player.context.play_now(track).await?;
 
         *queue.index_mut() = index;

@@ -88,7 +88,7 @@ impl crate::command::model::BotSlashCommand for Custom {
         let Some(filter) = SetEqualiser::new(equaliser) else {
             bad!(
                 format!(
-                    "At least one band gain must be changed: Band gains must not all be `{}`",
+                    "**At least one band gain must be changed**; Band gains must not all be `{}`.",
                     SetEqualiser::DEFAULT_GAIN
                 ),
                 ctx
@@ -96,6 +96,9 @@ impl crate::command::model::BotSlashCommand for Custom {
         };
 
         player.update_filter(Some(filter)).await?;
-        out!("🎛️🟢 Enabled player equaliser (**`Custom Settings`**)", ctx);
+        out!(
+            "🎛️🟢 Enabled player equaliser (**`Custom Settings`**).",
+            ctx
+        );
     }
 }

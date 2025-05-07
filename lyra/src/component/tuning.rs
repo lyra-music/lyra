@@ -97,7 +97,7 @@ pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twili
         tracing::warn!("guild {} {} forcefully", guild_id, describe);
         bot.http()
             .create_message(head.text_channel_id())
-            .content(&format!("{emoji} `(Bot was forcefully {describe})`"))
+            .content(&format!("{emoji} `(Bot was forcefully {describe})`."))
             .await?;
     }
     Ok(())

@@ -16,6 +16,6 @@ impl crate::command::model::BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<super::SetEqualiser>).await?;
-        out!("🎛️🔴 Disabled equaliser", ctx);
+        out!("🎛️🔴 Disabled equaliser.", ctx);
     }
 }

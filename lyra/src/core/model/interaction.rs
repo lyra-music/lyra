@@ -17,7 +17,7 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    command::declare::{POPULATED_COMMANDS_MAP, commands},
+    command::declare::{POPULATED_COMMAND_MAP, commands},
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
 };
 
@@ -367,7 +367,7 @@ impl<'a> Client<'a> {
             .models()
             .await?;
 
-        POPULATED_COMMANDS_MAP.get_or_init(|| {
+        POPULATED_COMMAND_MAP.get_or_init(|| {
             commands
                 .into_iter()
                 .map(|c| (&*c.name.clone().leak(), c))
@@ -380,9 +380,9 @@ impl<'a> Client<'a> {
     pub fn populated_command<T: CreateCommand>()
     -> &'static twilight_model::application::command::Command {
         let name = T::NAME;
-        POPULATED_COMMANDS_MAP
+        POPULATED_COMMAND_MAP
             .get()
-            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"))
+            .expect("populated command map must be populated")
             .get(name)
             .unwrap_or_else(|| panic!("command not found: {name}"))
     }
@@ -390,11 +390,8 @@ impl<'a> Client<'a> {
     pub fn mention_command<T: CreateCommand>() -> MentionCommand {
         let cmd = Self::populated_command::<T>();
 
-        let name = cmd.name.clone().into();
-        let id = cmd
-            .id
-            .unwrap_or_else(|| panic!("`POPULATED_COMMANDS_MAP` is not yet populated"));
-        MentionCommand::new(name, id)
+        let id = cmd.id.expect("populated command map must be populated");
+        MentionCommand::new(cmd.name.clone().into(), id)
     }
 
     #[inline]

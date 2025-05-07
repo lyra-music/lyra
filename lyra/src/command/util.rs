@@ -171,10 +171,7 @@ impl<T: UserIdAware + GuildAvatarAware> GuildAvatarUrlAware for T {}
 
 impl UserIdAware for PartialMember {
     fn user_id(&self) -> Id<UserMarker> {
-        self.user
-            .as_ref()
-            .unwrap_or_else(|| panic!("user field is missing"))
-            .id
+        self.user.as_ref().expect("user field must exist").id
     }
 }
 

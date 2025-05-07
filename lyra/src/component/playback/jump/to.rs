@@ -95,7 +95,7 @@ impl BotSlashCommand for To {
 
         let queue_len = queue.len();
         if queue_len == 1 {
-            bad!("No where else to jump to", ctx);
+            bad!("No where else to jump to.", ctx);
         }
 
         let input = self.track;
@@ -104,7 +104,7 @@ impl BotSlashCommand for To {
         #[allow(clippy::cast_possible_truncation)]
         let position = input.unsigned_abs() as usize;
         if position == queue.position().get() {
-            bad!("Cannot jump to the current track", ctx);
+            bad!("Cannot jump to the current track.", ctx);
         }
 
         queue.downgrade_repeat_mode();
@@ -112,7 +112,7 @@ impl BotSlashCommand for To {
 
         let index = position - 1;
         let track = queue[index].data();
-        let txt = format!("↔️ Jumped to `{}` (`#{}`)", track.info.title, position);
+        let txt = format!("↔️ Jumped to `{}` (`#{}`).", track.info.title, position);
         player.context.play_now(track).await?;
 
         *queue.index_mut() = index;

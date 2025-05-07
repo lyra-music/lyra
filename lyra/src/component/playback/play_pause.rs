@@ -45,9 +45,9 @@ pub async fn play_pause(
     drop(data_w);
 
     let message = if pause {
-        "▶️ Paused"
+        "▶️ Paused."
     } else {
-        "⏸️ Resumed"
+        "⏸️ Resumed."
     };
     let content = controller_fmt(ctx, via_controller, message);
     out!(content, ctx);

@@ -137,7 +137,7 @@ async fn start_inactivity_timeout(
     ctx.http()
         .create_message(text_channel_id)
         .content(&format!(
-            "💤📎 ~~{}~~ `(Left due to inactivity)`",
+            "💤📎 ~~{}~~ `(Left due to inactivity)`.",
             channel_id.mention()
         ))
         .await?;
@@ -181,7 +181,7 @@ pub async fn handle_voice_state_update(
                     player.set_pause(true).await?;
                     ctx.http()
                         .create_message(text_channel_id)
-                        .content("⚡▶ Paused `(Bot is not used by anyone)`")
+                        .content("⚡▶ Paused `(Bot is not used by anyone)`.")
                         .await?;
                 }
 
@@ -204,7 +204,7 @@ pub async fn handle_voice_state_update(
                 .http()
                 .create_message(text_channel_id)
                 .content(&format!(
-                    "{}📎 ~~{}~~ `(Bot was forcefully disconnected)`",
+                    "{}📎 ~~{}~~ `(Bot was forcefully disconnected)`.",
                     NOTICE,
                     old_channel_id.mention()
                 ))
@@ -255,7 +255,7 @@ async fn match_state_channel_id(
                     timestamp.mention()
                 )
             } else {
-                String::from("`(Bot was forcefully moved)`")
+                String::from("` (Bot was forcefully moved)`")
             };
 
             let stage_emoji = match joined.kind {
@@ -268,7 +268,7 @@ async fn match_state_channel_id(
                 .http()
                 .create_message(text_channel_id)
                 .content(&format!(
-                    "{}{}📎🖇️ ~~{}~~ ➜ __{}__ {}",
+                    "{}{}📎🖇️ ~~{}~~ ➜ __{}__{}.",
                     NOTICE,
                     stage_emoji,
                     old_channel_id.mention(),

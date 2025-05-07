@@ -63,7 +63,7 @@ pub async fn handle_voice_state_update(
         player.set_pause(true).await?;
         ctx.http()
             .create_message(text_channel_id)
-            .content("⚡▶ Paused `(Bot was moved to audience)`")
+            .content("⚡▶ Paused `(Bot was moved to audience).`")
             .await?;
     }
 

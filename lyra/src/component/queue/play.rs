@@ -28,7 +28,7 @@ use crate::{
     LavalinkAware,
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
-        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol, what_or_fol},
+        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol},
         model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
         require, util,
     },
@@ -383,20 +383,21 @@ async fn play(
                 .enqueue(total_tracks, ctx.user_id());
             player.play(&first_track).await?;
 
-            out_or_fol!(format!("{} Added {}", plus, enqueued_text), ctx);
+            out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
         }
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    crit_or_fol!(format!("Failed to load tracks for query: `{}`", query), ctx);
+                    crit_or_fol!(
+                        format!("Failed to load tracks for query: `{}`.", query),
+                        ctx
+                    );
                 }
-                QueryError::NoMatches(query) => {
-                    what_or_fol!(format!("No matches found for query: `{}`", query), ctx);
-                }
-                QueryError::SearchResult(query) => {
+                QueryError::SearchResult(query) | QueryError::NoMatches(query) => {
                     bad_or_fol!(
                         format!(
-                            "Given query is not a URL: `{}`. Try using the command's autocomplete to search for tracks.",
+                            "**Given query is not a URL: `{}`**; Use the command's autocomplete to search for tracks instead. \n\
+                            -# If the autocomplete results are empty, try using a different search query.",
                             query
                         ),
                         ctx
