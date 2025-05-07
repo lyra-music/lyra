@@ -180,7 +180,7 @@ generate_hid_or_fol_variants! {
     bad_or_fol => INVALID,
     nope_or_fol => PROHIBITED,
     cant_or_fol => FORBIDDEN,
-    // err_or_fol => KNOWN_ERROR,
+    err_or_fol => KNOWN_ERROR,
     crit_or_fol => UNKNOWN_ERROR
 }
 

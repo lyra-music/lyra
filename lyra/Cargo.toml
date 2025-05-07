@@ -42,9 +42,9 @@ bitflags = "2.9.0"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "2.0.12"
-color-eyre = "0.6.3"
+color-eyre = "0.6.4"
 futures = "0.3.31"
-tokio = { version = "1.44.2", features = [
+tokio = { version = "1.45.0", features = [
     "sync",
     "signal",
     "rt-multi-thread",
@@ -103,4 +103,4 @@ reqwest = { version = "0.12.15", default-features = false, features = [
     "charset",
     "rustls-tls-native-roots",
 ] }
-rustls = "0.23.26"
+rustls = "0.23.27"

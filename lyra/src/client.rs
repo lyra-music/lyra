@@ -1,11 +1,3 @@
-#[inline]
-#[allow(dead_code)]
-fn parse_directive(parsed: &str) -> tracing_subscriber::filter::Directive {
-    parsed
-        .parse()
-        .unwrap_or_else(|e| panic!("invalid directive `{parsed}`: {e}"))
-}
-
 #[tracing::instrument(err)]
 pub async fn run() -> Result<(), super::error::Run> {
     color_eyre::install()?;

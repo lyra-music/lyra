@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use lavalink_rs::error::LavalinkError;
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
@@ -17,8 +18,8 @@ use crate::{
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
         macros::{
-            bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, hid, nope, nope_or_fol,
-            note, out_upd, sus, sus_fol,
+            bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, err_or_fol, hid,
+            hid_or_fol, nope, nope_or_fol, note, out_upd, sus, sus_fol,
         },
         model::{ComponentCtx, NonPingInteraction},
         require,
@@ -267,6 +268,7 @@ impl Context {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
@@ -274,6 +276,8 @@ async fn match_error(
     i: InteractionInterface<'_>,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
+        //: possibly deferred from /play {{{
+        //:
         Fe::Cache => {
             tracing::warn!("cache error: {:#?}", error);
 
@@ -282,6 +286,50 @@ async fn match_error(
                 (i, acknowledged)
             );
         }
+        Fe::InVoiceWithoutUser(e) => {
+            nope_or_fol!(
+                format!(
+                    "You are not with the bot in {}; You need to be a ***DJ*** to do that.",
+                    e.0.mention(),
+                ),
+                (i, acknowledged)
+            );
+        }
+        Fe::Suppressed(e) => Ok(match_suppressed(e, (i, acknowledged)).await?),
+        Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
+        Fe::AutoJoinAttemptFailed(e) => {
+            Ok(match_autojoin_attempt_failed(e, (i, acknowledged)).await?)
+        }
+        Fe::Lavalink(e) => {
+            if let LavalinkError::TrackError(e) = e {
+                hid_or_fol!(
+                    format!("💔 Error loading this track: {}", e.message),
+                    (i, acknowledged)
+                );
+            } else {
+                err_or_fol!(
+                    format!("Something went wrong with lavalink: ```rs\n{error:#?}```"), ?(i,acknowledged)
+                );
+                Err(ProcessError::CommandExecute {
+                    name: command_name,
+                    source: error.into(),
+                })
+            }
+        }
+        Fe::TwilightHttp
+        | Fe::DeserializeBody
+        | Fe::MessageValidation
+        | Fe::Sqlx
+        | Fe::TaskJoin
+        | Fe::GatewaySend => {
+            err_or_fol!(format!("Something went wrong: ```rs\n{error:#?}```"), ?(i, acknowledged));
+            Err(ProcessError::CommandExecute {
+                name: command_name,
+                source: error.into(),
+            })
+        }
+        //:
+        //: }}}
         Fe::UserNotDj => {
             nope!("You need to be a ***DJ*** to do that.", i);
         }
@@ -302,26 +350,13 @@ async fn match_error(
                 i
             );
         }
-        Fe::InVoiceWithoutUser(e) => {
-            nope_or_fol!(
-                format!(
-                    "You are not with the bot in {}; You need to be a ***DJ*** to do that.",
-                    e.0.mention(),
-                ),
-                (i, acknowledged)
-            );
-        }
         Fe::InVoiceWithSomeoneElse(e) => {
             nope!(e.pretty_display(), i);
         }
         Fe::InVoiceWithoutSomeoneElse(e) => {
             bad!(format!("Not enough people are in {}.", e.0.mention()), i);
         }
-        Fe::Suppressed(e) => Ok(match_suppressed(e, (i, acknowledged)).await?),
-        Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => {
-            Ok(match_autojoin_attempt_failed(e, (i, acknowledged)).await?)
-        }
+
         Fe::Stopped => todo!(),
         Fe::NotPlaying => {
             bad!("Currently not playing anything.", i);
@@ -364,7 +399,7 @@ async fn match_error(
             );
         }
         _ => {
-            err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?i);
+            err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?(i, acknowledged));
             Err(ProcessError::CommandExecute {
                 name: command_name,
                 source: error.into(),

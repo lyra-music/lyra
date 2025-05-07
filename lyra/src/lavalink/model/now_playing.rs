@@ -192,7 +192,7 @@ impl Message {
         channel_id: Id<ChannelMarker>,
     ) -> Result<Self, NewNowPlayingMessageError> {
         let mut msg = Self {
-            id: Id::new(1), // default dummy value...
+            id: Id::new(u64::MAX), // default dummy value...
             channel_id,
             data: msg_data,
             http: http.clone(),

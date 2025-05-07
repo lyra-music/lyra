@@ -131,7 +131,6 @@ pub enum Event {
 
 pub type EventRecvResult<T> = Result<T, broadcast::error::RecvError>;
 
-#[allow(clippy::needless_pass_by_ref_mut)] // false positive
 pub async fn wait_for_with(
     rx: &mut broadcast::Receiver<Event>,
     predicate: impl Fn(&Event) -> bool + Send + Sync,

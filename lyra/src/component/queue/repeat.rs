@@ -58,9 +58,7 @@ impl BotSlashCommand for Repeat {
         let player = require::player(&ctx)?;
         let data = player.data();
 
-        let data_r = data.read().await;
-        require::queue_not_empty(&data_r)?;
-        drop(data_r);
+        require::queue_not_empty(&data.read().await)?;
 
         check::user_in(in_voice)?
             .only()

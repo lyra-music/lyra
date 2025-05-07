@@ -99,7 +99,7 @@ pub enum FlattenedError<'a> {
     StandbyCanceled,
     ConfirmationTimedOut,
     GatewaySend,
-    Lavalink,
+    Lavalink(&'a lavalink_rs::error::LavalinkError),
     NoPlayer,
     NotInGuild,
     UnrecognisedConnection,
@@ -306,8 +306,8 @@ impl<'a> Fe<'a> {
             super::component::connection::join::ResidualImplConnectToError::TwilightHttp(_) => {
                 Self::TwilightHttp
             }
-            super::component::connection::join::ResidualImplConnectToError::Lavalink(_) => {
-                Self::Lavalink
+            super::component::connection::join::ResidualImplConnectToError::Lavalink(e) => {
+                Self::Lavalink(e)
             }
             super::component::connection::join::ResidualImplConnectToError::UnrecognisedConnection(_) => {
                 Self::UnrecognisedConnection
@@ -391,8 +391,8 @@ impl<'a> Fe<'a> {
             super::component::connection::leave::DisconnectCleanupError::EventSend(_) => {
                 Self::EventSend
             }
-            super::component::connection::leave::DisconnectCleanupError::Lavalink(_) => {
-                Self::Lavalink
+            super::component::connection::leave::DisconnectCleanupError::Lavalink(e) => {
+                Self::Lavalink(e)
             }
         }
     }
@@ -447,7 +447,7 @@ impl<'a> Fe<'a> {
 
     const fn from_impl_connect_to_residual_2(error: &'a util::ResidualImplConnectToError) -> Self {
         match error {
-            util::ResidualImplConnectToError::Lavalink(_) => Self::Lavalink,
+            util::ResidualImplConnectToError::Lavalink(e) => Self::Lavalink(e),
             util::ResidualImplConnectToError::Cache(_) => Self::Cache,
             util::ResidualImplConnectToError::GatewaySend(_) => Self::GatewaySend,
             util::ResidualImplConnectToError::TwilightHttp(_) => Self::TwilightHttp,
@@ -505,7 +505,7 @@ impl<'a> Fe<'a> {
 
     const fn from_play(error: &'a super::component::queue::play::Error) -> Self {
         match error {
-            super::component::queue::play::Error::Lavalink(_) => Self::Lavalink,
+            super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
             super::component::queue::play::Error::RequireUnsuppressed(e) => {
                 Self::from_require_unsuppressed_error(e)
             }
@@ -521,7 +521,7 @@ impl<'a> Fe<'a> {
 
     const fn from_remove_tracks(error: &'a super::component::queue::RemoveTracksError) -> Self {
         match error {
-            super::component::queue::RemoveTracksError::Lavalink(_) => Self::Lavalink,
+            super::component::queue::RemoveTracksError::Lavalink(e) => Self::Lavalink(e),
             super::component::queue::RemoveTracksError::Respond(e) => Self::from_respond(e),
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
             super::component::queue::RemoveTracksError::DeserialiseBodyFromHttp(e) => {
@@ -532,7 +532,7 @@ impl<'a> Fe<'a> {
 
     const fn from_play_pause(error: &'a super::component::playback::PlayPauseError) -> Self {
         match error {
-            super::component::playback::PlayPauseError::Lavalink(_) => Self::Lavalink,
+            super::component::playback::PlayPauseError::Lavalink(e) => Self::Lavalink(e),
             super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
             super::component::playback::PlayPauseError::SetPauseWith(e) => {
                 Self::from_set_pause_with(e)
@@ -586,7 +586,7 @@ impl<'a> Fe<'a> {
 
     const fn from_seek_to_with(error: &'a require::SeekToWithError) -> Self {
         match error {
-            require::SeekToWithError::Lavalink(_) => Self::Lavalink,
+            require::SeekToWithError::Lavalink(e) => Self::Lavalink(e),
             require::SeekToWithError::UpdateNowPlayingMessage(e) => {
                 Self::from_update_now_playing_message(e)
             }
@@ -611,7 +611,7 @@ impl Error {
             Self::QueueEmpty(_) => Fe::QueueEmpty,
             Self::UserNotDj(_) => Fe::UserNotDj,
             Self::TwilightHttp(_) => Fe::TwilightHttp,
-            Self::Lavalink(_) => Fe::Lavalink,
+            Self::Lavalink(e) => Fe::Lavalink(e),
             Self::NoPlayer(_) => Fe::NoPlayer,
             Self::NotInGuild(_) => Fe::NotInGuild,
             Self::Cache(_) => Fe::Cache,
