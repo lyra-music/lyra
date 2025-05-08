@@ -1,9 +1,12 @@
-use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{fmt::Write, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use lavalink_rs::model::GuildId;
 use lyra_ext::{image::dominant_palette, pretty::duration_display::DurationDisplay};
 use twilight_http::Client;
-use twilight_mention::{Mention, timestamp::TimestampStyle};
+use twilight_mention::{
+    Mention,
+    timestamp::{Timestamp, TimestampStyle},
+};
 use twilight_model::{
     channel::message::{
         Component, Embed, EmojiReactionType,
@@ -185,6 +188,36 @@ impl HttpAware for Message {
     }
 }
 
+struct DurationLeft {
+    inner: Duration,
+    total: Duration,
+    paused: bool,
+}
+
+impl From<&Data> for DurationLeft {
+    fn from(value: &Data) -> Self {
+        Self {
+            inner: (value.duration - value.timestamp).div_f64(value.speed),
+            total: value.duration,
+            paused: value.paused,
+        }
+    }
+}
+
+impl std::fmt::Display for DurationLeft {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.paused {
+            f.write_char('`')?;
+            (self.total - self.inner).pretty_display().fmt(f)?;
+            f.write_char('`')
+        } else {
+            let unix = (lyra_ext::unix_time() + self.inner).as_secs();
+            let style = Some(TimestampStyle::RelativeTime);
+            Timestamp::new(unix, style).mention().fmt(f)
+        }
+    }
+}
+
 impl Message {
     pub async fn new(
         http: Arc<Client>,
@@ -257,7 +290,7 @@ impl Message {
 
     const fn build_content(&self) -> &'static str {
         if self.data.paused {
-            return "**Now Playing**";
+            return "Now Playing";
         }
         "🎵 **Now Playing**"
     }
@@ -333,11 +366,6 @@ impl Message {
     fn build_embeds(&self) -> Result<Embed, BuildNowPlayingEmbedError> {
         let data = &self.data;
         let description = {
-            let duration_left = twilight_mention::timestamp::Timestamp::new(
-                (lyra_ext::unix_time() + (data.duration - data.timestamp).div_f64(data.speed))
-                    .as_secs(),
-                Some(TimestampStyle::RelativeTime),
-            );
             let album_info = data
                 .album_name
                 .clone()
@@ -347,7 +375,7 @@ impl Message {
                 album_info,
                 data.queue_position,
                 data.queue_len,
-                duration_left.mention(),
+                DurationLeft::from(data),
                 data.duration.pretty_display()
             )
         };
