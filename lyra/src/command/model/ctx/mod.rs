@@ -27,7 +27,8 @@ use crate::{
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
     core::model::{
         BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, InteractionInterface,
-        OwnedBotState, OwnedBotStateAware, PartialMemberAware, UserAware, UserPermissionsAware,
+        OwnedBotState, OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, UserAware,
+        UserPermissionsAware,
     },
     error::{
         Cache, CacheResult, NotInGuild, command::RespondError, core::DeserialiseBodyFromHttpError,
@@ -260,6 +261,12 @@ impl<T: Kind, U: Location> CacheAware for Ctx<T, U> {
 impl<T: Kind, U: Location> HttpAware for Ctx<T, U> {
     fn http(&self) -> &HttpClient {
         self.bot.http()
+    }
+}
+
+impl<T: Kind, U: Location> OwnedHttpAware for Ctx<T, U> {
+    fn http_owned(&self) -> Arc<HttpClient> {
+        self.bot.http_owned()
     }
 }
 

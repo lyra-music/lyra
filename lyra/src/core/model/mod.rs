@@ -384,6 +384,12 @@ impl HttpAware for BotState {
     }
 }
 
+impl OwnedHttpAware for BotState {
+    fn http_owned(&self) -> Arc<Client> {
+        self.http.clone()
+    }
+}
+
 impl DatabaseAware for BotState {
     fn db(&self) -> &Pool<Postgres> {
         &self.db

@@ -3,7 +3,6 @@ mod exception;
 mod start;
 mod stuck;
 
-pub use end::delete_now_playing_message;
 use lavalink_rs::{
     client::LavalinkClient,
     hook,

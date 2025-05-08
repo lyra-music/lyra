@@ -28,19 +28,19 @@ pub async fn handle_voice_state_update(
     let state = ctx.inner.as_ref();
     let maybe_old_state = ctx.old_voice_state();
 
-    tracing::trace!("handling voice state update");
+    tracing::debug!("handling voice state update");
     let text_channel_id = {
         if connection_changed {
-            tracing::trace!("received connection change notification");
+            tracing::debug!("received connection change notification");
             return Ok(());
         }
 
         let Ok(head) = ctx.get_conn().get_head().await else {
-            tracing::trace!("no active connection");
+            tracing::debug!("no active connection");
             return Ok(());
         };
 
-        tracing::trace!("no connection change notification");
+        tracing::debug!("no connection change notification");
 
         head.text_channel_id()
     };

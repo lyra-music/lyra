@@ -294,7 +294,7 @@ async fn impl_remove(
         let next = queue.current().map(QueueItem::data);
 
         if let Some(next) = next {
-            queue.acquire_advance_lock();
+            queue.notify_skip_advance();
             player.context.play_now(next).await?;
         } else {
             player.acquire_advance_lock_and_stop_with(queue).await?;

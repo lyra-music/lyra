@@ -82,11 +82,12 @@ impl Data {
             .await
     }
 
-    pub async fn new(
+    async fn impl_new(
         client_data: &ClientData,
         guild_id: GuildId,
         data: &PlayerDataRead<'_>,
         track: &QueueItem,
+        timestamp: Duration,
     ) -> Result<Self, NewNowPlayingDataError> {
         let requester_id = track.requester();
         let track_data = track.data();
@@ -152,6 +153,7 @@ impl Data {
             artwork,
             album_name,
             artist_artwork_url,
+            timestamp,
             speed: data.speed(),
             paused: data.paused(),
             title: track_info.title.clone().into(),
@@ -159,12 +161,31 @@ impl Data {
             enqueued: track.enqueued(),
             queue_position: queue.position(),
             queue_len: queue.len(),
-            timestamp: Duration::ZERO,
             duration: Duration::from_millis(track_info.length),
             artist: track_info.author.clone().into(),
             repeat_mode: queue.repeat_mode(),
             indexer: queue.indexer_type(),
         })
+    }
+
+    #[inline]
+    pub async fn new(
+        client_data: &ClientData,
+        guild_id: GuildId,
+        data: &PlayerDataRead<'_>,
+        track: &QueueItem,
+    ) -> Result<Self, NewNowPlayingDataError> {
+        Self::impl_new(client_data, guild_id, data, track, data.timestamp()).await
+    }
+
+    #[inline]
+    pub async fn new_zeroed_timestamp(
+        client_data: &ClientData,
+        guild_id: GuildId,
+        data: &PlayerDataRead<'_>,
+        track: &QueueItem,
+    ) -> Result<Self, NewNowPlayingDataError> {
+        Self::impl_new(client_data, guild_id, data, track, Duration::ZERO).await
     }
 }
 

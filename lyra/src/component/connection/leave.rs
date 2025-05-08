@@ -22,7 +22,7 @@ use crate::{
         component::connection::leave::{self, DisconnectCleanupError},
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{DelegateMethods, Event, UnwrappedData, delete_now_playing_message},
+    lavalink::{DelegateMethods, Event, UnwrappedData},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -48,7 +48,12 @@ pub(super) async fn disconnect_cleanup(
 
     lavalink.handle_for(guild_id).dispatch(Event::QueueClear);
     if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
-        delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
+        player_ctx
+            .data_unwrapped()
+            .write()
+            .await
+            .delete_now_playing_message(cx)
+            .await;
     }
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;

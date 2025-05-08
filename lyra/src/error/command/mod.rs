@@ -64,6 +64,8 @@ pub enum Error {
     Shuffle(#[from] super::component::queue::ShuffleError),
     UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     SeekToWith(#[from] require::SeekToWithError),
+    NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
+    NewNowPlayingMessage(#[from] super::lavalink::NewNowPlayingMessageError),
 }
 
 pub enum FlattenedError<'a> {
@@ -104,6 +106,7 @@ pub enum FlattenedError<'a> {
     NotInGuild,
     UnrecognisedConnection,
     TimestampParse,
+    GetDominantPaletteFromUrl,
 }
 
 pub use FlattenedError as Fe;
@@ -597,6 +600,30 @@ impl<'a> Fe<'a> {
     const fn from_set_pause_with(error: &'a require::SetPauseWithError) -> Self {
         Self::from_seek_to_with(error)
     }
+
+    const fn from_new_now_playing_data(error: &'a super::lavalink::NewNowPlayingDataError) -> Self {
+        match error {
+            super::lavalink::NewNowPlayingDataError::Cache(_) => Self::Cache,
+            super::lavalink::NewNowPlayingDataError::GetDominantPaletteFromUrl(_) => {
+                Self::GetDominantPaletteFromUrl
+            }
+        }
+    }
+
+    const fn from_new_now_playing_message(
+        error: &'a super::lavalink::NewNowPlayingMessageError,
+    ) -> Self {
+        match error {
+            super::lavalink::NewNowPlayingMessageError::TwilightHttp(_) => Self::TwilightHttp,
+            super::lavalink::NewNowPlayingMessageError::DeserialiseBody(_) => Self::DeserializeBody,
+            super::lavalink::NewNowPlayingMessageError::DeserialiseBodyFromHttp(e) => {
+                Self::from_deserialize_body_from_http_error(e)
+            }
+            super::lavalink::NewNowPlayingMessageError::BuildNowPlayingEmbed(e) => {
+                Self::from_build_now_playing_embed(e)
+            }
+        }
+    }
 }
 
 impl Error {
@@ -641,6 +668,8 @@ impl Error {
             Self::Shuffle(e) => Fe::from_shuffle(e),
             Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
             Self::SeekToWith(e) => Fe::from_seek_to_with(e),
+            Self::NewNowPlayingData(e) => Fe::from_new_now_playing_data(e),
+            Self::NewNowPlayingMessage(e) => Fe::from_new_now_playing_message(e),
         }
     }
 }

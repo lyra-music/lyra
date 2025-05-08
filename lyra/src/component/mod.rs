@@ -1,5 +1,6 @@
 pub mod config;
 pub mod connection;
+pub mod controller;
 pub mod debug;
 pub mod info;
 pub mod misc;

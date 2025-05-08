@@ -245,7 +245,7 @@ async fn impl_connect_to(
 
     if let Ok(player) = require::player(ctx) {
         if old_channel_id.is_some() {
-            tracing::trace!("waiting for voice server update...");
+            tracing::debug!("waiting for voice server update...");
             let _ = ctx
                 .bot()
                 .standby()
@@ -257,7 +257,7 @@ async fn impl_connect_to(
                     }
                 })
                 .await;
-            tracing::trace!("voice server update received");
+            tracing::debug!("voice server update received");
             player.update_voice_channel(voice_is_empty).await?;
         }
     }

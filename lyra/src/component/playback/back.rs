@@ -50,7 +50,7 @@ pub async fn back(
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
-    queue.acquire_advance_lock();
+    queue.notify_skip_advance();
     queue.recede();
     let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;

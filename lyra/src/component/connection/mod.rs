@@ -155,15 +155,15 @@ pub async fn handle_voice_state_update(
 
     let guild_id = ctx.guild_id();
 
-    tracing::trace!("handling voice state update");
+    tracing::debug!("handling voice state update");
     let (connected_channel_id, text_channel_id) = {
         if connection_changed {
-            tracing::trace!("received connection change notification");
+            tracing::debug!("received connection change notification");
             return Ok(());
         }
 
         let Ok(head) = ctx.get_conn().get_head().await else {
-            tracing::trace!("no active connection");
+            tracing::debug!("no active connection");
             return Ok(());
         };
 

@@ -60,7 +60,7 @@ impl PlayerInterface {
     }
 
     pub async fn acquire_advance_lock_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
-        queue.acquire_advance_lock();
+        queue.notify_skip_advance();
         self.context.stop_now().await?;
         Ok(())
     }

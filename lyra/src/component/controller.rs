@@ -1,0 +1,57 @@
+use twilight_interactions::command::{CommandModel, CreateCommand};
+
+use crate::{
+    LavalinkAware,
+    command::{
+        macros::{note, out},
+        model::BotSlashCommand,
+        require,
+    },
+    core::model::{CacheAware, OwnedHttpAware},
+    gateway::GuildIdAware,
+    lavalink::{DelegateMethods, NowPlayingData},
+};
+
+/// Bumps the now-playing track message to the bottom of the current text channel
+#[derive(CommandModel, CreateCommand)]
+#[command(name = "bump-now-playing")]
+pub struct BumpNowPlaying;
+
+impl BotSlashCommand for BumpNowPlaying {
+    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
+        let mut ctx = require::guild(ctx)?;
+        let player = require::player(&ctx)?;
+        let data = player.data();
+        let data_r = data.read().await;
+
+        dbg!(data_r.queue().index());
+        let track = require::current_track(data_r.queue())?;
+        let msg_id = data_r
+            .now_playing_message_id()
+            .expect("now playing message exists");
+        let channel_id = ctx.channel_id();
+        let channel_messages = ctx.cache().channel_messages(channel_id);
+        if channel_messages.is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id)) {
+            note!(
+                "The now-playing track message is already at the bottom of the current text channel.",
+                ctx
+            );
+        } else {
+            out!("🔽 Bumped the now-playing track message.", ?ctx);
+            let lava_data = ctx.lavalink().data();
+            let guild_id = ctx.guild_id().into();
+            let msg_data = NowPlayingData::new(&lava_data, guild_id, &data_r, track.track).await?;
+            drop(data_r);
+
+            let mut data_w = data.write().await;
+            data_w.delete_now_playing_message(&ctx).await;
+            let http = ctx.http_owned();
+            data_w
+                .new_now_playing_message_in(http, msg_data, channel_id)
+                .await?;
+            drop(data_w);
+
+            Ok(())
+        }
+    }
+}
