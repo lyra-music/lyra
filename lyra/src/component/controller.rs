@@ -1,3 +1,4 @@
+use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -12,19 +13,25 @@ use crate::{
     lavalink::{DelegateMethods, NowPlayingData},
 };
 
-/// Bumps the now-playing track message to the bottom of the current text channel
-#[derive(CommandModel, CreateCommand)]
-#[command(name = "bump-now-playing")]
-pub struct BumpNowPlaying;
+#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[command(name = "now-playing", desc = ".")]
+pub enum NowPlaying {
+    #[command(name = "bump")]
+    Bump(Bump),
+}
 
-impl BotSlashCommand for BumpNowPlaying {
+/// Bump the now-playing track message to the bottom of the current text channel, deleting the old one
+#[derive(CommandModel, CreateCommand)]
+#[command(name = "bump")]
+pub struct Bump;
+
+impl BotSlashCommand for Bump {
     async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let player = require::player(&ctx)?;
         let data = player.data();
         let data_r = data.read().await;
 
-        dbg!(data_r.queue().index());
         let track = require::current_track(data_r.queue())?;
         let msg_id = data_r
             .now_playing_message_id()
