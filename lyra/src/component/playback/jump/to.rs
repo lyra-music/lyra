@@ -108,7 +108,7 @@ impl BotSlashCommand for To {
         }
 
         queue.downgrade_repeat_mode();
-        queue.acquire_advance_lock();
+        queue.notify_skip_advance();
 
         let index = position - 1;
         let track = queue[index].data();

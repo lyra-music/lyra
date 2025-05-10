@@ -18,6 +18,7 @@ use crate::{
     component::{
         config::Config,
         connection::{Join, Leave},
+        controller::NowPlaying,
         misc::Ping,
         playback::{Back, Jump, JumpAutocomplete, PlayPause, Restart, Seek, Skip},
         queue::{
@@ -182,6 +183,7 @@ declare_slash_commands![
     Jump,
     Skip,
     Back,
+    NowPlaying,
 ];
 
 declare_message_commands![AddToQueue,];

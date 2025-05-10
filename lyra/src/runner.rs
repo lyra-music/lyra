@@ -62,7 +62,9 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| Config {
         .leak(),
 });
 
-const INTENTS: Intents = Intents::GUILDS.union(Intents::GUILD_VOICE_STATES);
+const INTENTS: Intents = Intents::GUILDS
+    .union(Intents::GUILD_VOICE_STATES)
+    .union(Intents::GUILD_MESSAGES);
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
@@ -225,7 +227,7 @@ async fn wait_until_shutdown(
 
     tracing::debug!("deleting all now playing messages...");
     for data in bot.lavalink().iter_player_data() {
-        crate::lavalink::delete_now_playing_message(bot, &data).await;
+        data.write().await.delete_now_playing_message(bot).await;
     }
 
     tracing::debug!("sending close frames to all shards...");

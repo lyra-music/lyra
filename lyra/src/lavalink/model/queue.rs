@@ -2,7 +2,7 @@ use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use twilight_model::id::{Id, marker::UserMarker};
 
 use super::queue_indexer::{Indexer, IndexerType};
@@ -83,17 +83,17 @@ pub struct Queue {
     index: usize,
     indexer: Indexer,
     repeat_mode: RepeatMode,
-    advance_lock: Notify,
+    skip_advance: watch::Sender<()>,
 }
 
 impl Queue {
-    pub(super) const fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             inner: VecDeque::new(),
             indexer: Indexer::Standard,
             index: 0,
             repeat_mode: RepeatMode::Off,
-            advance_lock: Notify::const_new(),
+            skip_advance: watch::channel(()).0,
         }
     }
 
@@ -243,15 +243,22 @@ impl Queue {
         }
     }
 
-    pub fn acquire_advance_lock(&self) {
-        tracing::trace!("acquired queue advance lock");
-        self.advance_lock.notify_one();
+    pub fn subscribe_on_skip_advance(&self) -> watch::Receiver<()> {
+        self.skip_advance.subscribe()
     }
 
-    pub async fn not_advance_locked(&self) -> bool {
-        let future = self.advance_lock.notified();
-        let duration = crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT;
-        tokio::time::timeout(duration, future).await.is_err()
+    pub fn notify_skip_advance(&self) {
+        tracing::debug!("notified skip advance");
+        self.skip_advance.send(()).ok();
+    }
+
+    pub async fn skip_advance(&self) -> bool {
+        tokio::time::timeout(
+            crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT,
+            self.subscribe_on_skip_advance().changed(),
+        )
+        .await
+        .is_ok()
     }
 
     pub fn iter_positions_and_items(

@@ -64,6 +64,8 @@ pub enum Error {
     Shuffle(#[from] super::component::queue::ShuffleError),
     UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     SeekToWith(#[from] require::SeekToWithError),
+    NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
+    NewNowPlayingMessage(#[from] super::lavalink::NewNowPlayingMessageError),
 }
 
 pub enum FlattenedError<'a> {
@@ -104,6 +106,7 @@ pub enum FlattenedError<'a> {
     NotInGuild,
     UnrecognisedConnection,
     TimestampParse,
+    GetDominantPaletteFromUrl,
 }
 
 pub use FlattenedError as Fe;
@@ -506,16 +509,25 @@ impl<'a> Fe<'a> {
     const fn from_play(error: &'a super::component::queue::play::Error) -> Self {
         match error {
             super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
-            super::component::queue::play::Error::RequireUnsuppressed(e) => {
-                Self::from_require_unsuppressed_error(e)
-            }
             super::component::queue::play::Error::Respond(e) => Self::from_respond(e),
             super::component::queue::play::Error::RespondOrFollowup(e) => {
                 Self::from_respond_or_followup(e)
             }
-            super::component::queue::play::Error::AutoJoinOrCheckInVoiceWithUser(e) => {
-                Self::from_auto_join_or_check_in_voice_with_user(e)
+            super::component::queue::play::Error::HandleLoadTrackResults(e) => {
+                Self::from_handle_load_track_results(e)
             }
+        }
+    }
+
+    const fn from_handle_load_track_results(
+        error: &'a super::component::queue::play::HandleLoadTrackResultsError,
+    ) -> Self {
+        match error {
+            super::component::queue::play::HandleLoadTrackResultsError::Lavalink(e) => Self::Lavalink(e),
+            super::component::queue::play::HandleLoadTrackResultsError::RespondOrFollowup(e) => Self::from_respond_or_followup(e),
+            super::component::queue::play::HandleLoadTrackResultsError::RequireUnsuppressed(e) => Self::from_require_unsuppressed_error(e),
+            super::component::queue::play::HandleLoadTrackResultsError::AutoJoinOrCheckInVoiceWithUser(e) => Self::from_auto_join_or_check_in_voice_with_user(e),
+            super::component::queue::play::HandleLoadTrackResultsError::UpdateNowPlayingMessage(e) => Self::from_update_now_playing_message(e),
         }
     }
 
@@ -526,6 +538,9 @@ impl<'a> Fe<'a> {
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
             super::component::queue::RemoveTracksError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
+            }
+            super::component::queue::RemoveTracksError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
             }
         }
     }
@@ -597,6 +612,30 @@ impl<'a> Fe<'a> {
     const fn from_set_pause_with(error: &'a require::SetPauseWithError) -> Self {
         Self::from_seek_to_with(error)
     }
+
+    const fn from_new_now_playing_data(error: &'a super::lavalink::NewNowPlayingDataError) -> Self {
+        match error {
+            super::lavalink::NewNowPlayingDataError::Cache(_) => Self::Cache,
+            super::lavalink::NewNowPlayingDataError::GetDominantPaletteFromUrl(_) => {
+                Self::GetDominantPaletteFromUrl
+            }
+        }
+    }
+
+    const fn from_new_now_playing_message(
+        error: &'a super::lavalink::NewNowPlayingMessageError,
+    ) -> Self {
+        match error {
+            super::lavalink::NewNowPlayingMessageError::TwilightHttp(_) => Self::TwilightHttp,
+            super::lavalink::NewNowPlayingMessageError::DeserialiseBody(_) => Self::DeserializeBody,
+            super::lavalink::NewNowPlayingMessageError::DeserialiseBodyFromHttp(e) => {
+                Self::from_deserialize_body_from_http_error(e)
+            }
+            super::lavalink::NewNowPlayingMessageError::BuildNowPlayingEmbed(e) => {
+                Self::from_build_now_playing_embed(e)
+            }
+        }
+    }
 }
 
 impl Error {
@@ -641,6 +680,8 @@ impl Error {
             Self::Shuffle(e) => Fe::from_shuffle(e),
             Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
             Self::SeekToWith(e) => Fe::from_seek_to_with(e),
+            Self::NewNowPlayingData(e) => Fe::from_new_now_playing_data(e),
+            Self::NewNowPlayingMessage(e) => Fe::from_new_now_playing_message(e),
         }
     }
 }

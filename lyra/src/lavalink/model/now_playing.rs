@@ -1,9 +1,12 @@
-use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{fmt::Write, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use lavalink_rs::model::GuildId;
 use lyra_ext::{image::dominant_palette, pretty::duration_display::DurationDisplay};
 use twilight_http::Client;
-use twilight_mention::{Mention, timestamp::TimestampStyle};
+use twilight_mention::{
+    Mention,
+    timestamp::{Timestamp, TimestampStyle},
+};
 use twilight_model::{
     channel::message::{
         Component, Embed, EmojiReactionType,
@@ -79,11 +82,12 @@ impl Data {
             .await
     }
 
-    pub async fn new(
+    async fn impl_new(
         client_data: &ClientData,
         guild_id: GuildId,
         data: &PlayerDataRead<'_>,
         track: &QueueItem,
+        timestamp: Duration,
     ) -> Result<Self, NewNowPlayingDataError> {
         let requester_id = track.requester();
         let track_data = track.data();
@@ -149,6 +153,7 @@ impl Data {
             artwork,
             album_name,
             artist_artwork_url,
+            timestamp,
             speed: data.speed(),
             paused: data.paused(),
             title: track_info.title.clone().into(),
@@ -156,12 +161,31 @@ impl Data {
             enqueued: track.enqueued(),
             queue_position: queue.position(),
             queue_len: queue.len(),
-            timestamp: Duration::ZERO,
             duration: Duration::from_millis(track_info.length),
             artist: track_info.author.clone().into(),
             repeat_mode: queue.repeat_mode(),
             indexer: queue.indexer_type(),
         })
+    }
+
+    #[inline]
+    pub async fn new(
+        client_data: &ClientData,
+        guild_id: GuildId,
+        data: &PlayerDataRead<'_>,
+        track: &QueueItem,
+    ) -> Result<Self, NewNowPlayingDataError> {
+        Self::impl_new(client_data, guild_id, data, track, data.timestamp()).await
+    }
+
+    #[inline]
+    pub async fn new_zeroed_timestamp(
+        client_data: &ClientData,
+        guild_id: GuildId,
+        data: &PlayerDataRead<'_>,
+        track: &QueueItem,
+    ) -> Result<Self, NewNowPlayingDataError> {
+        Self::impl_new(client_data, guild_id, data, track, Duration::ZERO).await
     }
 }
 
@@ -170,6 +194,8 @@ pub enum Update {
     Indexer(IndexerType),
     Repeat(RepeatMode),
     Paused(bool),
+    QueueLen(usize),
+    QueuePosition(NonZeroUsize),
 }
 
 pub struct Message {
@@ -182,6 +208,36 @@ pub struct Message {
 impl HttpAware for Message {
     fn http(&self) -> &Client {
         &self.http
+    }
+}
+
+struct DurationLeft {
+    inner: Duration,
+    total: Duration,
+    paused: bool,
+}
+
+impl From<&Data> for DurationLeft {
+    fn from(value: &Data) -> Self {
+        Self {
+            inner: (value.duration - value.timestamp).div_f64(value.speed),
+            total: value.duration,
+            paused: value.paused,
+        }
+    }
+}
+
+impl std::fmt::Display for DurationLeft {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.paused {
+            f.write_char('`')?;
+            (self.total - self.inner).pretty_display().fmt(f)?;
+            f.write_char('`')
+        } else {
+            let unix = (lyra_ext::unix_time() + self.inner).as_secs();
+            let style = Some(TimestampStyle::RelativeTime);
+            Timestamp::new(unix, style).mention().fmt(f)
+        }
     }
 }
 
@@ -221,6 +277,8 @@ impl Message {
             Update::Indexer(idx) => self.data.indexer = idx,
             Update::Repeat(mode) => self.data.repeat_mode = mode,
             Update::Paused(paused) => self.data.paused = paused,
+            Update::QueueLen(i) => self.data.queue_len = i,
+            Update::QueuePosition(i) => self.data.queue_position = i,
         }
     }
 
@@ -257,7 +315,7 @@ impl Message {
 
     const fn build_content(&self) -> &'static str {
         if self.data.paused {
-            return "**Now Playing**";
+            return "Now Playing";
         }
         "🎵 **Now Playing**"
     }
@@ -333,11 +391,6 @@ impl Message {
     fn build_embeds(&self) -> Result<Embed, BuildNowPlayingEmbedError> {
         let data = &self.data;
         let description = {
-            let duration_left = twilight_mention::timestamp::Timestamp::new(
-                (lyra_ext::unix_time() + (data.duration - data.timestamp).div_f64(data.speed))
-                    .as_secs(),
-                Some(TimestampStyle::RelativeTime),
-            );
             let album_info = data
                 .album_name
                 .clone()
@@ -347,7 +400,7 @@ impl Message {
                 album_info,
                 data.queue_position,
                 data.queue_len,
-                duration_left.mention(),
+                DurationLeft::from(data),
                 data.duration.pretty_display()
             )
         };

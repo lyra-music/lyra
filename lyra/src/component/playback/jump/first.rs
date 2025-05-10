@@ -34,7 +34,7 @@ impl BotSlashCommand for First {
         }
 
         queue.downgrade_repeat_mode();
-        queue.acquire_advance_lock();
+        queue.notify_skip_advance();
 
         let track = queue[0].data();
         let txt = format!("⬅️ Jumped to `{}` (`#1`).", track.info.title);
