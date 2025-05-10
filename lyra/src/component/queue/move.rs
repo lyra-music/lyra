@@ -209,6 +209,10 @@ impl BotSlashCommand for Move {
         };
 
         queue.insert(insert_position, track);
+        let queue_position = queue.position();
+        data_w
+            .update_and_apply_now_playing_queue_position(queue_position)
+            .await?;
         drop(data_w);
 
         out!(message, ctx);
