@@ -312,79 +312,7 @@ async fn play(
     ctx.defer().await?;
     let load_ctx = LoadTrackContext::from(&*ctx);
     match load_ctx.process_many(queries).await {
-        Ok(results) => {
-            let (tracks, playlists) = results.split();
-
-            let tracks_len = tracks.len();
-            let track_text = match tracks_len {
-                0 => String::new(),
-                1..=ADD_TRACKS_WRAP_LIMIT => tracks
-                    .iter()
-                    .map(|t| {
-                        format!(
-                            "[`{}`](<{}>)",
-                            t.info.corrected_title(),
-                            t.info.uri_unwrapped()
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .pretty_join_with_and(),
-                _ => format!("`{tracks_len} tracks`"),
-            };
-
-            let playlists_len = playlists.len();
-            let playlist_text = match playlists_len {
-                0 => String::new(),
-                1..=ADD_TRACKS_WRAP_LIMIT => playlists
-                    .iter()
-                    .map(|p| {
-                        format!(
-                            "`{} tracks` from playlist [`{}`](<{}>)",
-                            p.tracks.len(),
-                            p.info.corrected_name(),
-                            p.uri
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .pretty_join_with_and(),
-                _ => format!(
-                    "`{} tracks` in total from `{} playlists`",
-                    playlists.iter().fold(0, |l, p| l + p.tracks.len()),
-                    playlists_len
-                ),
-            };
-
-            let enqueued_text = [track_text, playlist_text]
-                .into_iter()
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .pretty_join_with_and();
-            let plus = match tracks_len + playlists_len {
-                0 => panic!("no tracks or playlists loaded"),
-                1 => "**`＋`**",
-                _ => "**`≡+`**",
-            };
-
-            util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
-
-            let total_tracks = Vec::from(results);
-            let first_track = total_tracks
-                .first()
-                .expect("at least one track must be loaded")
-                .clone();
-
-            let player = util::auto_new_player(ctx).await?;
-
-            player
-                .data_unwrapped()
-                .write()
-                .await
-                .queue_mut()
-                .enqueue(total_tracks, ctx.user_id());
-            player.play(&first_track).await?;
-
-            out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
-        }
+        Ok(results) => Ok(handle_load_track_results(ctx, results).await?),
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
@@ -407,6 +335,88 @@ async fn play(
             LoadTrackProcessManyError::Lavalink(e) => Err(e.into()),
         },
     }
+}
+
+async fn handle_load_track_results(
+    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    results: LoadTrackResults,
+) -> Result<(), play::HandleLoadTrackResultsError> {
+    let (tracks, playlists) = results.split();
+    let tracks_len = tracks.len();
+    let track_text = match tracks_len {
+        0 => String::new(),
+        1..=ADD_TRACKS_WRAP_LIMIT => tracks
+            .iter()
+            .map(|t| {
+                format!(
+                    "[`{}`](<{}>)",
+                    t.info.corrected_title(),
+                    t.info.uri_unwrapped()
+                )
+            })
+            .collect::<Vec<_>>()
+            .pretty_join_with_and(),
+        _ => format!("`{tracks_len} tracks`"),
+    };
+    let playlists_len = playlists.len();
+    let playlist_text = match playlists_len {
+        0 => String::new(),
+        1..=ADD_TRACKS_WRAP_LIMIT => playlists
+            .iter()
+            .map(|p| {
+                format!(
+                    "`{} tracks` from playlist [`{}`](<{}>)",
+                    p.tracks.len(),
+                    p.info.corrected_name(),
+                    p.uri
+                )
+            })
+            .collect::<Vec<_>>()
+            .pretty_join_with_and(),
+        _ => format!(
+            "`{} tracks` in total from `{} playlists`",
+            playlists.iter().fold(0, |l, p| l + p.tracks.len()),
+            playlists_len
+        ),
+    };
+    let enqueued_text = [track_text, playlist_text]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .pretty_join_with_and();
+    util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
+    let total_tracks = Vec::from(results);
+    let total_tracks_len = total_tracks.len();
+    let plus = match total_tracks_len {
+        0 => panic!("no tracks or playlists loaded"),
+        1 => "**`＋`**",
+        _ => "**`≡+`**",
+    };
+    let first_track = total_tracks
+        .first()
+        .expect("at least one track must be loaded")
+        .clone();
+    let player = util::auto_new_player(ctx).await?;
+    let data = player.data_unwrapped();
+    let (now_playing_msg_exists, queue_len) = {
+        let data_r = data.read().await;
+        let queue = data_r.queue();
+        let pair = (require::current_track(queue).is_ok(), queue.len());
+        drop(data_r);
+        pair
+    };
+    if now_playing_msg_exists {
+        data.write()
+            .await
+            .update_and_apply_now_playing_queue_len(queue_len + total_tracks_len)
+            .await?;
+    }
+    data.write()
+        .await
+        .queue_mut()
+        .enqueue(total_tracks, ctx.user_id());
+    player.play(&first_track).await?;
+    out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
 }
 
 #[derive(CommandOption, CreateOption, Default)]

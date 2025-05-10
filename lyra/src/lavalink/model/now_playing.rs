@@ -194,6 +194,8 @@ pub enum Update {
     Indexer(IndexerType),
     Repeat(RepeatMode),
     Paused(bool),
+    QueueLen(usize),
+    QueuePosition(NonZeroUsize),
 }
 
 pub struct Message {
@@ -275,6 +277,8 @@ impl Message {
             Update::Indexer(idx) => self.data.indexer = idx,
             Update::Repeat(mode) => self.data.repeat_mode = mode,
             Update::Paused(paused) => self.data.paused = paused,
+            Update::QueueLen(i) => self.data.queue_len = i,
+            Update::QueuePosition(i) => self.data.queue_position = i,
         }
     }
 

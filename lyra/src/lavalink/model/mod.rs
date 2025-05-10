@@ -6,7 +6,11 @@ mod pitch;
 mod queue;
 mod queue_indexer;
 
-use std::{num::NonZeroU16, sync::Arc, time::Duration};
+use std::{
+    num::{NonZeroU16, NonZeroUsize},
+    sync::Arc,
+    time::Duration,
+};
 
 use connection::{Awaitable, ConnectionHandle, ConnectionsActor, Instruction};
 use lavalink_rs::{
@@ -275,6 +279,24 @@ impl RawPlayerData {
         paused: bool,
     ) -> UpdateNowPlayingMessageResult {
         self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Paused(paused))
+            .await
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_queue_len(
+        &mut self,
+        len: usize,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::QueueLen(len))
+            .await
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_queue_position(
+        &mut self,
+        position: NonZeroUsize,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::QueuePosition(position))
             .await
     }
 }

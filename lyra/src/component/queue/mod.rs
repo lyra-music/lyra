@@ -299,6 +299,11 @@ async fn impl_remove(
         } else {
             player.acquire_advance_lock_and_stop_with(queue).await?;
         }
+    } else {
+        let queue_len = queue.len();
+        data_w
+            .update_and_apply_now_playing_queue_len(queue_len)
+            .await?;
     }
     drop(data_w);
 

@@ -299,6 +299,7 @@ pub fn current_track(queue: &Queue) -> Result<CurrentTrack, NotPlaying> {
     })
 }
 
+#[must_use]
 pub struct CurrentTrack<'a> {
     pub track: &'a QueueItem,
     pub position: NonZeroUsize,

@@ -509,16 +509,25 @@ impl<'a> Fe<'a> {
     const fn from_play(error: &'a super::component::queue::play::Error) -> Self {
         match error {
             super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
-            super::component::queue::play::Error::RequireUnsuppressed(e) => {
-                Self::from_require_unsuppressed_error(e)
-            }
             super::component::queue::play::Error::Respond(e) => Self::from_respond(e),
             super::component::queue::play::Error::RespondOrFollowup(e) => {
                 Self::from_respond_or_followup(e)
             }
-            super::component::queue::play::Error::AutoJoinOrCheckInVoiceWithUser(e) => {
-                Self::from_auto_join_or_check_in_voice_with_user(e)
+            super::component::queue::play::Error::HandleLoadTrackResults(e) => {
+                Self::from_handle_load_track_results(e)
             }
+        }
+    }
+
+    const fn from_handle_load_track_results(
+        error: &'a super::component::queue::play::HandleLoadTrackResultsError,
+    ) -> Self {
+        match error {
+            super::component::queue::play::HandleLoadTrackResultsError::Lavalink(e) => Self::Lavalink(e),
+            super::component::queue::play::HandleLoadTrackResultsError::RespondOrFollowup(e) => Self::from_respond_or_followup(e),
+            super::component::queue::play::HandleLoadTrackResultsError::RequireUnsuppressed(e) => Self::from_require_unsuppressed_error(e),
+            super::component::queue::play::HandleLoadTrackResultsError::AutoJoinOrCheckInVoiceWithUser(e) => Self::from_auto_join_or_check_in_voice_with_user(e),
+            super::component::queue::play::HandleLoadTrackResultsError::UpdateNowPlayingMessage(e) => Self::from_update_now_playing_message(e),
         }
     }
 
@@ -529,6 +538,9 @@ impl<'a> Fe<'a> {
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
             super::component::queue::RemoveTracksError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
+            }
+            super::component::queue::RemoveTracksError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
             }
         }
     }
