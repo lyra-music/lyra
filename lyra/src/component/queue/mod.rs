@@ -297,7 +297,7 @@ async fn impl_remove(
             queue.notify_skip_advance();
             player.context.play_now(next).await?;
         } else {
-            player.acquire_advance_lock_and_stop_with(queue).await?;
+            player.notify_skip_advance_and_stop_with(queue).await?;
         }
     } else {
         let queue_len = queue.len();
