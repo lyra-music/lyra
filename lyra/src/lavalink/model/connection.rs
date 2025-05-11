@@ -28,14 +28,12 @@ pub struct Connection {
 
 impl Connection {
     pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
-        let (change, _) = watch::channel(());
-
         Self {
             channel_id,
             text_channel_id,
             mute: false,
-            change,
-            event_sender: broadcast::channel(16).0,
+            change: watch::channel(()).0,
+            event_sender: broadcast::channel(0xFF).0,
             poll: None,
         }
     }
