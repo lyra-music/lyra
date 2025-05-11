@@ -156,7 +156,8 @@ impl Context {
             _ => {
                 crit!(
                     format!(
-                        "Something unexpectedly went wrong: ```rs\n{source:#?}``` Please report this to the bot developers."
+                        "Something unexpectedly went wrong: ```rs\n{source:#?}```\
+                        Please report this to the bot developers."
                     ),
                     ?i
                 );
@@ -290,7 +291,8 @@ async fn match_error(
         Fe::InVoiceWithoutUser(e) => {
             nope_or_fol!(
                 format!(
-                    "You are not with the bot in {}; You need to be a ***DJ*** to do that.",
+                    "You are not with the bot in {}.\n\
+                    -# Members who are a ***DJ*** bypass this.",
                     e.0.mention(),
                 ),
                 (i, acknowledged)

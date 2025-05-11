@@ -88,7 +88,8 @@ impl std::fmt::Display for PrettyInVoiceWithSomeoneElseDisplayer<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "There are someone else in {}; You need to be a ***DJ*** to do that.",
+            "There are other people in {}.\n\
+            -# Members who are a ***DJ*** bypass this.",
             self.0.0.channel_id().mention(),
         )
     }
@@ -163,7 +164,8 @@ impl std::fmt::Display for PrettyNotUsersTrackDisplayer<'_> {
         let inner = self.0;
         write!(
             f,
-            "`{}` (`#{}`) was requested by {} and you're not the only person in {}; You'll need to be a ***DJ*** to do that.",
+            "`{}` (`#{}`) was requested by {} and you're not the only person in {}.\n\
+            -# Members who are a ***DJ*** bypass this.",
             inner.title,
             inner.position,
             inner.requester.mention(),
