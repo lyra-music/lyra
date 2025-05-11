@@ -8,7 +8,8 @@ use crate::{
         model::BotSlashCommand,
         require,
     },
-    core::model::{CacheAware, OwnedHttpAware},
+    component::config::now_playing::Toggle as ConfigNowPlayingToggle,
+    core::model::{CacheAware, InteractionClient, OwnedHttpAware},
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
 };
@@ -33,9 +34,16 @@ impl BotSlashCommand for Bump {
         let data_r = data.read().await;
 
         let track = require::current_track(data_r.queue())?;
-        let msg_id = data_r
-            .now_playing_message_id()
-            .expect("now playing message exists");
+        let Some(msg_id) = data_r.now_playing_message_id() else {
+            note!(
+                format!(
+                    "Now-playing track messages sending are disabled in this server.\n\
+                    -# Moderators can enable the feature by using {}.",
+                    InteractionClient::mention_command::<ConfigNowPlayingToggle>()
+                ),
+                ctx
+            );
+        };
         let channel_id = ctx.channel_id();
         let channel_messages = ctx.cache().channel_messages(channel_id);
         if channel_messages.is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id)) {
