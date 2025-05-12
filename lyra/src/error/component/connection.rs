@@ -327,6 +327,7 @@ pub enum StartInactivityTimeoutError {
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Http(#[from] twilight_http::Error),
     DisconnectCleanup(#[from] leave::DisconnectCleanupError),
+    UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
 }
 
 #[derive(Error, Debug)]

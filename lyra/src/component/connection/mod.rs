@@ -65,7 +65,7 @@ struct InactivityTimeoutContext {
 
 impl<T> From<&T> for InactivityTimeoutContext
 where
-    T: OwnedBotStateAware + SenderAware + GuildIdAware,
+    T: OwnedBotStateAware + SenderAware + GuildIdAware + LavalinkAware,
 {
     fn from(value: &T) -> Self {
         Self {
@@ -109,7 +109,6 @@ impl GuildIdAware for InactivityTimeoutContext {
 async fn start_inactivity_timeout(
     ctx: InactivityTimeoutContext,
     channel_id: Id<ChannelMarker>,
-    text_channel_id: Id<ChannelMarker>,
 ) -> Result<(), StartInactivityTimeoutError> {
     let guild_id = ctx.guild_id;
     tracing::debug!(
@@ -118,14 +117,41 @@ async fn start_inactivity_timeout(
         channel_id
     );
 
+    let lavalink = ctx.inner.lavalink();
     for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
         tokio::time::sleep(const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
-        if users_in_voice(&ctx, channel_id).is_some_and(|n| n >= 1) {
+        let new_channel_id = lavalink.handle_for(guild_id).get_head().await?.channel_id();
+        if channel_id != new_channel_id {
+            tracing::debug!(
+                "guild {} stopped channel {} inactivity timeout (channel changed to {})",
+                guild_id,
+                channel_id,
+                new_channel_id,
+            );
+            return Ok(());
+        }
+        let users_n = users_in_voice(&ctx, channel_id);
+        if users_n.is_some_and(|n| n >= 1) {
+            tracing::debug!(
+                "guild {} stopped channel {} inactivity timeout ({:?} users in voice)",
+                guild_id,
+                channel_id,
+                users_n,
+            );
             return Ok(());
         }
     }
-
-    if ctx.notify_change().await.is_err() {
+    let text_channel_id = lavalink
+        .handle_for(guild_id)
+        .get_head()
+        .await?
+        .text_channel_id();
+    if ctx.notify_voice_state_change().await.is_err() {
+        tracing::debug!(
+            "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
+            guild_id,
+            channel_id
+        );
         return Ok(());
     }
     disconnect_cleanup(&ctx).await?;
@@ -133,7 +159,8 @@ async fn start_inactivity_timeout(
 
     let response = LeaveResponse(channel_id);
 
-    tracing::debug!("guild {} {} due to inactivity", guild_id, response);
+    tracing::info!("guild {} {} due to inactivity", guild_id, response);
+
     ctx.http()
         .create_message(text_channel_id)
         .content(&format!(
@@ -188,7 +215,6 @@ pub async fn handle_voice_state_update(
                 traced::tokio_spawn(start_inactivity_timeout(
                     InactivityTimeoutContext::from(ctx),
                     connected_channel_id,
-                    text_channel_id,
                 ));
             }
             return Ok(());
@@ -292,7 +318,6 @@ async fn match_state_channel_id(
                 traced::tokio_spawn(start_inactivity_timeout(
                     InactivityTimeoutContext::from(ctx),
                     channel_id,
-                    text_channel_id,
                 ));
             }
             Ok(())

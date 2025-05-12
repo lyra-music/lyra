@@ -16,13 +16,21 @@ use crate::{command::poll::Poll as PlayerPoll, core::r#const, error::Unrecognise
 
 use super::Lavalink;
 
+/// The reason behind a `VoiceStateUpdate` event of the bot.
+/// This includes the connected voice channel and the deafen/mute state.
+#[derive(Debug)]
+pub(super) enum VoiceStateChangeNotificationState {
+    Unread,
+    Read,
+}
+
 #[derive(Debug)]
 pub struct Connection {
     pub channel_id: Id<ChannelMarker>,
     pub text_channel_id: Id<ChannelMarker>,
     pub mute: bool,
     poll: Option<PlayerPoll>,
-    change: watch::Sender<()>,
+    voice_state_change_tx: watch::Sender<VoiceStateChangeNotificationState>,
     event_sender: broadcast::Sender<Event>,
 }
 
@@ -32,15 +40,17 @@ impl Connection {
             channel_id,
             text_channel_id,
             mute: false,
-            change: watch::channel(()).0,
+            voice_state_change_tx: watch::channel(VoiceStateChangeNotificationState::Read).0,
             event_sender: broadcast::channel(0xFF).0,
             poll: None,
         }
     }
 
     /// Wait until the connection is changed or the timeout is reached.
-    pub fn subscribe_on_changed(&self) -> watch::Receiver<()> {
-        self.change.subscribe()
+    fn subscribe_to_voice_state_changes(
+        &self,
+    ) -> watch::Receiver<VoiceStateChangeNotificationState> {
+        self.voice_state_change_tx.subscribe()
     }
 
     pub const fn poll(&self) -> Option<&PlayerPoll> {
@@ -57,9 +67,20 @@ impl Connection {
     }
 
     /// Notify the connection to trigger a change.
-    pub fn notify_change(&self) {
-        tracing::debug!("notified connection change");
-        self.change.send(()).ok();
+    fn set_voice_state_change_notification_state(&self, state: VoiceStateChangeNotificationState) {
+        tracing::debug!("notified voice state change");
+        // This notifies the `VoiceStateUpdate` handler, passing on an acknowledgement
+        // stating that the incoming event is intentionally caused by the bot, either via
+        // /leave or /join.
+        self.voice_state_change_tx.send_replace(state);
+    }
+
+    pub fn notify_voice_state_change(&self) {
+        self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Unread);
+    }
+
+    pub fn acknowledge_change(&self) {
+        self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Read);
     }
 
     /// Subscribe to events from this connection.
@@ -168,9 +189,16 @@ pub(super) enum Instruction {
     /// Subscribe to events from a connection
     Subscribe(Id<GuildMarker>, Response<broadcast::Receiver<Event>>),
     /// Notify a connection of a change
-    NotifyChange(Id<GuildMarker>, Response<()>),
+    SetVoiceChangeNotificationState(
+        Id<GuildMarker>,
+        VoiceStateChangeNotificationState,
+        Response<()>,
+    ),
     /// Subscribe to changes from a connection
-    SubscribeOnChange(Id<GuildMarker>, Response<watch::Receiver<()>>),
+    SubscribeToVoiceStateChange(
+        Id<GuildMarker>,
+        Response<watch::Receiver<VoiceStateChangeNotificationState>>,
+    ),
     /// Toggle mute
     ///
     /// Returns the current mute state if successful
@@ -266,11 +294,17 @@ impl ConnectionsActor {
                 Instruction::Subscribe(guild_id, sender) => {
                     self.with_connection(guild_id, sender, Connection::subscribe);
                 }
-                Instruction::NotifyChange(guild_id, sender) => {
-                    self.with_connection(guild_id, sender, Connection::notify_change);
+                Instruction::SetVoiceChangeNotificationState(guild_id, reason, sender) => {
+                    self.with_connection(guild_id, sender, |c| {
+                        c.set_voice_state_change_notification_state(reason);
+                    });
                 }
-                Instruction::SubscribeOnChange(guild_id, sender) => {
-                    self.with_connection(guild_id, sender, Connection::subscribe_on_changed);
+                Instruction::SubscribeToVoiceStateChange(guild_id, sender) => {
+                    self.with_connection(
+                        guild_id,
+                        sender,
+                        Connection::subscribe_to_voice_state_changes,
+                    );
                 }
                 Instruction::ToggleMute(guild_id, sender) => {
                     self.with_connection_mut(guild_id, sender, |c| {
@@ -349,8 +383,55 @@ impl ConnectionHandle<'_> {
         self.call_awaitable(|sender| Instruction::Dispatch(self.guild_id, event, sender))
     }
 
-    pub fn notify_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.call_awaitable(|sender| Instruction::NotifyChange(self.guild_id, sender))
+    fn set_voice_change_notification_state(
+        &self,
+        reason: VoiceStateChangeNotificationState,
+    ) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| {
+            Instruction::SetVoiceChangeNotificationState(self.guild_id, reason, sender)
+        })
+    }
+
+    #[inline]
+    pub fn notify_voice_state_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.set_voice_change_notification_state(VoiceStateChangeNotificationState::Unread)
+    }
+
+    #[inline]
+    pub fn acknowledge_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.set_voice_change_notification_state(VoiceStateChangeNotificationState::Read)
+    }
+
+    async fn subscribe_to_voice_state_change(
+        &self,
+    ) -> Result<watch::Receiver<VoiceStateChangeNotificationState>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::SubscribeToVoiceStateChange(self.guild_id, sender))
+            .await
+    }
+
+    pub async fn was_notified_of_voice_state_change(&self) -> bool {
+        // We want to determine if this was caused by another command invoked by the user, or an outside action by Discord.
+        // Intentional changes are sent as such by commands that alter voice state, and the logic for determining a change is as follows:
+        // - We wait to see if a new intentional change comes in, if so, this was an intentional change.
+        // - If nothing is received, check the last value in the watch and see if that change was intentional.
+        let vs_changed = if let Ok(mut rx) = self.subscribe_to_voice_state_change().await {
+            tokio::time::timeout(
+                crate::core::r#const::connection::CHANGED_TIMEOUT,
+                rx.wait_for(|r| matches!(r, VoiceStateChangeNotificationState::Unread)),
+            )
+            .await
+            .is_ok()
+                || matches!(*rx.borrow(), VoiceStateChangeNotificationState::Unread)
+        } else {
+            false
+        };
+
+        // If the connection was intentionally changed, reset this value.
+        if vs_changed {
+            self.acknowledge_change();
+        }
+
+        vs_changed
     }
 
     pub fn toggle_mute(&self) -> Awaitable<Result<bool, UnrecognisedConnection>> {
@@ -395,11 +476,6 @@ impl ConnectionHandle<'_> {
 
     pub async fn subscribe(&self) -> Result<broadcast::Receiver<Event>, UnrecognisedConnection> {
         self.call_result(|sender| Instruction::Subscribe(self.guild_id, sender))
-            .await
-    }
-
-    pub async fn subscribe_on_change(&self) -> Result<watch::Receiver<()>, UnrecognisedConnection> {
-        self.call_result(|sender| Instruction::SubscribeOnChange(self.guild_id, sender))
             .await
     }
 }

@@ -73,8 +73,10 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
         self.lavalink().has_connection(self.guild_id()).await
     }
 
-    fn notify_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.lavalink().handle_for(self.guild_id()).notify_change()
+    fn notify_voice_state_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.lavalink()
+            .handle_for(self.guild_id())
+            .notify_voice_state_change()
     }
 
     fn get_conn(&self) -> ConnectionHandle {

@@ -69,12 +69,12 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let conn = ctx.get_conn();
     conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
-    conn.notify_change().await?;
+    conn.notify_voice_state_change().await?;
     disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 
     let response = LeaveResponse(channel_id);
-    tracing::debug!("guild {guild_id} {response}");
+    tracing::info!("guild {guild_id} {response}");
     Ok(response)
 }
 

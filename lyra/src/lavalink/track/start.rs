@@ -14,7 +14,7 @@ pub(super) async fn impl_start(
     event: &TrackStart,
 ) -> ProcessResult {
     let guild_id = event.guild_id;
-    tracing::debug!(
+    tracing::info!(
         "guild {} started {:?}",
         event.guild_id.0,
         event.track.info.checked_title()

@@ -221,7 +221,7 @@ async fn impl_connect_to(
     let response = old_channel_id.map_or_else(
         || {
             let connection = Connection::new(channel_id, ctx.channel_id());
-            connection.notify_change();
+            connection.notify_voice_state_change();
             lavalink.new_connection_with(guild_id, connection);
             Response::Joined {
                 voice: joined,
@@ -231,7 +231,7 @@ async fn impl_connect_to(
         |from| {
             let conn = lavalink.handle_for(guild_id);
             conn.set_channel(channel_id);
-            conn.notify_change();
+            conn.notify_voice_state_change();
             Response::Moved {
                 from,
                 to: joined,
@@ -271,7 +271,7 @@ async fn impl_connect_to(
             .await?;
     }
 
-    tracing::debug!("guild {guild_id} {response}");
+    tracing::info!("guild {guild_id} {response}");
     Ok(response)
 }
 
@@ -358,7 +358,6 @@ async fn handle_response(
     };
 
     if empty {
-        let text_channel_id = ctx.channel_id();
         let duration = unix_time() + INACTIVITY_TIMEOUT;
         let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
         let empty_voice_notice_txt = format!(
@@ -369,7 +368,6 @@ async fn handle_response(
         traced::tokio_spawn(start_inactivity_timeout(
             super::InactivityTimeoutContext::from(&*ctx),
             joined.id,
-            text_channel_id,
         ));
 
         let empty_voice_notice = note_fol!(empty_voice_notice_txt, ?ctx);
