@@ -180,8 +180,8 @@ impl AutocompleteResultPrettify for TrackData {
         let track_info = &mut self.info;
 
         let track_length = Duration::from_millis(track_info.length);
-        let title = track_info.take_and_correct_title();
         let author = track_info.take_and_correct_author();
+        let title = track_info.take_and_correct_title();
 
         format!(
             "⌛{} 👤{} 🎵{}",

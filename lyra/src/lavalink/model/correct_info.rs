@@ -9,123 +9,108 @@ mod private {
 }
 
 pub trait CorrectTrackInfo: private::CorrectInfo {
-    fn incorrect_title() -> String;
-    fn default_title() -> String;
-    fn title(&self) -> &String;
-    fn title_mut(&mut self) -> &mut String;
-    fn check_title(title: &String) -> Option<&str> {
-        (*title != Self::incorrect_title()).then_some(title)
+    const INCORRECT_TITLE: &str;
+    const DEFAULT_TITLE: &str;
+    fn title(&self) -> &str;
+    fn take_title(&mut self) -> String;
+
+    fn check_title(title: &str) -> Option<&str> {
+        (title != Self::INCORRECT_TITLE).then_some(title)
     }
     fn checked_title(&self) -> Option<&str> {
         Self::check_title(self.title())
     }
-    fn corrected_title(&self) -> Cow<str> {
-        self.checked_title()
-            .map_or_else(|| Cow::Owned(Self::default_title()), Cow::Borrowed)
+    fn corrected_title(&self) -> &str {
+        self.checked_title().unwrap_or(Self::DEFAULT_TITLE)
     }
-    fn take_and_correct_title(&mut self) -> String {
-        let title = std::mem::take(self.title_mut());
-        Self::check_title(&title)
-            .is_some()
-            .then_some(title)
-            .unwrap_or_else(Self::default_title)
+    fn take_and_correct_title(&mut self) -> Cow<'static, str> {
+        let title = self.take_title();
+        if Self::check_title(&title).is_some() {
+            Cow::Owned(title)
+        } else {
+            Cow::Borrowed(Self::DEFAULT_TITLE)
+        }
     }
 
-    fn author(&self) -> &String;
-    fn author_mut(&mut self) -> &mut String;
+    const INCORRECT_AUTHOR: &'static str;
+    const DEFAULT_AUTHOR: &str;
+    fn author(&self) -> &str;
+    fn take_author(&mut self) -> String;
 
-    fn incorrect_author() -> String;
-    fn default_author() -> String;
-    fn check_author(author: &String) -> Option<&str> {
-        (*author != Self::incorrect_author()).then_some(author)
+    fn check_author(author: &str) -> Option<&str> {
+        (author != Self::INCORRECT_AUTHOR).then_some(author)
     }
     fn checked_author(&self) -> Option<&str> {
         Self::check_author(self.author())
     }
-    fn corrected_author(&self) -> Cow<str> {
-        self.checked_author()
-            .map_or_else(|| Cow::Owned(Self::default_author()), Cow::Borrowed)
+    fn corrected_author(&self) -> &str {
+        self.checked_author().unwrap_or(Self::DEFAULT_AUTHOR)
     }
-    fn take_and_correct_author(&mut self) -> String {
-        let author = std::mem::take(self.author_mut());
-        Self::check_author(&author)
-            .is_some()
-            .then_some(author)
-            .unwrap_or_else(Self::default_author)
+    fn take_and_correct_author(&mut self) -> Cow<'static, str> {
+        let author = self.take_author();
+        if Self::check_author(&author).is_some() {
+            Cow::Owned(author)
+        } else {
+            Cow::Borrowed(Self::DEFAULT_AUTHOR)
+        }
     }
 }
 
 impl CorrectTrackInfo for lavalink_rs::model::track::TrackInfo {
-    fn incorrect_title() -> String {
-        const_lavaplayer::UNKNOWN_TITLE.to_owned()
-    }
-    fn default_title() -> String {
-        const_text::UNTITLED_TRACK.to_owned()
-    }
+    const INCORRECT_TITLE: &str = const_lavaplayer::UNKNOWN_TITLE;
+    const DEFAULT_TITLE: &str = const_text::UNTITLED_TRACK;
 
-    fn title(&self) -> &String {
+    fn title(&self) -> &str {
         &self.title
     }
 
-    fn title_mut(&mut self) -> &mut String {
-        &mut self.title
+    fn take_title(&mut self) -> String {
+        std::mem::take(&mut self.title)
     }
 
-    fn incorrect_author() -> String {
-        const_lavaplayer::UNKNOWN_ARTIST.to_owned()
-    }
+    const INCORRECT_AUTHOR: &str = const_lavaplayer::UNKNOWN_ARTIST;
+    const DEFAULT_AUTHOR: &str = const_text::UNKNOWN_ARTIST;
 
-    fn default_author() -> String {
-        const_text::UNKNOWN_ARTIST.to_owned()
-    }
-
-    fn author(&self) -> &String {
+    fn author(&self) -> &str {
         &self.author
     }
 
-    fn author_mut(&mut self) -> &mut String {
-        &mut self.author
+    fn take_author(&mut self) -> String {
+        std::mem::take(&mut self.author)
     }
 }
 
 pub trait CorrectPlaylistInfo: private::CorrectInfo {
-    fn incorrect_name() -> String;
-    fn default_name() -> String;
-    fn name(&self) -> &String;
-    fn name_mut(&mut self) -> &mut String;
-    fn check_name(title: &String) -> Option<&str> {
-        (*title != Self::incorrect_name()).then_some(title)
+    const INCORRECT_NAME: &str;
+    const DEFAULT_NAME: &str;
+    fn name(&self) -> &str;
+    fn take_name(&mut self) -> String;
+    fn check_name(title: &str) -> Option<&str> {
+        (title != Self::INCORRECT_NAME).then_some(title)
     }
     fn checked_name(&self) -> Option<&str> {
         Self::check_name(self.name())
     }
-    fn corrected_name(&self) -> Cow<str> {
-        self.checked_name()
-            .map_or_else(|| Cow::Owned(Self::default_name()), Cow::Borrowed)
+    fn corrected_name(&self) -> &str {
+        self.checked_name().unwrap_or(Self::DEFAULT_NAME)
     }
-    fn take_and_correct_name(&mut self) -> String {
-        let title = std::mem::take(self.name_mut());
-        Self::check_name(&title)
-            .is_some()
-            .then_some(title)
-            .unwrap_or_else(Self::default_name)
+    fn take_and_correct_name(&mut self) -> Cow<'static, str> {
+        let name = self.take_name();
+        if Self::check_name(&name).is_some() {
+            Cow::Owned(name)
+        } else {
+            Cow::Borrowed(Self::DEFAULT_NAME)
+        }
     }
 }
 
 impl CorrectPlaylistInfo for lavalink_rs::model::track::PlaylistInfo {
-    fn incorrect_name() -> String {
-        const_lavaplayer::UNKNOWN_TITLE.to_owned()
-    }
-
-    fn default_name() -> String {
-        const_text::UNNAMED_PLAYLIST.to_owned()
-    }
-
-    fn name(&self) -> &String {
+    const INCORRECT_NAME: &str = const_lavaplayer::UNKNOWN_TITLE;
+    const DEFAULT_NAME: &str = const_text::UNNAMED_PLAYLIST;
+    fn name(&self) -> &str {
         &self.name
     }
-
-    fn name_mut(&mut self) -> &mut String {
-        &mut self.name
+    fn take_name(&mut self) -> String {
+        std::mem::take(&mut self.name)
     }
 }

@@ -47,19 +47,18 @@ macro_rules! declare_slash_commands {
                 }
             });
 
-        type SlashCommands = [
-            ::twilight_model::application::command::Command;
+        type SlashCommandRefs = [
+            &'static ::twilight_model::application::command::Command;
             SLASH_COMMANDS_N
         ];
 
         #[inline]
-        fn slash_commands() -> SlashCommands {
+        fn slash_commands() -> SlashCommandRefs {
             ::paste::paste! {
                 [
                     $(
-                        SLASH_COMMAND_MAP
-                            .[<_ $raw_cmd:snake>]
-                            .clone(),
+                        &SLASH_COMMAND_MAP
+                            .[<_ $raw_cmd:snake>],
                     )*
                 ]
             }
@@ -166,19 +165,18 @@ macro_rules! declare_message_commands {
                 }
             });
 
-        type MessageCommands = [
-            ::twilight_model::application::command::Command;
+        type MessageCommandRefs = [
+            &'static ::twilight_model::application::command::Command;
             MESSAGE_COMMANDS_N
         ];
 
         #[inline]
-        fn message_commands() -> MessageCommands {
+        fn message_commands() -> MessageCommandRefs {
             ::paste::paste! {
                 [
                     $(
-                        MESSAGE_COMMAND_MAP
-                            .[<_ $raw_cmd:snake>]
-                            .clone(),
+                        &MESSAGE_COMMAND_MAP
+                            .[<_ $raw_cmd:snake>],
                     )*
                 ]
             }
