@@ -23,7 +23,7 @@ fn declare_commands(
     v: &Variant,
     c: (QuoteTokenStream, QuoteTokenStream),
     name: &Ident,
-    parent_name_aware_path: &Path,
+    root_name_aware_path: &Path,
 ) -> (QuoteTokenStream, QuoteTokenStream) {
     let sub_cmd = fields
         .unnamed
@@ -38,7 +38,8 @@ fn declare_commands(
                 || quote!(),
                 |inner| {
                     quote! {
-                        impl #parent_name_aware_path for #inner {
+                        impl #root_name_aware_path for #inner {
+                            const ROOT_NAME: &'static str = #name::ROOT_NAME;
                             const PARENT_NAME: ::std::option::Option<&'static str>
                                 = ::std::option::Option::Some(#name::NAME);
                         }
@@ -53,7 +54,8 @@ fn declare_commands(
                 },
                 quote! {
                     #impl_resolved_command_data
-                    impl #parent_name_aware_path for #sub_cmd {
+                    impl #root_name_aware_path for #sub_cmd {
+                        const ROOT_NAME: &'static str = #name::ROOT_NAME;
                         const PARENT_NAME: ::std::option::Option<&'static str>
                             = ::std::option::Option::Some(#name::NAME);
                     }
@@ -69,15 +71,16 @@ pub fn impl_bot_command_group(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
     let data = &input.data;
 
-    let parent_name_aware_path =
-        syn::parse_str::<Path>("crate::command::model::ParentNameAware").expect("path is valid");
+    let root_name_aware_path =
+        syn::parse_str::<Path>("crate::command::model::CommandStructureAware")
+            .expect("path is valid");
     let (sub_cmd_matches, impls_resolved_command_data) = match data {
         Data::Enum(data) => {
             data.variants
                 .iter()
                 .fold((quote!(), quote!()), |c, v| match v.fields {
                     Fields::Unnamed(ref fields) => {
-                        declare_commands(fields, v, c, name, &parent_name_aware_path)
+                        declare_commands(fields, v, c, name, &root_name_aware_path)
                     }
                     _ => panic!("all fields must be unnamed"),
                 })

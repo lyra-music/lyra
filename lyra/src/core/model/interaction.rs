@@ -1,7 +1,6 @@
 use std::fmt::{Display, Write};
 
 use twilight_http::Response;
-use twilight_interactions::command::CreateCommand;
 use twilight_model::{
     application::{command::CommandOptionChoice, interaction::Interaction},
     channel::{
@@ -17,7 +16,10 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    command::declare::{POPULATED_COMMAND_MAP, commands},
+    command::{
+        declare::{POPULATED_COMMAND_MAP, commands},
+        model::CommandStructureAware,
+    },
     error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
 };
 
@@ -377,9 +379,23 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
-    pub fn populated_command<T: CreateCommand>()
+    fn qualified_command_name<T: CommandStructureAware>() -> QualifiedCommandName<'static> {
+        match (T::ROOT_NAME, T::PARENT_NAME, T::NAME) {
+            // FIXME: This code relies on the invaariant `root != inner != leaf` for it to function properly.
+            // However, the Discord API does not enforce said invariant.
+            // This is not a future-proof design, and should be revisited some time in the future.
+            (root, None, leaf) if root == leaf => QualifiedCommandName::Root(root),
+            (_, None, _) => {
+                panic!("a slash command has a root different from its leaf yet has no parent")
+            }
+            (root, Some(inner), leaf) if root == inner => QualifiedCommandName::Group(root, leaf),
+            (root, Some(inner), leaf) => QualifiedCommandName::SubGroup(root, inner, leaf),
+        }
+    }
+
+    pub fn populated_command_root<T: CommandStructureAware>()
     -> &'static twilight_model::application::command::Command {
-        let name = T::NAME;
+        let name = T::ROOT_NAME;
         POPULATED_COMMAND_MAP
             .get()
             .expect("populated command map must be populated")
@@ -387,11 +403,11 @@ impl<'a> Client<'a> {
             .unwrap_or_else(|| panic!("command not found: {name}"))
     }
 
-    pub fn mention_command<T: CreateCommand>() -> MentionCommand {
-        let cmd = Self::populated_command::<T>();
+    pub fn mention_command<T: CommandStructureAware>() -> MentionCommand<'static> {
+        let cmd = Self::populated_command_root::<T>();
 
         let id = cmd.id.expect("populated command map must be populated");
-        MentionCommand::new(cmd.name.clone().into(), id)
+        MentionCommand::new(id, Self::qualified_command_name::<T>())
     }
 
     #[inline]
@@ -412,21 +428,47 @@ impl<'a> Client<'a> {
     }
 }
 
-pub struct MentionCommand {
-    name: Box<str>,
-    id: Id<CommandMarker>,
+pub enum QualifiedCommandName<'a> {
+    Root(&'a str),
+    Group(&'a str, &'a str),
+    SubGroup(&'a str, &'a str, &'a str),
 }
 
-impl MentionCommand {
-    pub const fn new(name: Box<str>, id: Id<CommandMarker>) -> Self {
-        Self { name, id }
+impl Display for QualifiedCommandName<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QualifiedCommandName::Root(r) => f.write_str(r),
+            QualifiedCommandName::Group(r, l) => {
+                f.write_str(r)?;
+                f.write_char(' ')?;
+                f.write_str(l)
+            }
+            QualifiedCommandName::SubGroup(r, i, l) => {
+                f.write_str(r)?;
+                f.write_char(' ')?;
+                f.write_str(i)?;
+                f.write_char(' ')?;
+                f.write_str(l)
+            }
+        }
     }
 }
 
-impl Display for MentionCommand {
+pub struct MentionCommand<'a> {
+    id: Id<CommandMarker>,
+    name: QualifiedCommandName<'a>,
+}
+
+impl<'a> MentionCommand<'a> {
+    pub const fn new(id: Id<CommandMarker>, name: QualifiedCommandName<'a>) -> Self {
+        Self { id, name }
+    }
+}
+
+impl Display for MentionCommand<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("</")?;
-        f.write_str(&self.name)?;
+        self.name.fmt(f)?;
         f.write_char(':')?;
         self.id.fmt(f)?;
         f.write_char('>')?;

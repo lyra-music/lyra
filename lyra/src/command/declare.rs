@@ -65,10 +65,7 @@ macro_rules! declare_slash_commands {
         }
 
         $(
-            impl $crate::command::model::ParentNameAware for $raw_cmd {
-                const PARENT_NAME: ::core::option::Option<&'static str> =
-                    ::core::option::Option::None;
-            }
+            impl $crate::command::model::CommandStructureAware for $raw_cmd {}
         )*
 
         type Callback = &'static (
