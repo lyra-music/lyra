@@ -196,6 +196,7 @@ pub enum Update {
     Paused(bool),
     QueueLen(usize),
     QueuePosition(NonZeroUsize),
+    Speed(f64),
 }
 
 pub struct Message {
@@ -279,6 +280,7 @@ impl Message {
             Update::Paused(paused) => self.data.paused = paused,
             Update::QueueLen(i) => self.data.queue_len = i,
             Update::QueuePosition(i) => self.data.queue_position = i,
+            Update::Speed(s) => self.data.speed = s,
         }
     }
 

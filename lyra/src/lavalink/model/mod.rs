@@ -300,6 +300,15 @@ impl RawPlayerData {
         self.update_and_apply_now_playing_data(NowPlayingDataUpdate::QueuePosition(position))
             .await
     }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_speed(
+        &mut self,
+        speed: f64,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_and_apply_now_playing_data(NowPlayingDataUpdate::Speed(speed))
+            .await
+    }
 }
 
 pub struct Lavalink {

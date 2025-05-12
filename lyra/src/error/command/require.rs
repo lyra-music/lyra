@@ -22,3 +22,4 @@ pub enum SeekToWithError {
 }
 
 pub type SetPauseWithError = SeekToWithError;
+pub type SetSpeedError = SeekToWithError;

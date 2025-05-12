@@ -1,7 +1,4 @@
-use lavalink_rs::{
-    error::LavalinkResult,
-    model::player::{Filters, Timescale},
-};
+use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -12,7 +9,7 @@ use crate::{
         require::{self, PlayerInterface},
     },
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
-    error::CommandResult,
+    error::{CommandResult, command::require::SetSpeedError},
 };
 
 use super::ApplyFilter;
@@ -69,8 +66,11 @@ impl SpeedFilter {
         }
     }
 
-    fn multiplier(&self) -> f64 {
-        self.multiplier.unwrap_or(Self::DEFAULT_SPEED)
+    const fn multiplier(&self) -> f64 {
+        match self.multiplier {
+            Some(m) => m,
+            None => Self::DEFAULT_SPEED,
+        }
     }
 
     fn tier(&self) -> Tier {
@@ -94,8 +94,13 @@ impl ApplyFilter for SpeedFilter {
 }
 
 impl PlayerInterface {
-    async fn set_speed(&self, update: SpeedFilter) -> LavalinkResult<()> {
-        self.data().write().await.set_speed(update.multiplier());
+    async fn set_speed(&self, update: SpeedFilter) -> Result<(), SetSpeedError> {
+        let data = self.data();
+        let mut data_w = data.write().await;
+        let mul = update.multiplier();
+        data_w.set_speed(mul);
+        data_w.update_and_apply_now_playing_speed(mul).await?;
+        drop(data_w);
         self.update_filter(update).await?;
         Ok(())
     }
