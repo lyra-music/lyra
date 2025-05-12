@@ -29,7 +29,6 @@ use twilight_model::id::{
 };
 
 use crate::{
-    command::require::{InVoice, PartialInVoice},
     core::model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
     error::{
         UnrecognisedConnection,
@@ -412,11 +411,6 @@ impl UnwrappedPlayerInfoUri for TrackInfo {
         self.uri.expect("track must be nonlocal")
     }
 }
-
-pub trait ConnectionAware: GuildIdAware {}
-
-impl ConnectionAware for InVoice<'_> {}
-impl ConnectionAware for PartialInVoice {}
 
 pub type ArtworkCache = Cache<(Box<str>, usize), Arc<[u32]>>;
 

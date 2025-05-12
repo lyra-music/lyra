@@ -37,9 +37,7 @@ pub fn impl_read_equaliser_presets_as(ty: &Ident) -> TokenStream {
     });
 
     quote! {
-        use twilight_interactions::command::{CommandOption, CreateOption};
-
-        #[derive(CommandOption, CreateOption)]
+        #[derive(::twilight_interactions::command::CommandOption, ::twilight_interactions::command::CreateOption)]
         enum #ty {
             #(
                 #[option(name = #preset_names_strs, value = #preset_names_strs)]

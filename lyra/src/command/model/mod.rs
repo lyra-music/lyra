@@ -92,7 +92,11 @@ pub enum PartialInteractionData {
     Component(Box<MessageComponentInteractionData>),
 }
 
-pub trait BotSlashCommand: CreateCommand {
+pub trait ParentNameAware: CreateCommand {
+    const PARENT_NAME: Option<&'static str> = None;
+}
+
+pub trait BotSlashCommand: ParentNameAware {
     async fn run(self, ctx: SlashCtx) -> CommandResult;
 }
 

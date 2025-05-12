@@ -1,34 +1,32 @@
-use std::sync::OnceLock;
-
-use twilight_model::channel::message::EmojiReactionType;
-
-use crate::{core::model::HttpAware, error::core::DeserialiseBodyFromHttpError};
-
 macro_rules! generate_emojis {
     ($ (($name: ident, $default: expr)) ,* $(,)? ) => {$(
-        pub async fn $name(cx: &(impl HttpAware + Sync)) -> Result<&'static EmojiReactionType, DeserialiseBodyFromHttpError> {
+        pub async fn $name(cx: &(impl $crate::core::model::HttpAware + ::std::marker::Sync))
+            -> ::std::result::Result<
+                &'static ::twilight_model::channel::message::EmojiReactionType,
+                $crate::error::core::DeserialiseBodyFromHttpError> {
             ::paste::paste! {
-                static [<$name:upper>]: OnceLock<EmojiReactionType> = OnceLock::new();
-                if let Some(emoji) = [<$name:upper>].get() {
-                    return Ok(emoji);
+                static [<$name:upper>]: ::std::sync::OnceLock<::twilight_model::channel::message::EmojiReactionType> =
+                    ::std::sync::OnceLock::new();
+                if let ::std::option::Option::Some(emoji) = [<$name:upper>].get() {
+                    return ::std::result::Result::Ok(emoji);
                 }
             }
 
-            let emojis = crate::core::r#static::application::emojis(cx).await?;
-            let emoji = emojis.iter().find(|e| e.name == stringify!($name));
+            let emojis = $crate::core::r#static::application::emojis(cx).await?;
+            let emoji = emojis.iter().find(|e| e.name == ::std::stringify!($name));
             let reaction = emoji.map_or(
                 {
-                    EmojiReactionType::Unicode {
-                        name: String::from($default),
+                    ::twilight_model::channel::message::EmojiReactionType::Unicode {
+                        name: ::std::string::String::from($default),
                     }
                 },
-                |emoji| EmojiReactionType::Custom {
+                |emoji| ::twilight_model::channel::message::EmojiReactionType::Custom {
                     animated: emoji.animated,
                     id: emoji.id,
-                    name: Some(emoji.name.clone()),
+                    name: ::std::option::Option::Some(emoji.name.clone()),
                 },
             );
-            ::paste::paste!(Ok([<$name:upper>].get_or_init(|| reaction)))
+            ::paste::paste!(::std::result::Result::Ok([<$name:upper>].get_or_init(|| reaction)))
         }
     )*};
 }

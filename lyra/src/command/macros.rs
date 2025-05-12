@@ -1,10 +1,10 @@
 macro_rules! out {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond($cnt).await?;
     };
@@ -21,47 +21,47 @@ macro_rules! out {
 // }
 
 macro_rules! out_or_fol {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_or_followup($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_or_followup($cnt).await?;
     };
 }
 
 macro_rules! out_or_upd {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_or_update($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_or_update($cnt).await?;
     };
 }
 
 macro_rules! out_upd {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         $ctx.update_no_components_embeds(&$cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         $ctx.update_no_components_embeds(&$cnt).await?;
     };
 }
 
 macro_rules! hid {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         #[allow(unused_imports)]
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_ephemeral($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         #[allow(unused_imports)]
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_ephemeral($cnt).await?;
@@ -69,25 +69,25 @@ macro_rules! hid {
 }
 
 macro_rules! hid_fol {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         #[allow(unused_imports)]
         use crate::core::model::AcknowledgementAware;
         $ctx.followup_ephemeral($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {{
+    ($cnt:expr, ? $ctx:expr) => {{
         use crate::core::model::AcknowledgementAware;
         $ctx.followup_ephemeral($cnt).await?
     }};
 }
 
 macro_rules! hid_or_fol {
-    ($cnt: expr, $ctx: expr) => {
+    ($cnt:expr, $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_ephemeral_or_followup($cnt).await?;
         return Ok(());
     };
-    ($cnt: expr, ?$ctx: expr) => {
+    ($cnt:expr, ? $ctx:expr) => {
         use crate::core::model::AcknowledgementAware;
         $ctx.respond_ephemeral_or_followup($cnt).await?;
     };

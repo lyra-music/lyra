@@ -195,7 +195,7 @@ impl AccessCategoryFlag {
     const fn ident(&self) -> &'static str {
         const POSTFIX: &str = "_access";
         macro_rules! concat_postfix {
-            ($postfix: expr) => {
+            ($postfix:expr) => {
                 const_str_concat!($postfix, POSTFIX)
             };
         }
