@@ -10,7 +10,7 @@ use crate::{
     error::CommandResult,
 };
 
-/// Shifts the playback pitch down
+/// Shifts the playback pitch down.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "down")]
 pub struct Down {

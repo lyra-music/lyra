@@ -65,7 +65,7 @@ pub enum ChannelMix {
     Off(Off),
 }
 
-/// Enable Channel Mix: Mixes both channels (left and right).
+/// Enables Channel Mix: Mixes both channels (left and right).
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

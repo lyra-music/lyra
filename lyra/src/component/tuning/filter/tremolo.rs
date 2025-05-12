@@ -23,7 +23,7 @@ pub enum Tremolo {
     Off(Off),
 }
 
-/// Enable Tremolo: Quickly oscillates the playback volume, giving a shuddering effect.
+/// Enables Tremolo: Quickly oscillates the playback volume, giving a shuddering effect.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

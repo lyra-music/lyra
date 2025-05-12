@@ -8,7 +8,7 @@ use crate::{
     error::CommandResult,
 };
 
-/// Set the playback volume
+/// Sets the playback volume.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "set")]
 pub struct Set {

@@ -61,7 +61,7 @@ impl ApplyFilter for SetPitch {
     }
 }
 
-/// Sets the playback pitch
+/// Sets the playback pitch.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "set")]
 pub struct Set {

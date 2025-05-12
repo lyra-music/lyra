@@ -62,7 +62,7 @@ pub enum Distortion {
     Off(Off),
 }
 
-/// Enable Distortion: If used correctly, can generate some rather unique audio effects.
+/// Enables Distortion: If used correctly, can generate some rather unique audio effects.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

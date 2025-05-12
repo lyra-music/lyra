@@ -9,7 +9,7 @@ use crate::{
     error::CommandResult,
 };
 
-/// Views the currently configured access controls for channels, roles and members
+/// Views the currently configured access controls for channels, roles and members.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "view")]
 pub struct View;

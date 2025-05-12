@@ -35,7 +35,7 @@ impl From<RepeatMode> for LavalinkRepeatMode {
     }
 }
 
-/// Sets a repeat mode of the queue
+/// Sets a repeat mode of the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "repeat", dm_permission = false)]
 pub struct Repeat {

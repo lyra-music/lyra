@@ -17,7 +17,7 @@ use crate::{
     gateway::GuildIdAware,
 };
 
-/// Clears all currently configured access controls for channels, roles or members
+/// Clears all currently configured access controls for channels, roles or members.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "clear")]
 pub struct Clear {

@@ -21,7 +21,7 @@ pub enum NowPlaying {
     Bump(Bump),
 }
 
-/// Bump the now-playing track message to the bottom of the current text channel, deleting the old one
+/// Bumps the now-playing track message to the bottom of the current text channel, deleting the old one.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "bump")]
 pub struct Bump;

@@ -22,7 +22,7 @@ impl From<EqualiserPreset> for SetEqualiser {
     }
 }
 
-/// Enable the player equaliser from presets
+/// Enables the player equaliser from presets.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "preset")]
 pub struct Preset {

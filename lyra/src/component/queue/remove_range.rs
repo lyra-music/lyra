@@ -138,7 +138,7 @@ impl BotAutocomplete for Autocomplete {
     }
 }
 
-/// Removes a range of tracks from the queue
+/// Removes a range of tracks from the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "remove-range", dm_permission = false)]
 pub struct RemoveRange {

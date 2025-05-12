@@ -403,7 +403,7 @@ pub async fn join(
     Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
 }
 
-/// Joins a voice/stage channel
+/// Joins a voice/stage channel.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "join", contexts = "guild")]
 pub struct Join {

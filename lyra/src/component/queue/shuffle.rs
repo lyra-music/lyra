@@ -12,7 +12,7 @@ use crate::{
     lavalink::{IndexerType, OwnedPlayerData},
 };
 
-/// Toggles queue shuffling
+/// Toggles queue shuffling.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "shuffle", dm_permission = false)]
 pub struct Shuffle;

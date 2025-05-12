@@ -9,7 +9,7 @@ use crate::{
     gateway::GuildIdAware,
 };
 
-/// Toggles server muting the bot
+/// Toggles server muting the bot.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "toggle-mute")]
 pub struct ToggleMute;

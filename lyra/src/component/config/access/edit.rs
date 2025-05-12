@@ -134,7 +134,7 @@ impl EditActionPrettify for EditAction {
     }
 }
 
-/// Edits the currently configured access controls for users or roles
+/// Edits the currently configured access controls for users or roles.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "edit-user-or-role")]
 pub struct MemberRole {

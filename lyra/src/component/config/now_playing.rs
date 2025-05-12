@@ -18,7 +18,7 @@ pub enum NowPlaying {
     Toggle(Toggle),
 }
 
-/// Toggles whether now-playing track messages should be automatically sent or not
+/// Toggles whether now-playing track messages should be automatically sent or not.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "toggle")]
 pub struct Toggle;

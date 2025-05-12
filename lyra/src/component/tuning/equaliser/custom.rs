@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-/// Enable the player equaliser with custom settings.
+/// Enables the player equaliser with custom settings.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "custom")]
 #[allow(clippy::struct_field_names)]

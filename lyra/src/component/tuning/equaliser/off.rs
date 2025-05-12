@@ -5,7 +5,7 @@ use crate::{
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
 };
 
-/// Disable the player equaliser
+/// Disables the player equaliser.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "off")]
 pub struct Off;

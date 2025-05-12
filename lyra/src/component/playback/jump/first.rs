@@ -7,7 +7,7 @@ use crate::command::{
     require,
 };
 
-/// Jumps to the first track in the queue
+/// Jumps to the first track in the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "first")]
 pub struct First;

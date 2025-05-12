@@ -96,7 +96,7 @@ impl BotAutocomplete for Autocomplete {
     }
 }
 
-/// Removes track(s) from the queue
+/// Removes track(s) from the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "remove", dm_permission = false)]
 pub struct Remove {

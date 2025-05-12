@@ -78,7 +78,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     Ok(response)
 }
 
-/// Leaves the currently connected voice/stage channel and clears the queue
+/// Leaves the currently connected voice/stage channel and clears the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "leave", dm_permission = false)]
 pub struct Leave;

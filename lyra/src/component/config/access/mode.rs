@@ -89,7 +89,7 @@ impl From<AccessMode> for Option<bool> {
     }
 }
 
-/// Sets the access mode for channels, roles or members
+/// Sets the access mode for channels, roles or members.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "mode")]
 pub struct Mode {

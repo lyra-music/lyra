@@ -12,7 +12,7 @@ use crate::{
     lavalink::OwnedPlayerData,
 };
 
-/// Jumps to the track before the current one in the queue. Will wrap around if queue repeat is enabled.
+/// Jumps to the track before the current one in the queue, wrapping around if queue repeat is enabled.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "back")]
 pub struct Back;

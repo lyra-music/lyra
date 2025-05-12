@@ -16,7 +16,7 @@ use crate::{
     gateway::GuildIdAware,
 };
 
-/// Increase the playback volume
+/// Increases the playback volume.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "up")]
 pub struct Up {

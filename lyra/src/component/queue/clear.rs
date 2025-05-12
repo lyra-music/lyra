@@ -14,7 +14,7 @@ use crate::{
     lavalink::Event,
 };
 
-/// Clears the queue
+/// Clears the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "clear", dm_permission = false)]
 pub struct Clear;

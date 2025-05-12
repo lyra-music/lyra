@@ -67,7 +67,7 @@ pub enum LowPass {
     Off(Off),
 }
 
-/// Enable Low Pass: Suppressing higher frequencies, making the audio "muffled".
+/// Enables Low Pass: Suppressing higher frequencies, making the audio "muffled".
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

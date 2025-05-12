@@ -45,7 +45,7 @@ pub enum Rotation {
     Off(Off),
 }
 
-/// Enable Rotation (Audio Panning / "8D Audio"): Rotates the sound around the stereo channels.
+/// Enables Rotation (Audio Panning / "8D Audio"): Rotates the sound around the stereo channels.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

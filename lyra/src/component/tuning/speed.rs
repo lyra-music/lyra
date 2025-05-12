@@ -106,7 +106,7 @@ impl PlayerInterface {
     }
 }
 
-/// Sets the playback speed
+/// Sets the playback speed.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "speed", dm_permission = false)]
 pub struct Speed {

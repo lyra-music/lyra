@@ -30,7 +30,7 @@ impl super::ApplyFilter for ResetAllExceptSpeed {
     }
 }
 
-/// Disable all filter
+/// Disables all filters.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "all-off")]
 pub struct AllOff;

@@ -134,7 +134,7 @@ impl BotAutocomplete for Autocomplete {
     }
 }
 
-/// Moves a track to a new position in the queue
+/// Moves a track to a new position in the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "move", dm_permission = false)]
 pub struct Move {

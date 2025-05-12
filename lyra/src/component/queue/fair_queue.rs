@@ -11,7 +11,7 @@ use crate::{
     lavalink::IndexerType,
 };
 
-/// Toggles fair queuing
+/// Toggles fair queuing.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "fair-queue", dm_permission = false)]
 pub struct FairQueue;

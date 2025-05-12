@@ -23,7 +23,7 @@ pub enum Vibrato {
     Off(Off),
 }
 
-/// Enable Vibrato: Quickly oscillates the playback pitch, giving a shuddering effect.
+/// Enables Vibrato: Quickly oscillates the playback pitch, giving a shuddering effect.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {

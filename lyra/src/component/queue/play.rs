@@ -436,7 +436,7 @@ enum PlaySource {
     Spotify,
 }
 
-/// Adds track(s) to the queue
+/// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "play", dm_permission = false)]
 pub struct Play {
@@ -478,7 +478,7 @@ impl BotSlashCommand for Play {
     }
 }
 
-/// Adds track(s) from audio files to the queue
+/// Adds track(s) from audio files to the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "play-file", dm_permission = false)]
 pub struct File {
