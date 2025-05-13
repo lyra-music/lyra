@@ -46,7 +46,7 @@ impl BotSlashCommand for Backward {
         };
 
         queue.downgrade_repeat_mode();
-        queue.notify_skip_advance();
+        queue.disable_advancing();
 
         let track = queue[index].data();
         let txt = format!("↩️ Jumped to `{}` (`#{}`).", track.info.title, index + 1);

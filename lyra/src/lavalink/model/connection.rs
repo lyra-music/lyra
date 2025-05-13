@@ -68,7 +68,6 @@ impl Connection {
 
     /// Notify the connection to trigger a change.
     fn set_voice_state_change_notification_state(&self, state: VoiceStateChangeNotificationState) {
-        tracing::debug!("notified voice state change");
         // This notifies the `VoiceStateUpdate` handler, passing on an acknowledgement
         // stating that the incoming event is intentionally caused by the bot, either via
         // /leave or /join.
@@ -76,10 +75,12 @@ impl Connection {
     }
 
     pub fn notify_voice_state_change(&self) {
+        tracing::debug!("notified voice state change");
         self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Unread);
     }
 
     pub fn acknowledge_change(&self) {
+        tracing::debug!("voice state notification change acknowledged");
         self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Read);
     }
 

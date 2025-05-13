@@ -59,8 +59,8 @@ impl PlayerInterface {
         self.context.data_unwrapped()
     }
 
-    pub async fn notify_skip_advance_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
-        queue.notify_skip_advance();
+    pub async fn disable_advancing_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
+        queue.disable_advancing();
         self.context.stop_now().await?;
         Ok(())
     }

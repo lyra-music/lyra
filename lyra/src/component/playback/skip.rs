@@ -44,7 +44,7 @@ pub async fn skip(
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
-    queue.notify_skip_advance();
+    queue.disable_advancing();
     queue.advance();
     if let Some(item) = queue.current() {
         player.context.play_now(item.data()).await?;

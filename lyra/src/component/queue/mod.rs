@@ -294,10 +294,10 @@ async fn impl_remove(
         let next = queue.current().map(QueueItem::data);
 
         if let Some(next) = next {
-            queue.notify_skip_advance();
+            queue.disable_advancing();
             player.context.play_now(next).await?;
         } else {
-            player.notify_skip_advance_and_stop_with(queue).await?;
+            player.disable_advancing_and_stop_with(queue).await?;
         }
     } else {
         let queue_len = queue.len();

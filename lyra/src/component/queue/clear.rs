@@ -33,7 +33,7 @@ impl BotSlashCommand for Clear {
         let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
         check::all_users_track(queue, positions, in_voice_with_user)?;
 
-        player.notify_skip_advance_and_stop_with(queue).await?;
+        player.disable_advancing_and_stop_with(queue).await?;
         drop(data_r);
         ctx.get_conn().dispatch(Event::QueueClear).await?;
 

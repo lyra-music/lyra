@@ -54,7 +54,7 @@ impl BotSlashCommand for Forward {
         check::all_users_track(queue, skipped, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
-        queue.notify_skip_advance();
+        queue.disable_advancing();
 
         let track = queue[new_position].data();
         let txt = format!("↪️ Jumped to `{}` (`#{}`).", track.info.title, new_position);

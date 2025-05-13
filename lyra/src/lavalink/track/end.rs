@@ -31,7 +31,7 @@ pub(super) async fn impl_end(
         .await;
 
     let data_r = data.read().await;
-    if data_r.queue().skip_advance().await {
+    if data_r.queue().advancing_disabled().await {
         tracing::debug!(?guild_id, "track ended forcefully");
     } else {
         tracing::debug!(?guild_id, "track ended normally");

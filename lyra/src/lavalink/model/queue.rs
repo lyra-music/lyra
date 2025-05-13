@@ -90,7 +90,7 @@ pub struct Queue {
     index: usize,
     indexer: Indexer,
     repeat_mode: RepeatMode,
-    skip_advance: watch::Sender<()>,
+    advancing_enabler: watch::Sender<bool>,
 }
 
 impl Queue {
@@ -100,7 +100,7 @@ impl Queue {
             indexer: Indexer::Standard,
             index: 0,
             repeat_mode: RepeatMode::Off,
-            skip_advance: watch::channel(()).0,
+            advancing_enabler: watch::channel(false).0,
         }
     }
 
@@ -250,22 +250,39 @@ impl Queue {
         }
     }
 
-    pub fn subscribe_on_skip_advance(&self) -> watch::Receiver<()> {
-        self.skip_advance.subscribe()
+    pub fn subscribe_on_advance_enabler(&self) -> watch::Receiver<bool> {
+        self.advancing_enabler.subscribe()
     }
 
-    pub fn notify_skip_advance(&self) {
-        tracing::debug!("notified skip advance");
-        self.skip_advance.send(()).ok();
+    fn set_advancing_state(&self, state: bool) {
+        self.advancing_enabler.send_replace(state);
     }
 
-    pub async fn skip_advance(&self) -> bool {
-        tokio::time::timeout(
-            crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT,
-            self.subscribe_on_skip_advance().changed(),
+    pub fn disable_advancing(&self) {
+        tracing::debug!("disabling queue advancing");
+        self.set_advancing_state(true);
+    }
+
+    pub fn enable_advancing(&self) {
+        tracing::debug!("enabling queue advancing");
+        self.set_advancing_state(false);
+    }
+
+    pub async fn advancing_disabled(&self) -> bool {
+        let mut rx = self.subscribe_on_advance_enabler();
+        let disabled = tokio::time::timeout(
+            crate::core::r#const::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
+            rx.wait_for(|&r| r),
         )
         .await
         .is_ok()
+            || *rx.borrow();
+
+        if disabled {
+            self.enable_advancing();
+        }
+
+        disabled
     }
 
     pub fn iter_positions_and_items(
