@@ -101,6 +101,7 @@ pub trait BotSlashCommand: CommandStructureAware {
     async fn run(self, ctx: SlashCtx) -> CommandResult;
 }
 
+#[allow(unused)]
 pub trait BotUserCommand: CreateCommand {
     async fn run(ctx: User) -> CommandResult;
 }

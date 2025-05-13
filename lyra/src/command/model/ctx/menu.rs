@@ -12,9 +12,12 @@ use twilight_model::{
 
 use super::{AppCtxKind, AppCtxMarker, Ctx, Location};
 
+#[allow(unused)]
 pub struct UserAppMarker;
 impl AppCtxKind for UserAppMarker {}
+#[allow(unused)]
 pub type UserMarker = AppCtxMarker<UserAppMarker>;
+#[allow(unused)]
 pub type User = Ctx<UserMarker>;
 
 pub struct MessageAppMarker;
@@ -41,6 +44,7 @@ impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
     }
 }
 
+#[allow(unused)]
 impl<U: Location> Ctx<UserMarker, U> {
     #[inline]
     pub const fn target_user_id(&self) -> Id<TwilightUserMarker> {

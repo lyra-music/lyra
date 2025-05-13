@@ -9,6 +9,7 @@ use super::{
 
 pub struct Marker;
 impl Kind for Marker {}
+#[allow(unused)]
 pub type Modal = Ctx<Marker>;
 pub type Guild = Ctx<Marker, GuildMarker>;
 

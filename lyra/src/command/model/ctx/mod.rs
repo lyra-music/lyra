@@ -64,6 +64,7 @@ impl<T: AppCtxKind> Kind for AppCtxMarker<T> {}
 
 pub type SlashMarker = AppCtxMarker<SlashAppMarker>;
 pub type Slash = Ctx<SlashMarker>;
+#[allow(unused)]
 pub type GuildSlash = Ctx<SlashMarker, GuildMarker>;
 
 pub struct ComponentMarker;
@@ -148,10 +149,6 @@ impl<T: Kind, U: Location> Ctx<T, U> {
 
     pub fn channel(&self) -> &Channel {
         self.inner.channel_expected()
-    }
-
-    pub fn interaction(&self) -> &InteractionCreate {
-        self.inner.as_ref()
     }
 
     pub fn interaction_token(&self) -> &str {
