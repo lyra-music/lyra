@@ -299,12 +299,11 @@ async fn impl_remove(
         } else {
             player.disable_advancing_and_stop_with(queue).await?;
         }
-    } else {
-        let queue_len = queue.len();
-        data_w
-            .update_and_apply_now_playing_queue_len(queue_len)
-            .await?;
     }
+    let (queue_len, queue_position) = (queue.len(), queue.position());
+    data_w
+        .update_and_apply_now_playing_queue_len_and_position(queue_len, queue_position)
+        .await?;
     drop(data_w);
 
     out!(format!("{} Removed {}.", minus, removed_text), ?ctx);

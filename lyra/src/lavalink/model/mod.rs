@@ -257,6 +257,20 @@ impl RawPlayerData {
     }
 
     #[inline]
+    async fn update_many_and_apply_now_playing_data(
+        &mut self,
+        updates: impl IntoIterator<Item = NowPlayingDataUpdate>,
+    ) -> UpdateNowPlayingMessageResult {
+        let timestamp = self.timestamp();
+        if let Some(ref mut msg) = self.now_playing_message {
+            updates.into_iter().for_each(|u| msg.update(u));
+            msg.update_timestamp(timestamp);
+            msg.apply_update().await?;
+        }
+        Ok(())
+    }
+
+    #[inline]
     pub async fn set_repeat_mode_then_update_and_apply_to_now_playing(
         &mut self,
         mode: RepeatMode,
@@ -301,6 +315,19 @@ impl RawPlayerData {
     ) -> UpdateNowPlayingMessageResult {
         self.update_and_apply_now_playing_data(NowPlayingDataUpdate::QueuePosition(position))
             .await
+    }
+
+    #[inline]
+    pub async fn update_and_apply_now_playing_queue_len_and_position(
+        &mut self,
+        len: usize,
+        position: NonZeroUsize,
+    ) -> UpdateNowPlayingMessageResult {
+        self.update_many_and_apply_now_playing_data([
+            NowPlayingDataUpdate::QueueLen(len),
+            NowPlayingDataUpdate::QueuePosition(position),
+        ])
+        .await
     }
 
     #[inline]
