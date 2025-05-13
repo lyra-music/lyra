@@ -19,7 +19,7 @@ pub mod play {
     #[derive(thiserror::Error, Debug)]
     #[error("playing failed: {:?}", .0)]
     pub enum Error {
-        Respond(#[from] crate::error::command::RespondError),
+        TwilightHttp(#[from] twilight_http::Error),
         RespondOrFollowup(#[from] crate::error::command::RespondOrFollowupError),
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
         HandleLoadTrackResults(#[from] HandleLoadTrackResultsError),
@@ -43,22 +43,12 @@ pub mod repeat {
     #[error(transparent)]
     pub enum Error {
         UnrecognisedConnection(#[from] crate::error::UnrecognisedConnection),
-        Respond(#[from] crate::error::command::RespondError),
-        UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
-    }
-}
-
-pub mod shuffle {
-    #[derive(thiserror::Error, Debug)]
-    #[error(transparent)]
-    pub enum Error {
-        Respond(#[from] crate::error::command::RespondError),
+        TwilightHttp(#[from] twilight_http::Error),
         UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),
     }
 }
 
 pub use repeat::Error as RepeatError;
-pub use shuffle::Error as ShuffleError;
 
 use thiserror::Error;
 
@@ -66,7 +56,7 @@ use thiserror::Error;
 #[error(transparent)]
 pub enum RemoveTracksError {
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
-    Respond(#[from] crate::error::command::RespondError),
+    TwilightHttp(#[from] twilight_http::Error),
     Followup(#[from] crate::error::command::FollowupError),
     DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     UpdateNowPlayingMessage(#[from] crate::error::lavalink::UpdateNowPlayingMessageError),

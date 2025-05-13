@@ -17,7 +17,7 @@ pub mod play_pause {
     #[error(transparent)]
     pub enum Error {
         Lavalink(#[from] lavalink_rs::error::LavalinkError),
-        Respond(#[from] crate::error::command::RespondError),
+        TwilightHttp(#[from] twilight_http::Error),
         SetPauseWith(#[from] crate::error::command::require::SetPauseWithError),
     }
 }

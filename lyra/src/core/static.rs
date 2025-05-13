@@ -1,4 +1,6 @@
 pub mod application {
+    use std::sync::OnceLock;
+
     use tokio::sync::OnceCell;
     use twilight_model::{
         guild::Emoji,
@@ -7,18 +9,16 @@ pub mod application {
 
     use crate::{core::model::HttpAware, error::core::DeserialiseBodyFromHttpError};
 
-    static ID: OnceCell<Id<ApplicationMarker>> = OnceCell::const_new();
+    static ID: OnceLock<Id<ApplicationMarker>> = OnceLock::new();
     static EMOJIS: OnceCell<&'static [Emoji]> = OnceCell::const_new();
 
-    pub async fn id(
-        cx: &(impl HttpAware + Sync),
-    ) -> Result<Id<ApplicationMarker>, DeserialiseBodyFromHttpError> {
-        ID.get_or_try_init(|| async {
-            let application = cx.http().current_user_application().await?.model().await?;
-            Ok(application.id)
-        })
-        .await
-        .copied()
+    pub fn set_id(id: Id<ApplicationMarker>) {
+        ID.set(id).ok();
+    }
+
+    pub fn id() -> Id<ApplicationMarker> {
+        *ID.get()
+            .expect("ready event should have populated the application id")
     }
 
     pub async fn emojis(
@@ -26,7 +26,7 @@ pub mod application {
     ) -> Result<&'static [Emoji], DeserialiseBodyFromHttpError> {
         EMOJIS
             .get_or_try_init(|| async {
-                let application_id = id(cx).await?;
+                let application_id = id();
                 let req = cx.http().get_application_emojis(application_id);
                 Ok(&*req.await?.model().await?.items.leak())
             })

@@ -90,7 +90,7 @@ impl Process for Context {
 impl Context {
     async fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
-        let i = bot.interaction().await?.interfaces(&self.inner);
+        let i = bot.interaction().interfaces(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
             unreachable!()

@@ -8,7 +8,7 @@ use crate::{
         require,
         util::controller_fmt,
     },
-    error::CommandResult,
+    error::{CommandResult, lavalink::UpdateNowPlayingMessageError},
     lavalink::{IndexerType, OwnedPlayerData},
 };
 
@@ -36,7 +36,7 @@ pub async fn shuffle(
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
-) -> Result<(), crate::error::component::queue::ShuffleError> {
+) -> Result<(), UpdateNowPlayingMessageError> {
     let indexer_type = data.read().await.queue().indexer_type();
     match indexer_type {
         IndexerType::Shuffled => {

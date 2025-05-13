@@ -26,10 +26,7 @@ use crate::{
         InVoiceWithoutUser as InVoiceWithoutUserError, NotUsersTrack as NotUsersTrackError,
         UserNotAccessManager as UserNotAccessManagerError, UserNotAllowed as UserNotAllowedError,
         UserNotDj as UserNotDjError, UserNotStageManager as UserNotStageManagerError,
-        command::check::{
-            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
-            UserOnlyInError,
-        },
+        command::check::{self, AlternateVoteResponse, PollResolvableError, UserOnlyInError},
     },
     gateway::GuildIdAware,
     lavalink::{
@@ -831,11 +828,10 @@ async fn handle_poll(
 async fn send_superseded_win_notice(
     interaction_token: String,
     bot: Arc<BotState>,
-) -> Result<(), SendSupersededWinNoticeError> {
+) -> Result<(), twilight_http::Error> {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
     bot.interaction()
-        .await?
         .create_followup(&interaction_token)
         .flags(MessageFlags::EPHEMERAL)
         .content("🪄 The poll was superseded to win by a DJ.")

@@ -27,9 +27,9 @@ impl<T: RespondVia, U: Location> Ctx<T, U> {
         &mut self,
         data: Option<InteractionResponseData>,
     ) -> MessageRespondResult {
-        let response = self.interface().await?.respond_with(data).await;
+        let response = self.interface().respond_with(data).await;
         self.acknowledge();
-        Ok(response?)
+        response
     }
 
     pub async fn respond_embeds(
@@ -54,13 +54,13 @@ impl<T: RespondVia, U: Location> Ctx<T, U> {
 
     pub async fn defer(&mut self) -> UnitRespondResult {
         self.acknowledge();
-        Ok(self.interface().await?.defer().await?)
+        self.interface().defer().await
     }
 }
 
 impl<T: RespondVia, U: Location> crate::core::model::AcknowledgementAware for Ctx<T, U> {
     type FollowupError = FollowupError;
-    type RespondError = crate::error::command::RespondError;
+    type RespondError = twilight_http::Error;
     type RespondOrFollowupError = crate::error::command::RespondOrFollowupError;
 
     fn acknowledged(&self) -> bool {
@@ -90,24 +90,20 @@ impl<T: RespondVia, U: Location> crate::core::model::AcknowledgementAware for Ct
         &self,
         content: impl Into<String> + Send,
     ) -> Result<MessageResponse, Self::RespondError> {
-        Ok(self
-            .interface()
-            .await?
-            .update_no_components_embeds(content)
-            .await?)
+        self.interface().update_no_components_embeds(content).await
     }
 
     async fn followup(
         &self,
         content: impl Into<String> + Send,
     ) -> Result<MessageResponse, Self::FollowupError> {
-        Ok(self.interface().await?.followup(content).await?)
+        Ok(self.interface().followup(content).await?)
     }
 
     async fn followup_ephemeral(
         &self,
         content: impl Into<String> + Send,
     ) -> Result<MessageResponse, Self::FollowupError> {
-        Ok(self.interface().await?.followup_ephemeral(content).await?)
+        Ok(self.interface().followup_ephemeral(content).await?)
     }
 }

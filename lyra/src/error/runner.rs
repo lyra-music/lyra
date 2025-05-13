@@ -9,8 +9,6 @@ pub enum StartError {
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
     Http(#[from] twilight_http::Error),
     WaitUntilShutdown(#[from] WaitUntilShutdownError),
-    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-    RegisterGlobalCommands(#[from] super::core::RegisterGlobalCommandsError),
 }
 
 #[derive(Error, Debug)]

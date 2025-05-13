@@ -16,10 +16,7 @@ use twilight_gateway::ShardId;
 use twilight_http::Client;
 use twilight_model::{
     guild::{Emoji, PartialMember, Permissions},
-    id::{
-        Id,
-        marker::{ApplicationMarker, UserMarker},
-    },
+    id::{Id, marker::UserMarker},
     user::{CurrentUser, User},
     util::ImageHash,
 };
@@ -338,22 +335,14 @@ impl BotState {
     }
 
     #[inline]
-    pub async fn application_id(
-        &self,
-    ) -> Result<Id<ApplicationMarker>, DeserialiseBodyFromHttpError> {
-        application::id(self).await
-    }
-
-    #[inline]
     pub async fn application_emojis(
         &self,
     ) -> Result<&'static [Emoji], DeserialiseBodyFromHttpError> {
         application::emojis(self).await
     }
 
-    pub async fn interaction(&self) -> Result<InteractionClient, DeserialiseBodyFromHttpError> {
-        let client = self.http.interaction(self.application_id().await?);
-        Ok(InteractionClient::new(client))
+    pub fn interaction(&self) -> InteractionClient {
+        InteractionClient::new(self.http.interaction(application::id()))
     }
 
     pub fn user(&self) -> CurrentUser {

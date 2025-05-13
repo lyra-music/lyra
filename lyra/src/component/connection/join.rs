@@ -317,7 +317,6 @@ async fn delete_empty_voice_notice(
         .await?;
 
     bot.interaction()
-        .await?
         .delete_followup(&ctx.interaction_token, ctx.message_id)
         .await?;
     Ok(())

@@ -7,7 +7,6 @@ pub mod join {
     pub enum DeleteEmptyVoiceNoticeError {
         Http(#[from] twilight_http::Error),
         StandbyDropped(#[from] twilight_standby::future::Canceled),
-        DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     }
 
     #[derive(thiserror::Error, Debug)]

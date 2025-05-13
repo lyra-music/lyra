@@ -2,7 +2,10 @@ use std::fmt::{Display, Write};
 
 use twilight_http::Response;
 use twilight_model::{
-    application::{command::CommandOptionChoice, interaction::Interaction},
+    application::{
+        command::{Command, CommandOptionChoice},
+        interaction::Interaction,
+    },
     channel::{
         Message,
         message::{AllowedMentions, Embed, MessageFlags, component::ActionRow},
@@ -16,11 +19,8 @@ use twilight_model::{
 use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::{
-    command::{
-        declare::{self, POPULATED_COMMAND_MAP},
-        model::CommandStructureAware,
-    },
-    error::core::{FollowupResult, RegisterGlobalCommandsError, RespondResult},
+    command::{declare::POPULATED_COMMAND_MAP, model::CommandStructureAware},
+    error::core::{FollowupResult, RespondResult, SetGlobalCommandsError},
 };
 
 pub type MessageResponse = Response<Message>;
@@ -361,13 +361,11 @@ impl<'a> Client<'a> {
         }
     }
 
-    pub async fn register_global_commands(&self) -> Result<(), RegisterGlobalCommandsError> {
-        let commands = self
-            .0
-            .set_global_commands(&declare::commands())
-            .await?
-            .models()
-            .await?;
+    pub async fn set_global_commands(
+        &self,
+        commands: &[Command],
+    ) -> Result<(), SetGlobalCommandsError> {
+        let commands = self.0.set_global_commands(commands).await?.models().await?;
 
         POPULATED_COMMAND_MAP.get_or_init(|| {
             commands

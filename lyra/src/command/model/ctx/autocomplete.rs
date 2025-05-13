@@ -13,8 +13,8 @@ impl<U: Location> Ctx<Marker, U> {
         &mut self,
         choices: impl IntoIterator<Item = CommandOptionChoice> + Send,
     ) -> UnitRespondResult {
-        let response = self.interface().await?.autocomplete(choices).await;
+        let response = self.interface().autocomplete(choices).await;
         self.acknowledge();
-        Ok(response?)
+        response
     }
 }

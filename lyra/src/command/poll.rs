@@ -561,7 +561,7 @@ async fn wait_for_votes(
                     vote,
                     interaction,
                 } => {
-                    let i = ctx.bot().interaction().await?.interfaces(&interaction);
+                    let i = ctx.bot().interaction().interfaces(&interaction);
                     if !users_in_voice.contains(&user_id) {
                         nope!("You are not eligible to cast a vote to this poll.", ?i);
                         continue;
@@ -625,12 +625,12 @@ async fn wait_for_votes(
                     .await?;
                 }
                 PollAction::DjUpvote(inter) => {
-                    let i = ctx.bot().interaction().await?.interfaces(&inter);
+                    let i = ctx.bot().interaction().interfaces(&inter);
                     hid!(format!("🪄 Superseded this poll to win."), ?i);
                     return Ok(Resolution::SupersededWinViaDj);
                 }
                 PollAction::DjDownvote(inter) => {
-                    let i = ctx.bot().interaction().await?.interfaces(&inter);
+                    let i = ctx.bot().interaction().interfaces(&inter);
                     hid!(format!("🪄 Superseded this poll to lose."), ?i);
                     return Ok(Resolution::SupersededLossViaDj);
                 }

@@ -33,12 +33,8 @@ impl<T: RespondVia, U: Location> Ctx<T, U> {
         title: impl Into<String> + Send,
         text_inputs: impl IntoIterator<Item = impl Into<Component>> + Send,
     ) -> UnitRespondResult {
-        let response = self
-            .interface()
-            .await?
-            .modal(custom_id, title, text_inputs)
-            .await;
+        let response = self.interface().modal(custom_id, title, text_inputs).await;
         self.acknowledge();
-        Ok(response?)
+        response
     }
 }

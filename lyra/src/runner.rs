@@ -118,7 +118,6 @@ pub async fn start() -> Result<(), StartError> {
     let mut senders = Vec::with_capacity(shards_len);
     let mut tasks = Vec::with_capacity(shards_len);
     let bot = Arc::new(BotState::new(db, http, cache, lavalink));
-    bot.interaction().await?.register_global_commands().await?;
 
     for shard in shards {
         senders.push(shard.sender());

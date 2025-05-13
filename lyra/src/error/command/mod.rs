@@ -5,13 +5,6 @@ pub mod require;
 pub mod util;
 
 #[derive(thiserror::Error, Debug)]
-#[error("creating a response failed: {}", .0)]
-pub enum RespondError {
-    TwilightHttp(#[from] twilight_http::Error),
-    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-}
-
-#[derive(thiserror::Error, Debug)]
 #[error("creating a followup failed: {}", .0)]
 pub enum FollowupError {
     DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
@@ -21,7 +14,7 @@ pub enum FollowupError {
 #[derive(thiserror::Error, Debug)]
 #[error("creating a response or followup failed: {}", 0)]
 pub enum RespondOrFollowupError {
-    Respond(#[from] RespondError),
+    TwilightHttp(#[from] twilight_http::Error),
     Followup(#[from] FollowupError),
 }
 
@@ -41,7 +34,6 @@ pub enum Error {
     RequireInVoiceWithSomeoneElse(#[from] require::InVoiceWithSomeoneElseError),
     PositionOutOfRange(#[from] super::PositionOutOfRange),
     CheckRun(#[from] check::RunError),
-    Respond(#[from] RespondError),
     Followup(#[from] FollowupError),
     PromptForConfirmation(#[from] util::PromptForConfirmationError),
     Join(#[from] super::component::connection::join::ResidualError),
@@ -61,7 +53,6 @@ pub enum Error {
     UnrecognisedConnection(#[from] super::UnrecognisedConnection),
     PlayPause(#[from] super::component::playback::PlayPauseError),
     Repeat(#[from] super::component::queue::RepeatError),
-    Shuffle(#[from] super::component::queue::ShuffleError),
     UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     SeekToWith(#[from] require::SeekToWithError),
     NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
@@ -199,9 +190,6 @@ impl<'a> Fe<'a> {
         match error {
             poll::WaitForVotesError::TwilightHttp(_) => Self::TwilightHttp,
             poll::WaitForVotesError::EventRecv(_) => Self::EventRecv,
-            poll::WaitForVotesError::DeserialiseBodyFromHttp(e) => {
-                Self::from_deserialize_body_from_http_error(e)
-            }
             poll::WaitForVotesError::UpdateEmbed(e) => Self::from_update_embed(e),
         }
     }
@@ -209,8 +197,8 @@ impl<'a> Fe<'a> {
     const fn from_start_poll(error: &'a poll::StartPollError) -> Self {
         match error {
             poll::StartPollError::Cache(_) => Self::Cache,
+            poll::StartPollError::TwilightHttp(_) => Self::TwilightHttp,
             poll::StartPollError::DeserializeBody(_) => Self::DeserializeBody,
-            poll::StartPollError::Respond(e) => Self::from_respond(e),
             poll::StartPollError::GenerateEmbed(e) => Self::from_generate_embed(e),
             poll::StartPollError::WaitForVotes(e) => Self::from_wait_for_votes(e),
         }
@@ -241,15 +229,6 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_respond(error: &'a RespondError) -> Self {
-        match error {
-            RespondError::TwilightHttp(_) => Self::TwilightHttp,
-            RespondError::DeserialiseBodyFromHttp(e) => {
-                Self::from_deserialize_body_from_http_error(e)
-            }
-        }
-    }
-
     const fn from_followup(error: &'a FollowupError) -> Self {
         match error {
             FollowupError::DeserialiseBodyFromHttp(e) => {
@@ -261,7 +240,7 @@ impl<'a> Fe<'a> {
 
     const fn from_respond_or_followup(error: &'a RespondOrFollowupError) -> Self {
         match error {
-            RespondOrFollowupError::Respond(e) => Self::from_respond(e),
+            RespondOrFollowupError::TwilightHttp(_) => Self::TwilightHttp,
             RespondOrFollowupError::Followup(e) => Self::from_followup(e),
         }
     }
@@ -270,7 +249,7 @@ impl<'a> Fe<'a> {
         match error {
             util::PromptForConfirmationError::StandbyCanceled(_) => Self::StandbyCanceled,
             util::PromptForConfirmationError::ConfirmationTimedout(_) => Self::ConfirmationTimedOut,
-            util::PromptForConfirmationError::Respond(e) => Self::from_respond(e),
+            util::PromptForConfirmationError::TwilightHttp(_) => Self::TwilightHttp,
         }
     }
 
@@ -508,8 +487,8 @@ impl<'a> Fe<'a> {
 
     const fn from_play(error: &'a super::component::queue::play::Error) -> Self {
         match error {
+            super::component::queue::play::Error::TwilightHttp(_) => Self::TwilightHttp,
             super::component::queue::play::Error::Lavalink(e) => Self::Lavalink(e),
-            super::component::queue::play::Error::Respond(e) => Self::from_respond(e),
             super::component::queue::play::Error::RespondOrFollowup(e) => {
                 Self::from_respond_or_followup(e)
             }
@@ -533,8 +512,8 @@ impl<'a> Fe<'a> {
 
     const fn from_remove_tracks(error: &'a super::component::queue::RemoveTracksError) -> Self {
         match error {
+            super::component::queue::RemoveTracksError::TwilightHttp(_) => Self::TwilightHttp,
             super::component::queue::RemoveTracksError::Lavalink(e) => Self::Lavalink(e),
-            super::component::queue::RemoveTracksError::Respond(e) => Self::from_respond(e),
             super::component::queue::RemoveTracksError::Followup(e) => Self::from_followup(e),
             super::component::queue::RemoveTracksError::DeserialiseBodyFromHttp(e) => {
                 Self::from_deserialize_body_from_http_error(e)
@@ -547,8 +526,8 @@ impl<'a> Fe<'a> {
 
     const fn from_play_pause(error: &'a super::component::playback::PlayPauseError) -> Self {
         match error {
+            super::component::playback::PlayPauseError::TwilightHttp(_) => Self::TwilightHttp,
             super::component::playback::PlayPauseError::Lavalink(e) => Self::Lavalink(e),
-            super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
             super::component::playback::PlayPauseError::SetPauseWith(e) => {
                 Self::from_set_pause_with(e)
             }
@@ -557,20 +536,11 @@ impl<'a> Fe<'a> {
 
     const fn from_repeat(error: &'a super::component::queue::RepeatError) -> Self {
         match error {
+            super::component::queue::RepeatError::TwilightHttp(_) => Self::TwilightHttp,
             super::component::queue::RepeatError::UnrecognisedConnection(_) => {
                 Self::UnrecognisedConnection
             }
-            super::component::queue::RepeatError::Respond(e) => Self::from_respond(e),
             super::component::queue::RepeatError::UpdateNowPlayingMessage(e) => {
-                Self::from_update_now_playing_message(e)
-            }
-        }
-    }
-
-    const fn from_shuffle(error: &'a super::component::queue::ShuffleError) -> Self {
-        match error {
-            super::component::queue::ShuffleError::Respond(e) => Self::from_respond(e),
-            super::component::queue::ShuffleError::UpdateNowPlayingMessage(e) => {
                 Self::from_update_now_playing_message(e)
             }
         }
@@ -665,7 +635,6 @@ impl Error {
                 Fe::from_require_in_voice_with_someone_else_error(e)
             }
             Self::CheckRun(e) => Fe::from_run(e),
-            Self::Respond(e) => Fe::from_respond(e),
             Self::Followup(e) => Fe::from_followup(e),
             Self::PromptForConfirmation(e) => Fe::from_prompt_for_confirmation(e),
             Self::Join(e) => Fe::from_join_residual(e),
@@ -677,7 +646,6 @@ impl Error {
             Self::HandlePoll(e) => Fe::from_handle_poll(e),
             Self::PlayPause(e) => Fe::from_play_pause(e),
             Self::Repeat(e) => Fe::from_repeat(e),
-            Self::Shuffle(e) => Fe::from_shuffle(e),
             Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
             Self::SeekToWith(e) => Fe::from_seek_to_with(e),
             Self::NewNowPlayingData(e) => Fe::from_new_now_playing_data(e),
@@ -692,7 +660,7 @@ pub type Result = core::result::Result<(), Error>;
 #[error("autocomplete failed: {}", .0)]
 pub enum AutocompleteError {
     LoadFailed(#[from] super::LoadFailed),
-    Respond(#[from] RespondError),
+    TwilightHttp(#[from] twilight_http::Error),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
     NotInGuild(#[from] super::NotInGuild),
 }

@@ -30,9 +30,7 @@ use crate::{
         OwnedBotState, OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, UserAware,
         UserPermissionsAware,
     },
-    error::{
-        Cache, CacheResult, NotInGuild, command::RespondError, core::DeserialiseBodyFromHttpError,
-    },
+    error::{Cache, CacheResult, NotInGuild},
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
 };
@@ -48,7 +46,7 @@ pub use self::{
     modal::{Guild as GuildModal, RespondVia as RespondViaModal},
 };
 
-type RespondResult<T> = Result<T, RespondError>;
+type RespondResult<T> = Result<T, twilight_http::Error>;
 type UnitRespondResult = RespondResult<()>;
 type CachedBotMember<'a> = Reference<'a, (Id<TwilightGuildMarker>, Id<UserMarker>), CachedMember>;
 
@@ -155,8 +153,8 @@ impl<T: Kind, U: Location> Ctx<T, U> {
         &self.inner.token
     }
 
-    pub async fn interface(&self) -> Result<InteractionInterface, DeserialiseBodyFromHttpError> {
-        Ok(self.bot.interaction().await?.interfaces(&self.inner))
+    pub fn interface(&self) -> InteractionInterface {
+        self.bot.interaction().interfaces(&self.inner)
     }
 
     pub fn guild_id_expected(&self) -> Id<TwilightGuildMarker> {

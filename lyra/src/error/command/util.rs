@@ -5,7 +5,7 @@ use twilight_model::id::{Id, marker::MessageMarker};
 #[error(transparent)]
 pub enum PromptForConfirmationError {
     StandbyCanceled(#[from] twilight_standby::future::Canceled),
-    Respond(#[from] super::RespondError),
+    TwilightHttp(#[from] twilight_http::Error),
     ConfirmationTimedout(#[from] crate::error::ConfirmationTimedOut),
 }
 
