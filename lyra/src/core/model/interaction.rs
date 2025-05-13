@@ -381,7 +381,7 @@ impl<'a> Client<'a> {
 
     fn qualified_command_name<T: CommandStructureAware>() -> QualifiedCommandName<'static> {
         match (T::ROOT_NAME, T::PARENT_NAME, T::NAME) {
-            // FIXME: This code relies on the invaariant `root != inner != leaf` for it to function properly.
+            // TODO: This code relies on the invaariant `root != inner != leaf` for it to function properly.
             // However, the Discord API does not enforce said invariant.
             // This is not a future-proof design, and should be revisited some time in the future.
             (root, None, leaf) if root == leaf => QualifiedCommandName::Root(root),
