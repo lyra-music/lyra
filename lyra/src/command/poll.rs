@@ -53,6 +53,7 @@ use super::{
 
 #[derive(Hash)]
 pub enum Topic {
+    #[allow(unused)] // TODO: #44
     Repeat(crate::lavalink::RepeatMode),
 }
 

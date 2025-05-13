@@ -3,11 +3,9 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        SlashCtx,
-        check::{self, ResolveWithPoll, StartPoll},
+        SlashCtx, check,
         macros::out_or_upd,
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
-        poll::Topic,
         require,
         util::controller_fmt,
     },
@@ -60,11 +58,13 @@ impl BotSlashCommand for Repeat {
 
         require::queue_not_empty(&data.read().await)?;
 
-        check::user_in(in_voice)?
-            .only()
-            .or_else_try_resolve_with(Topic::Repeat(mode))?
-            .and_then_start(&mut ctx)
-            .await?;
+        // TODO: #44
+        //
+        // check::user_in(in_voice)?.only()
+        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
+        //    .and_then_start(&mut ctx)
+        //    .await?;
+        check::user_in(in_voice)?.only()?;
 
         Ok(repeat(&mut ctx, data, mode, false).await?)
     }
