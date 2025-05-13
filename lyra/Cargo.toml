@@ -23,8 +23,6 @@ vergen-git2 = { version = "1.0.7", features = [
 unsafe_code = "forbid"
 
 [lints.clippy]
-multiple_unsafe_ops_per_block = "forbid"
-undocumented_unsafe_blocks = "forbid"
 enum_glob_use = "forbid"
 unwrap_used = "forbid"
 try_err = "forbid"

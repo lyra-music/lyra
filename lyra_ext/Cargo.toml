@@ -8,8 +8,6 @@ edition = "2024"
 unsafe_code = "forbid"
 
 [lints.clippy]
-multiple_unsafe_ops_per_block = "forbid"
-undocumented_unsafe_blocks = "forbid"
 enum_glob_use = "forbid"
 unwrap_used = "forbid"
 try_err = "forbid"
