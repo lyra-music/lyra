@@ -42,7 +42,10 @@ use crate::{
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
     },
     gateway::GuildIdAware,
-    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedData, UnwrappedPlayerInfoUri},
+    lavalink::{
+        CorrectPlaylistInfo, CorrectTrackInfo, PlaylistAwareTrackData, PlaylistMetadata,
+        UnwrappedData, UnwrappedPlayerInfoUri, make_playlist_aware,
+    },
 };
 
 struct LoadTrackContext {
@@ -101,8 +104,7 @@ impl LoadTrackContext {
 }
 
 struct Playlist {
-    uri: Box<str>,
-    info: PlaylistInfo,
+    metadata: PlaylistMetadata,
     tracks: Box<[TrackData]>,
 }
 
@@ -110,14 +112,14 @@ impl Playlist {
     fn new(loaded: LoadedTracks, uri: Box<str>) -> Self {
         match loaded.load_type {
             TrackLoadType::Playlist => {
-                let Some(TrackLoadData::Playlist(data)) = loaded.data else {
+                let Some(TrackLoadData::Playlist(mut data)) = loaded.data else {
                     panic!("loaded playlist missing playlist load data")
                 };
 
+                let tracks = std::mem::take(&mut data.tracks).into();
                 Self {
-                    uri,
-                    info: data.info,
-                    tracks: data.tracks.into(),
+                    metadata: PlaylistMetadata::new(uri, data),
+                    tracks,
                 }
             }
             _ => panic!("`loaded resources not a playlist"),
@@ -146,15 +148,15 @@ impl LoadTrackResults {
     }
 }
 
-impl From<LoadTrackResults> for Vec<TrackData> {
+impl From<LoadTrackResults> for Vec<PlaylistAwareTrackData> {
     fn from(value: LoadTrackResults) -> Self {
         value
             .0
             .into_vec()
             .into_iter()
             .flat_map(|result| match result {
-                LoadTrackResult::Track(t) => Self::from([t]),
-                LoadTrackResult::Playlist(p) => p.tracks.into_vec(),
+                LoadTrackResult::Track(t) => Self::from([t.into()]),
+                LoadTrackResult::Playlist(p) => make_playlist_aware(p.tracks, p.metadata),
             })
             .collect()
     }
@@ -367,8 +369,8 @@ async fn handle_load_track_results(
                 format!(
                     "`{} tracks` from playlist [`{}`](<{}>)",
                     p.tracks.len(),
-                    p.info.corrected_name(),
-                    p.uri
+                    p.metadata.corrected_name(),
+                    p.metadata.uri
                 )
             })
             .collect::<Vec<_>>()
@@ -415,7 +417,7 @@ async fn handle_load_track_results(
         .await
         .queue_mut()
         .enqueue(total_tracks, ctx.user_id());
-    player.play(&first_track).await?;
+    player.play(first_track.inner()).await?;
     out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
 }
 

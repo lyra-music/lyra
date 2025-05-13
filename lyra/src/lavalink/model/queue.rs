@@ -5,7 +5,10 @@ use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use tokio::sync::watch;
 use twilight_model::id::{Id, marker::UserMarker};
 
-use super::queue_indexer::{Indexer, IndexerType};
+use super::{
+    PlaylistAwareTrackData, PlaylistMetadata,
+    queue_indexer::{Indexer, IndexerType},
+};
 
 #[derive(Hash, Copy, Clone)]
 pub enum RepeatMode {
@@ -47,13 +50,13 @@ impl std::fmt::Display for RepeatMode {
 
 #[derive(Debug)]
 pub struct Item {
-    track: TrackData,
+    track: PlaylistAwareTrackData,
     enqueued: Duration,
     pub(super) requester: Id<UserMarker>,
 }
 
 impl Item {
-    fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
+    fn new(track: PlaylistAwareTrackData, requester: Id<UserMarker>) -> Self {
         Self {
             track,
             requester,
@@ -66,7 +69,11 @@ impl Item {
     }
 
     pub const fn data(&self) -> &TrackData {
-        &self.track
+        self.track.inner()
+    }
+
+    pub fn playlist_data(&self) -> Option<&PlaylistMetadata> {
+        self.track.playlist()
     }
 
     pub const fn enqueued(&self) -> Duration {
@@ -74,7 +81,7 @@ impl Item {
     }
 
     pub fn into_data(self) -> TrackData {
-        self.track
+        self.track.into_inner()
     }
 }
 
@@ -132,7 +139,7 @@ impl Queue {
         (current, position)
     }
 
-    pub fn enqueue(&mut self, tracks: Vec<TrackData>, requester: Id<UserMarker>) {
+    pub fn enqueue(&mut self, tracks: Vec<PlaylistAwareTrackData>, requester: Id<UserMarker>) {
         match self.indexer {
             Indexer::Fair(ref mut indexer) => indexer.enqueue(tracks.len(), requester),
             Indexer::Shuffled(ref mut indexer) => indexer.enqueue(tracks.len(), self.index),

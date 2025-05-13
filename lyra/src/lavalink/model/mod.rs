@@ -3,6 +3,7 @@ mod correct_info;
 mod delegate;
 mod now_playing;
 mod pitch;
+mod playlist;
 mod queue;
 mod queue_indexer;
 
@@ -45,6 +46,7 @@ pub use self::{
         Data as NowPlayingData, Message as NowPlayingMessage, Update as NowPlayingDataUpdate,
     },
     pitch::Pitch,
+    playlist::{PlaylistAwareTrackData, PlaylistMetadata, make_playlist_aware},
     queue::{Item as QueueItem, Queue, RepeatMode},
     queue_indexer::IndexerType,
 };

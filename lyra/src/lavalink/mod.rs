@@ -8,9 +8,10 @@ pub use self::{
     model::{
         ClientAndGuildIdAware, ClientAware, ClientData, Connection, CorrectPlaylistInfo,
         CorrectTrackInfo, DelegateMethods, Event, EventRecvResult, IndexerType, Lavalink,
-        NowPlayingData, OwnedPlayerData, Pitch, PlayerDataRead, PlayerDataWrite, Queue, QueueItem,
-        RepeatMode, UnwrappedData, UnwrappedPlayerInfoUri, wait_for_with,
+        NowPlayingData, OwnedPlayerData, Pitch, PlayerDataRead, PlayerDataWrite,
+        PlaylistAwareTrackData, PlaylistMetadata, Queue, QueueItem, RepeatMode, UnwrappedData,
+        UnwrappedPlayerInfoUri, make_playlist_aware, wait_for_with,
     },
-    plugin::lava_src::PluginInfo,
+    plugin::lava_src::{PluginInfo, PluginPlaylistInfo},
     process::handlers,
 };
