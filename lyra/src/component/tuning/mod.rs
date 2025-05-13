@@ -3,13 +3,14 @@ mod filter;
 mod speed;
 mod volume;
 
-use std::num::NonZeroU16;
-
 pub use equaliser::Equaliser;
 pub use filter::Filter;
-use lavalink_rs::{error::LavalinkResult, model::player::Filters};
 pub use speed::Speed;
 pub use volume::Volume;
+
+use std::num::NonZeroU16;
+
+use lavalink_rs::{error::LavalinkResult, model::player::Filters};
 
 use crate::{
     CommandError, LavalinkAndGuildIdAware, LavalinkAware,

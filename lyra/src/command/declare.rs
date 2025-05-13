@@ -6,7 +6,7 @@ use crate::component::{
     config::Config,
     connection::{Join, Leave},
     controller::NowPlaying,
-    misc::Ping,
+    misc::{Ping, Uptime},
     playback::{Back, Jump, JumpAutocomplete, PlayPause, Restart, Seek, Skip},
     queue::{
         AddToQueue, Clear, FairQueue, Move, MoveAutocomplete, Play, PlayAutocomplete, PlayFile,
@@ -237,6 +237,7 @@ macro_rules! declare_autocomplete {
 
 declare_slash_commands![
     Ping,
+    Uptime,
     Join,
     Leave,
     Config,

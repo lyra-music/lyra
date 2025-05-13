@@ -1,6 +1,10 @@
 mod interaction;
 
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use sqlx::{Pool, Postgres};
 use tokio::sync::{
@@ -140,6 +144,10 @@ pub struct BotInfo {
 }
 
 impl BotInfo {
+    pub fn uptime(&self) -> Duration {
+        self.started.elapsed()
+    }
+
     pub async fn total_guild_count(&self) -> usize {
         self.guild_counter.read_total().await
     }
