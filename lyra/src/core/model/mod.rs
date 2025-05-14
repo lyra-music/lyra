@@ -283,6 +283,16 @@ pub trait CacheAware {
     fn cache(&self) -> &InMemoryCache;
 }
 
+impl CacheAware for Arc<InMemoryCache> {
+    fn cache(&self) -> &InMemoryCache {
+        self
+    }
+}
+
+pub trait OwnedCacheAware {
+    fn cache_owned(&self) -> Arc<InMemoryCache>;
+}
+
 pub trait HttpAware {
     fn http(&self) -> &Client;
 }
@@ -372,6 +382,12 @@ impl CacheAware for BotState {
 impl CacheAware for Arc<BotState> {
     fn cache(&self) -> &InMemoryCache {
         &self.cache
+    }
+}
+
+impl OwnedCacheAware for BotState {
+    fn cache_owned(&self) -> Arc<InMemoryCache> {
+        self.cache.clone()
     }
 }
 

@@ -8,7 +8,7 @@ use lyra_ext::{iso8601_time, unix_time};
 use std::sync::Arc;
 
 use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
-use twilight_gateway::MessageSender;
+use twilight_gateway::{Event, MessageSender};
 use twilight_http::Client;
 use twilight_mention::{
     Mention,
@@ -32,7 +32,9 @@ use crate::{
             connection::{self as const_connection, INACTIVITY_TIMEOUT},
             exit_code::NOTICE,
         },
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware},
+        model::{
+            BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, OwnedCacheAware,
+        },
         traced,
     },
     error::{
@@ -117,43 +119,31 @@ async fn start_inactivity_timeout(
         channel_id
     );
 
-    let lavalink = ctx.inner.lavalink();
-    for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
-        tokio::time::sleep(const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
-        let Ok(head) = lavalink.handle_for(guild_id).get_head().await else {
-            tracing::debug!(
-                "guild {} stopped channel {} inactivity timeout (disconnected early)",
-                guild_id,
-                channel_id,
-            );
-            return Ok(());
-        };
-        let new_channel_id = head.channel_id();
-        if channel_id != new_channel_id {
-            tracing::debug!(
-                "guild {} stopped channel {} inactivity timeout (channel changed to {})",
-                guild_id,
-                channel_id,
-                new_channel_id,
-            );
-            return Ok(());
-        }
-        let users_n = users_in_voice(&ctx, channel_id);
-        if users_n.is_some_and(|n| n >= 1) {
-            tracing::debug!(
-                "guild {} stopped channel {} inactivity timeout ({:?} users in voice)",
-                guild_id,
-                channel_id,
-                users_n,
-            );
-            return Ok(());
-        }
+    let cache = ctx.inner.cache_owned();
+    let bot_user_id = ctx.inner.user_id();
+
+    if tokio::time::timeout(const_connection::INACTIVITY_TIMEOUT, {
+        ctx.inner.standby().wait_for(guild_id, move |e: &Event| {
+            let Event::VoiceStateUpdate(voice_state) = e else {
+                return false;
+            };
+            let vs_channel_id = voice_state.channel_id;
+
+            (voice_state.user_id == bot_user_id && vs_channel_id != Some(channel_id)) // bot changed channel
+                || users_in_voice(&cache, channel_id).is_some_and(|n| n >= 1) // bot not alone
+        })
+    })
+    .await
+    .is_ok()
+    {
+        tracing::debug!(
+            "guild {} stopped channel {} inactivity timeout",
+            guild_id,
+            channel_id,
+        );
+        return Ok(());
     }
-    let text_channel_id = lavalink
-        .handle_for(guild_id)
-        .get_head()
-        .await?
-        .text_channel_id();
+
     if ctx.disable_vsu_handler().await.is_err() {
         tracing::debug!(
             "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
@@ -162,6 +152,12 @@ async fn start_inactivity_timeout(
         );
         return Ok(());
     }
+    let text_channel_id = ctx
+        .lavalink()
+        .handle_for(guild_id)
+        .get_head()
+        .await?
+        .text_channel_id();
     disconnect_cleanup(&ctx).await?;
     disconnect(&ctx)?;
 

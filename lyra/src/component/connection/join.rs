@@ -303,16 +303,16 @@ async fn delete_empty_voice_notice(
     ctx: DeleteEmptyVoiceNotice,
 ) -> Result<(), DeleteEmptyVoiceNoticeError> {
     let bot = ctx.bot.clone();
+    let bot_user_id = bot.user_id();
+    let channel_id = ctx.channel_id;
 
     bot.standby()
         .wait_for(ctx.guild_id, move |e: &Event| {
             let Event::VoiceStateUpdate(voice_state) = e else {
                 return false;
             };
-            voice_state.channel_id.is_some_and(|id| {
-                id == ctx.channel_id
-                    && users_in_voice(&ctx.bot, ctx.channel_id).is_some_and(|n| n >= 1)
-            })
+            (voice_state.user_id == bot_user_id && voice_state.channel_id != Some(channel_id)) // bot changed channel
+                || users_in_voice(&ctx.bot, channel_id).is_some_and(|n| n >= 1) // bot not alone
         })
         .await?;
 
