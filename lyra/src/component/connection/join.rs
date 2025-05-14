@@ -221,7 +221,7 @@ async fn impl_connect_to(
     let response = old_channel_id.map_or_else(
         || {
             let connection = Connection::new(channel_id, ctx.channel_id());
-            connection.notify_voice_state_change();
+            connection.disable_vsu_handler();
             lavalink.new_connection_with(guild_id, connection);
             Response::Joined {
                 voice: joined,
@@ -231,7 +231,7 @@ async fn impl_connect_to(
         |from| {
             let conn = lavalink.handle_for(guild_id);
             conn.set_channel(channel_id);
-            conn.notify_voice_state_change();
+            conn.disable_vsu_handler();
             Response::Moved {
                 from,
                 to: joined,

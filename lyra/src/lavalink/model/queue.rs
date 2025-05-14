@@ -250,7 +250,7 @@ impl Queue {
         }
     }
 
-    pub fn subscribe_on_advance_enabler(&self) -> watch::Receiver<bool> {
+    pub fn subscribe_to_advance_enabler(&self) -> watch::Receiver<bool> {
         self.advancing_enabler.subscribe()
     }
 
@@ -269,7 +269,7 @@ impl Queue {
     }
 
     pub async fn advancing_disabled(&self) -> bool {
-        let mut rx = self.subscribe_on_advance_enabler();
+        let mut rx = self.subscribe_to_advance_enabler();
         let disabled = tokio::time::timeout(
             crate::core::r#const::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
             rx.wait_for(|&r| r),

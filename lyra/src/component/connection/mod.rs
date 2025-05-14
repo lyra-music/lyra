@@ -146,7 +146,7 @@ async fn start_inactivity_timeout(
         .get_head()
         .await?
         .text_channel_id();
-    if ctx.notify_voice_state_change().await.is_err() {
+    if ctx.disable_vsu_handler().await.is_err() {
         tracing::debug!(
             "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
             guild_id,

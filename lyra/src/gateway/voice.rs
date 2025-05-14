@@ -95,7 +95,7 @@ impl GuildIdAware for Context {
 
 impl Process for Context {
     async fn process(self) -> ProcessResult {
-        let connection_changed = self.get_conn().was_notified_of_voice_state_change().await;
+        let connection_changed = self.get_conn().vsu_handler_disabled().await;
 
         tokio::try_join![
             connection::handle_voice_state_update(&self, connection_changed)

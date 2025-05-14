@@ -69,7 +69,7 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let conn = ctx.get_conn();
     conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
-    conn.notify_voice_state_change().await?;
+    conn.disable_vsu_handler().await?;
     disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 

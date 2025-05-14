@@ -16,22 +16,16 @@ use crate::{command::poll::Poll as PlayerPoll, core::r#const, error::Unrecognise
 
 use super::Lavalink;
 
-/// The reason behind a `VoiceStateUpdate` event of the bot.
-/// This includes the connected voice channel and the deafen/mute state.
-#[derive(Debug)]
-pub(super) enum VoiceStateChangeNotificationState {
-    Unread,
-    Read,
-}
-
 #[derive(Debug)]
 pub struct Connection {
     pub channel_id: Id<ChannelMarker>,
     pub text_channel_id: Id<ChannelMarker>,
     pub mute: bool,
     poll: Option<PlayerPoll>,
-    voice_state_change_tx: watch::Sender<VoiceStateChangeNotificationState>,
     event_sender: broadcast::Sender<Event>,
+    /// A watch channel used to enable or disable the voice state update (VSU) handler.
+    /// A `true` value indicates the handler should be disabled; `false` means enabled.
+    vsu_handler_enabler: watch::Sender<bool>,
 }
 
 impl Connection {
@@ -40,17 +34,15 @@ impl Connection {
             channel_id,
             text_channel_id,
             mute: false,
-            voice_state_change_tx: watch::channel(VoiceStateChangeNotificationState::Read).0,
-            event_sender: broadcast::channel(0xFF).0,
             poll: None,
+            event_sender: broadcast::channel(0xFF).0,
+            vsu_handler_enabler: watch::channel(false).0,
         }
     }
 
-    /// Wait until the connection is changed or the timeout is reached.
-    fn subscribe_to_voice_state_changes(
-        &self,
-    ) -> watch::Receiver<VoiceStateChangeNotificationState> {
-        self.voice_state_change_tx.subscribe()
+    /// Returns a `watch::Receiver` to listen for changes to the voice state update handler's enabled/disabled state.
+    fn subscribe_to_vsu_handler_enabler(&self) -> watch::Receiver<bool> {
+        self.vsu_handler_enabler.subscribe()
     }
 
     pub const fn poll(&self) -> Option<&PlayerPoll> {
@@ -66,22 +58,22 @@ impl Connection {
         let _ = self.event_sender.send(event);
     }
 
-    /// Notify the connection to trigger a change.
-    fn set_voice_state_change_notification_state(&self, state: VoiceStateChangeNotificationState) {
-        // This notifies the `VoiceStateUpdate` handler, passing on an acknowledgement
-        // stating that the incoming event is intentionally caused by the bot, either via
-        // /leave or /join.
-        self.voice_state_change_tx.send_replace(state);
+    /// Updates the current state of the voice state update handler.
+    /// `true` disables the handler; `false` enables it.
+    fn set_vsu_handler_state(&self, state: bool) {
+        self.vsu_handler_enabler.send_replace(state);
     }
 
-    pub fn notify_voice_state_change(&self) {
-        tracing::debug!("notified voice state change");
-        self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Unread);
+    /// Disables the voice state update handler and notifies any subscribers.
+    pub fn disable_vsu_handler(&self) {
+        tracing::debug!("disabled voice state update handler");
+        self.set_vsu_handler_state(true);
     }
 
-    pub fn acknowledge_change(&self) {
-        tracing::debug!("voice state notification change acknowledged");
-        self.set_voice_state_change_notification_state(VoiceStateChangeNotificationState::Read);
+    /// Enables the voice state update handler and notifies any subscribers.
+    pub fn enable_vsu_handler(&self) {
+        tracing::debug!("enabled voice state update handler");
+        self.set_vsu_handler_state(false);
     }
 
     /// Subscribe to events from this connection.
@@ -189,17 +181,12 @@ pub(super) enum Instruction {
     Dispatch(Id<GuildMarker>, Event, Response<()>),
     /// Subscribe to events from a connection
     Subscribe(Id<GuildMarker>, Response<broadcast::Receiver<Event>>),
-    /// Notify a connection of a change
-    SetVoiceChangeNotificationState(
-        Id<GuildMarker>,
-        VoiceStateChangeNotificationState,
-        Response<()>,
-    ),
-    /// Subscribe to changes from a connection
-    SubscribeToVoiceStateChange(
-        Id<GuildMarker>,
-        Response<watch::Receiver<VoiceStateChangeNotificationState>>,
-    ),
+    /// Set the voice state update handler's state for the specified guild.
+    /// `true` disables it, `false` enables it.
+    SetVsuHandlerState(Id<GuildMarker>, bool, Response<()>),
+    /// Subscribe to the voice state update handler's
+    /// enable/disable state changes for the specified guild.
+    SubscribeToVsuHandlerEnabler(Id<GuildMarker>, Response<watch::Receiver<bool>>),
     /// Toggle mute
     ///
     /// Returns the current mute state if successful
@@ -295,16 +282,16 @@ impl ConnectionsActor {
                 Instruction::Subscribe(guild_id, sender) => {
                     self.with_connection(guild_id, sender, Connection::subscribe);
                 }
-                Instruction::SetVoiceChangeNotificationState(guild_id, reason, sender) => {
+                Instruction::SetVsuHandlerState(guild_id, reason, sender) => {
                     self.with_connection(guild_id, sender, |c| {
-                        c.set_voice_state_change_notification_state(reason);
+                        c.set_vsu_handler_state(reason);
                     });
                 }
-                Instruction::SubscribeToVoiceStateChange(guild_id, sender) => {
+                Instruction::SubscribeToVsuHandlerEnabler(guild_id, sender) => {
                     self.with_connection(
                         guild_id,
                         sender,
-                        Connection::subscribe_to_voice_state_changes,
+                        Connection::subscribe_to_vsu_handler_enabler,
                     );
                 }
                 Instruction::ToggleMute(guild_id, sender) => {
@@ -384,52 +371,54 @@ impl ConnectionHandle<'_> {
         self.call_awaitable(|sender| Instruction::Dispatch(self.guild_id, event, sender))
     }
 
-    fn set_voice_change_notification_state(
-        &self,
-        reason: VoiceStateChangeNotificationState,
-    ) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.call_awaitable(|sender| {
-            Instruction::SetVoiceChangeNotificationState(self.guild_id, reason, sender)
-        })
+    /// Issues an instruction to set the voice state update handler's state.
+    /// Returns an awaitable result indicating success or unrecognized connection.
+    fn set_vsu_handler_state(&self, reason: bool) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.call_awaitable(|sender| Instruction::SetVsuHandlerState(self.guild_id, reason, sender))
     }
 
+    /// Disables the voice state update handler for the current guild.
     #[inline]
-    pub fn notify_voice_state_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.set_voice_change_notification_state(VoiceStateChangeNotificationState::Unread)
+    pub fn disable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.set_vsu_handler_state(true)
     }
 
+    /// Enables the voice state update handler for the current guild.
     #[inline]
-    pub fn acknowledge_change(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.set_voice_change_notification_state(VoiceStateChangeNotificationState::Read)
+    fn enable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
+        self.set_vsu_handler_state(false)
     }
 
-    async fn subscribe_to_voice_state_change(
+    /// Subscribes to the voice state update handler state for this guild.
+    /// Returns a receiver to watch for enabled/disabled state changes.
+    async fn subscribe_to_vsu_handler_enabler(
         &self,
-    ) -> Result<watch::Receiver<VoiceStateChangeNotificationState>, UnrecognisedConnection> {
-        self.call_result(|sender| Instruction::SubscribeToVoiceStateChange(self.guild_id, sender))
+    ) -> Result<watch::Receiver<bool>, UnrecognisedConnection> {
+        self.call_result(|sender| Instruction::SubscribeToVsuHandlerEnabler(self.guild_id, sender))
             .await
     }
 
-    pub async fn was_notified_of_voice_state_change(&self) -> bool {
-        // We want to determine if this was caused by another command invoked by the user, or an outside action by Discord.
-        // Intentional changes are sent as such by commands that alter voice state, and the logic for determining a change is as follows:
-        // - We wait to see if a new intentional change comes in, if so, this was an intentional change.
-        // - If nothing is received, check the last value in the watch and see if that change was intentional.
-        let vs_changed = if let Ok(mut rx) = self.subscribe_to_voice_state_change().await {
+    /// Returns `true` if the VSU handler is currently disabled or has changed to disabled recently.
+    /// This will attempt to enable it again after detection.
+    pub async fn vsu_handler_disabled(&self) -> bool {
+        // Attempt to subscribe to state updates.
+        let vs_changed = if let Ok(mut rx) = self.subscribe_to_vsu_handler_enabler().await {
+            // Wait up to a timeout duration for the state to change to "disabled".
             tokio::time::timeout(
                 crate::core::r#const::connection::CHANGED_TIMEOUT,
-                rx.wait_for(|r| matches!(r, VoiceStateChangeNotificationState::Unread)),
+                rx.wait_for(|&r| r),
             )
             .await
             .is_ok()
-                || matches!(*rx.borrow(), VoiceStateChangeNotificationState::Unread)
+                || *rx.borrow() // Check if it's already disabled.
         } else {
             false
         };
 
-        // If the connection was intentionally changed, reset this value.
+        // If the handler is disabled, re-enable it.
         if vs_changed {
-            self.acknowledge_change();
+            // Fire and forget — no need to await.
+            self.enable_vsu_handler();
         }
 
         vs_changed
