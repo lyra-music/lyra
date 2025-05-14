@@ -100,7 +100,7 @@ impl Queue {
             indexer: Indexer::Standard,
             index: 0,
             repeat_mode: RepeatMode::Off,
-            advancing_enabler: watch::channel(false).0,
+            advancing_enabler: watch::channel(true).0,
         }
     }
 
@@ -260,23 +260,23 @@ impl Queue {
 
     pub fn disable_advancing(&self) {
         tracing::debug!("disabling queue advancing");
-        self.set_advancing_state(true);
+        self.set_advancing_state(false);
     }
 
     pub fn enable_advancing(&self) {
         tracing::debug!("enabling queue advancing");
-        self.set_advancing_state(false);
+        self.set_advancing_state(true);
     }
 
     pub async fn advancing_disabled(&self) -> bool {
         let mut rx = self.subscribe_to_advance_enabler();
         let disabled = tokio::time::timeout(
             crate::core::r#const::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
-            rx.wait_for(|&r| r),
+            rx.wait_for(|&r| !r),
         )
         .await
         .is_ok()
-            || *rx.borrow();
+            || !*rx.borrow();
 
         if disabled {
             self.enable_advancing();
