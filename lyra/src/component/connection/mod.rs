@@ -42,7 +42,7 @@ use crate::{
         },
     },
     gateway::{GuildIdAware, SenderAware, voice},
-    lavalink::Lavalink,
+    lavalink::{ConnectionHead, Lavalink},
 };
 
 pub fn users_in_voice(cx: &impl CacheAware, channel_id: Id<ChannelMarker>) -> Option<usize> {
@@ -120,7 +120,15 @@ async fn start_inactivity_timeout(
     let lavalink = ctx.inner.lavalink();
     for _ in 0..const_connection::INACTIVITY_TIMEOUT_POLL_N {
         tokio::time::sleep(const_connection::INACTIVITY_TIMEOUT_POLL_INTERVAL).await;
-        let new_channel_id = lavalink.handle_for(guild_id).get_head().await?.channel_id();
+        let Ok(head) = lavalink.handle_for(guild_id).get_head().await else {
+            tracing::debug!(
+                "guild {} stopped channel {} inactivity timeout (disconnected early)",
+                guild_id,
+                channel_id,
+            );
+            return Ok(());
+        };
+        let new_channel_id = head.channel_id();
         if channel_id != new_channel_id {
             tracing::debug!(
                 "guild {} stopped channel {} inactivity timeout (channel changed to {})",
@@ -172,10 +180,10 @@ async fn start_inactivity_timeout(
     Ok(())
 }
 
-#[tracing::instrument(skip_all, name = "voice_state_update")]
+#[tracing::instrument(skip_all, name = "connection")]
 pub async fn handle_voice_state_update(
     ctx: &voice::Context,
-    connection_changed: bool,
+    head: ConnectionHead,
 ) -> Result<(), HandleVoiceStateUpdateError> {
     let state = &ctx.inner;
     let maybe_old_state = ctx.old_voice_state();
@@ -183,19 +191,7 @@ pub async fn handle_voice_state_update(
     let guild_id = ctx.guild_id();
 
     tracing::debug!("handling voice state update");
-    let (connected_channel_id, text_channel_id) = {
-        if connection_changed {
-            tracing::debug!("received connection change notification");
-            return Ok(());
-        }
-
-        let Ok(head) = ctx.get_conn().get_head().await else {
-            tracing::debug!("no active connection");
-            return Ok(());
-        };
-
-        (head.channel_id(), head.text_channel_id())
-    };
+    let (connected_channel_id, text_channel_id) = (head.channel_id(), head.text_channel_id());
 
     match maybe_old_state {
         Some(old_state) if state.user_id != ctx.bot().user_id() => {

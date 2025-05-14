@@ -13,38 +13,22 @@ pub use seek::Seek;
 pub use skip::{Skip, skip};
 
 use crate::{
-    LavalinkAndGuildIdAware,
     command::require,
     core::model::{BotStateAware, CacheAware, HttpAware},
     error::component::playback::HandleVoiceStateUpdateError,
     gateway::voice::Context,
+    lavalink::ConnectionHead,
 };
 
-#[tracing::instrument(skip_all, name = "voice_state_update")]
+#[tracing::instrument(skip_all, name = "playback")]
 pub async fn handle_voice_state_update(
     ctx: &Context,
-    connection_changed: bool,
+    head: ConnectionHead,
 ) -> Result<(), HandleVoiceStateUpdateError> {
     let state = ctx.inner.as_ref();
     let maybe_old_state = ctx.old_voice_state();
 
     tracing::debug!("handling voice state update");
-    let text_channel_id = {
-        if connection_changed {
-            tracing::debug!("received connection change notification");
-            return Ok(());
-        }
-
-        let Ok(head) = ctx.get_conn().get_head().await else {
-            tracing::debug!("no active connection");
-            return Ok(());
-        };
-
-        tracing::debug!("no connection change notification");
-
-        head.text_channel_id()
-    };
-
     let Ok(player) = require::player(ctx) else {
         return Ok(());
     };
@@ -62,7 +46,7 @@ pub async fn handle_voice_state_update(
     {
         player.set_pause(true).await?;
         ctx.http()
-            .create_message(text_channel_id)
+            .create_message(head.text_channel_id())
             .content("⚡▶ Paused `(Bot was moved to audience).`")
             .await?;
     }

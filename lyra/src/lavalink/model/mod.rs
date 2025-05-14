@@ -39,7 +39,7 @@ use crate::{
 };
 
 pub use self::{
-    connection::{Connection, Event, EventRecvResult, wait_for_with},
+    connection::{Connection, ConnectionHead, Event, EventRecvResult, wait_for_with},
     correct_info::{CorrectPlaylistInfo, CorrectTrackInfo},
     delegate::DelegateMethods,
     now_playing::{

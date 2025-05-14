@@ -21,7 +21,7 @@ use crate::{
     },
     core::model::{BotStateAware, HttpAware},
     gateway::{GuildIdAware, voice},
-    lavalink::DelegateMethods,
+    lavalink::{ConnectionHead, DelegateMethods},
 };
 
 #[inline]
@@ -73,15 +73,14 @@ impl UpdateFilter for PlayerInterface {
     }
 }
 
-#[tracing::instrument(skip_all, name = "voice_state_update")]
-pub async fn handle_voice_state_update(ctx: &voice::Context) -> Result<(), twilight_http::Error> {
+#[tracing::instrument(skip_all, name = "tuning")]
+pub async fn handle_voice_state_update(
+    ctx: &voice::Context,
+    head: ConnectionHead,
+) -> Result<(), twilight_http::Error> {
     let bot = ctx.bot();
     let guild_id = ctx.guild_id();
     let conn = ctx.get_conn();
-    let Ok(head) = conn.get_head().await else {
-        return Ok(());
-    };
-
     let state_mute = ctx.inner.mute;
     if head.mute() != state_mute {
         conn.set_mute(state_mute);

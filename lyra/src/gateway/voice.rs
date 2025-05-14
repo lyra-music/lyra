@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::TryFutureExt;
+use futures::{FutureExt, TryFutureExt};
 use twilight_model::gateway::payload::incoming::VoiceStateUpdate;
 
 use twilight_cache_inmemory::{InMemoryCache, model::CachedVoiceState};
@@ -94,15 +94,28 @@ impl GuildIdAware for Context {
 }
 
 impl Process for Context {
+    #[tracing::instrument(skip_all, name = "voice_state_update")]
     async fn process(self) -> ProcessResult {
-        let connection_changed = self.get_conn().vsu_handler_disabled().await;
+        let get_conn = self.get_conn();
+        let disabled = get_conn.vsu_handler_disabled().await;
 
-        tokio::try_join![
-            connection::handle_voice_state_update(&self, connection_changed)
-                .map_err(ProcessError::from),
-            playback::handle_voice_state_update(&self, connection_changed).map_err(Into::into),
-            tuning::handle_voice_state_update(&self).map_err(Into::into),
-        ]?;
+        let mut vec = Vec::new();
+        if let Ok(h) = get_conn.get_head().await {
+            let t = tuning::handle_voice_state_update(&self, h.clone()).map_err(ProcessError::from);
+            vec.push(t.boxed());
+
+            if disabled {
+                tracing::debug!("voice state update handler is disabled");
+            } else {
+                let c = connection::handle_voice_state_update(&self, h.clone()).map_err(Into::into);
+                let p = playback::handle_voice_state_update(&self, h).map_err(Into::into);
+                vec.extend([c.boxed(), p.boxed()]);
+            }
+        } else {
+            tracing::debug!("no active connection");
+        }
+
+        futures::future::try_join_all(vec).await?;
         Ok(())
     }
 }

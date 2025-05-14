@@ -24,7 +24,7 @@ pub struct Connection {
     poll: Option<PlayerPoll>,
     event_sender: broadcast::Sender<Event>,
     /// A watch channel used to enable or disable the voice state update (VSU) handler.
-    /// A `true` value indicates the handler should be disabled; `false` means enabled.
+    /// A `true` value indicates the handler should be abled; `false` means disenabled.
     vsu_handler_enabler: watch::Sender<bool>,
 }
 
@@ -36,7 +36,7 @@ impl Connection {
             mute: false,
             poll: None,
             event_sender: broadcast::channel(0xFF).0,
-            vsu_handler_enabler: watch::channel(false).0,
+            vsu_handler_enabler: watch::channel(true).0,
         }
     }
 
@@ -59,7 +59,7 @@ impl Connection {
     }
 
     /// Updates the current state of the voice state update handler.
-    /// `true` disables the handler; `false` enables it.
+    /// `true` enables the handler; `false` disables it.
     fn set_vsu_handler_state(&self, state: bool) {
         self.vsu_handler_enabler.send_replace(state);
     }
@@ -67,13 +67,13 @@ impl Connection {
     /// Disables the voice state update handler and notifies any subscribers.
     pub fn disable_vsu_handler(&self) {
         tracing::debug!("disabled voice state update handler");
-        self.set_vsu_handler_state(true);
+        self.set_vsu_handler_state(false);
     }
 
     /// Enables the voice state update handler and notifies any subscribers.
     pub fn enable_vsu_handler(&self) {
         tracing::debug!("enabled voice state update handler");
-        self.set_vsu_handler_state(false);
+        self.set_vsu_handler_state(true);
     }
 
     /// Subscribe to events from this connection.
@@ -82,6 +82,7 @@ impl Connection {
     }
 }
 
+#[derive(Clone)]
 pub struct ConnectionHead {
     channel_id: Id<ChannelMarker>,
     text_channel_id: Id<ChannelMarker>,
@@ -182,7 +183,7 @@ pub(super) enum Instruction {
     /// Subscribe to events from a connection
     Subscribe(Id<GuildMarker>, Response<broadcast::Receiver<Event>>),
     /// Set the voice state update handler's state for the specified guild.
-    /// `true` disables it, `false` enables it.
+    /// `true` enables it, `false` disables it.
     SetVsuHandlerState(Id<GuildMarker>, bool, Response<()>),
     /// Subscribe to the voice state update handler's
     /// enable/disable state changes for the specified guild.
@@ -380,13 +381,13 @@ impl ConnectionHandle<'_> {
     /// Disables the voice state update handler for the current guild.
     #[inline]
     pub fn disable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.set_vsu_handler_state(true)
+        self.set_vsu_handler_state(false)
     }
 
     /// Enables the voice state update handler for the current guild.
     #[inline]
     fn enable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
-        self.set_vsu_handler_state(false)
+        self.set_vsu_handler_state(true)
     }
 
     /// Subscribes to the voice state update handler state for this guild.
@@ -402,26 +403,27 @@ impl ConnectionHandle<'_> {
     /// This will attempt to enable it again after detection.
     pub async fn vsu_handler_disabled(&self) -> bool {
         // Attempt to subscribe to state updates.
-        let vs_changed = if let Ok(mut rx) = self.subscribe_to_vsu_handler_enabler().await {
+        let vsu_handler_disabled = if let Ok(mut rx) = self.subscribe_to_vsu_handler_enabler().await
+        {
             // Wait up to a timeout duration for the state to change to "disabled".
             tokio::time::timeout(
                 crate::core::r#const::connection::CHANGED_TIMEOUT,
-                rx.wait_for(|&r| r),
+                rx.wait_for(|&r| !r),
             )
             .await
             .is_ok()
-                || *rx.borrow() // Check if it's already disabled.
+                || !*rx.borrow() // Check if it's already disabled.
         } else {
             false
         };
 
         // If the handler is disabled, re-enable it.
-        if vs_changed {
+        if vsu_handler_disabled {
             // Fire and forget — no need to await.
             self.enable_vsu_handler();
         }
 
-        vs_changed
+        vsu_handler_disabled
     }
 
     pub fn toggle_mute(&self) -> Awaitable<Result<bool, UnrecognisedConnection>> {
