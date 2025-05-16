@@ -30,7 +30,7 @@ impl Pitch {
 
     #[inline]
     pub fn get(&self) -> f64 {
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let half_ton_shifts_i32 = self.half_tone_shifts as i32;
         self.multiplier * TWELFTH_ROOT_OF_TWO.powi(half_ton_shifts_i32)
     }

@@ -181,7 +181,7 @@ impl BotSlashCommand for Move {
             return Ok(());
         }
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let (track_usize, position_usize) = (
             self.track.unsigned_abs() as usize,
             self.position.unsigned_abs() as usize,

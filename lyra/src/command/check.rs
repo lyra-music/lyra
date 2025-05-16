@@ -213,7 +213,7 @@ impl InVoiceWithUserResult<'_> {
 
 pub trait ResolveWithPoll {
     type Error;
-    #[allow(unused)] // TODO: #44
+    #[expect(unused)] // TODO: #44
     fn or_else_try_resolve_with(self, topic: PollTopic)
     -> Result<Option<PollStarter>, Self::Error>;
 }
@@ -244,7 +244,7 @@ impl ResolveWithPoll for InVoiceWithUserOnlyResult {
 }
 
 pub trait StartPoll: Sized {
-    #[allow(unused)] // TODO: #44
+    #[expect(unused)] // TODO: #44
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
@@ -465,7 +465,7 @@ pub fn all_users_track(
 //     Ok(())
 // }
 //
-// #[allow(clippy::struct_excessive_bools)]
+// #[expect(clippy::struct_excessive_bools)]
 // struct Checks {
 //     in_voice_with_user: InVoiceWithUserFlag,
 //     queue_not_empty: bool,

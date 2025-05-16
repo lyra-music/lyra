@@ -309,7 +309,7 @@ impl Message {
     fn build_embeds(&self) -> Result<Embed, BuildNowPlayingEmbedError> {
         let data = &self.data;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let timestamp =
             twilight_model::util::Timestamp::from_micros(data.enqueued.as_micros() as i64)?;
 

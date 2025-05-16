@@ -31,7 +31,7 @@ impl BotSlashCommand for Down {
         let data = player.data();
         let old_percent = data.read().await.volume();
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let maybe_new_percent = old_percent
             .get()
             .checked_sub(self.percent.unwrap_or(10).unsigned_abs() as u16)

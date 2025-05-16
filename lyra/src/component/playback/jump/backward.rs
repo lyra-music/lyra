@@ -27,7 +27,7 @@ impl BotSlashCommand for Backward {
             check::current_track_is_users(&current_track, in_voice_with_user)?;
         }
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let tracks = self.tracks.unsigned_abs() as usize;
         let queue_index = queue.index();
         let Some(index) = queue_index.checked_sub(tracks) else {

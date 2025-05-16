@@ -142,7 +142,7 @@ impl BotSlashCommand for Remove {
 
         super::validate_input_positions(&inputs, queue.len())?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let mut positions = inputs
             .iter()
             .filter_map(|&p| NonZeroUsize::new(p.unsigned_abs() as usize))

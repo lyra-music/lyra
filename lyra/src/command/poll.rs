@@ -56,7 +56,7 @@ use super::{
 
 #[derive(Hash)]
 pub enum Topic {
-    #[allow(unused)] // TODO: #44
+    #[expect(unused)] // TODO: #44
     Repeat(crate::lavalink::RepeatMode),
 }
 
@@ -378,7 +378,7 @@ fn calculate_votes_and_ratios(
     let downvotes = total_votes - upvotes;
     let votes_left = threshold - total_votes;
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let (threshold_f64, upvotes_f64, downvotes_f64, votes_left_f64) = (
         threshold as f64,
         upvotes as f64,
@@ -420,7 +420,7 @@ fn generate_embed_colour(
         );
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     mixbox::latent_to_rgb(&z_mix.map(|f| f as f32))
 }
 
@@ -453,10 +453,10 @@ pub async fn start(
     let users_in_voice = get_users_in_voice(ctx, in_voice).await?;
     let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let threshold = ((users_in_voice_plus_1 / 2.).round() as isize).unsigned_abs();
 
     let embed = generate_embed(
@@ -529,10 +529,10 @@ fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: u
     let ((upvotes, downvotes), (upvote_ratio, downvote_ratio, _)) =
         calculate_votes_and_ratios(votes, threshold);
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let ratio_bar_size = RATIO_BAR_SIZE as f64;
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let (upvote_char_n, downvote_char_n) = (
         ((upvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
         ((downvote_ratio * ratio_bar_size) as isize).unsigned_abs(),

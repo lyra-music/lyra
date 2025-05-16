@@ -202,7 +202,7 @@ impl BotSlashCommand for RemoveRange {
             return Ok(());
         }
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let positions =
             (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p.unsigned_abs() as usize));
         check::all_users_track(queue, positions, in_voice_with_user)?;

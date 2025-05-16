@@ -233,7 +233,7 @@ bitflags! {
 
 impl From<AccessCategory> for AccessCategoryFlags {
     fn from(category: AccessCategory) -> Self {
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         Self::from_bits_retain(category.value().unsigned_abs() as u8)
     }
 }

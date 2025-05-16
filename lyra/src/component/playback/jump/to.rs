@@ -107,7 +107,7 @@ impl BotSlashCommand for To {
         let input = self.track;
         validate_input_position(input, queue_len)?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let position = input.unsigned_abs() as usize;
         if position == queue.position().get() {
             ctx.wrng("Cannot jump to the current track.").await?;

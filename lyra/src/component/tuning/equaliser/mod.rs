@@ -20,7 +20,7 @@ impl SetEqualiser {
             equaliser.map(|o| o.filter(|o| (o - Self::DEFAULT_GAIN).abs() > ERR_MARGIN));
         equaliser.iter().any(Option::is_some).then(|| {
             Self(core::array::from_fn(|i| Equalizer {
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 band: i as u8,
                 gain: equaliser[i].unwrap_or(Self::DEFAULT_GAIN),
             }))

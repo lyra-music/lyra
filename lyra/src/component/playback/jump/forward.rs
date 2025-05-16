@@ -27,7 +27,7 @@ impl BotSlashCommand for Forward {
         let queue = require::queue_not_empty_mut(&mut data_w)?;
         let current_track = require::current_track(queue)?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let jump = self.tracks.unsigned_abs() as usize;
         let queue_len = queue.len();
 

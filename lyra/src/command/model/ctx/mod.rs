@@ -69,7 +69,7 @@ impl<T: AppCtxKind> Kind for AppCtxMarker<T> {}
 
 pub type SlashMarker = AppCtxMarker<SlashAppMarker>;
 pub type Slash = Ctx<SlashMarker>;
-#[allow(unused)]
+#[expect(unused)]
 pub type GuildSlash = Ctx<SlashMarker, GuildMarker>;
 
 pub struct ComponentMarker;
@@ -122,7 +122,7 @@ impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
 }
 
 impl<U: Location> Ctx<ComponentMarker, U> {
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn into_modal_interaction(
         self,
         inner: Box<InteractionCreate>,

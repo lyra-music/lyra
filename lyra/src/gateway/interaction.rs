@@ -263,7 +263,7 @@ impl Context {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn process_as_modal(mut self) -> ProcessResult {
         let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
             unreachable!()
@@ -277,7 +277,7 @@ impl Context {
 type UnitRespondResult = Result<(), RespondError>;
 type UnitRespondOrFollowupResult = Result<(), RespondOrFollowupError>;
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
@@ -575,7 +575,7 @@ async fn match_another_poll_ongoing(
     Ok(())
 }
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async)]
 async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitRespondResult {
     let PollLossError { source: _, kind } = error;
 

@@ -8,7 +8,7 @@ mod repeat;
 mod shuffle;
 
 pub use clear::Clear;
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub use fair_queue::FairQueue;
 use lyra_ext::{
     num::usize_to_i64_truncating,
@@ -16,7 +16,7 @@ use lyra_ext::{
 };
 
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub use play::AddToQueue;
 pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
@@ -168,7 +168,7 @@ pub fn generate_position_choices_from_fuzzy_match<'a>(
 }
 
 fn normalize_queue_position(position: i64, queue_len: NonZeroUsize) -> Option<NonZeroUsize> {
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let position_usize = position.unsigned_abs() as usize;
 
     (1..=queue_len.get()).contains(&position_usize).then(|| {
@@ -216,7 +216,7 @@ async fn remove_range(
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let (start_usize, end_usize) = (start.unsigned_abs() as usize, end.unsigned_abs() as usize);
 
     let data = player.data();

@@ -21,7 +21,7 @@ pub type ModalFromAppCmd = Marker<AppCmdSrcMarker>;
 pub type ModalFromComponent = Marker<ComponentSrcMarker>;
 
 impl<T: ModalSrcMarker> Kind for Marker<T> {}
-#[allow(unused)]
+#[expect(unused)]
 pub type Modal = Ctx<ModalFromAppCmd>;
 pub type Guild = Ctx<ModalFromAppCmd, GuildMarker>;
 

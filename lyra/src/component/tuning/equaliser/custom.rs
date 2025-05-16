@@ -11,7 +11,7 @@ use crate::{
 /// Enables the player equaliser with custom settings.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "custom")]
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 pub struct Custom {
     /// How much gain for band 1? [Default: 0, Muted: -0.25, Doubled: 0.25] (If not given, 0)
     #[command(min_value = -0.25, max_value = 1.0)]

@@ -23,7 +23,7 @@ impl BotSlashCommand for Set {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let percent = NonZeroU16::new(self.percent.unsigned_abs() as u16)
             .expect("percent should be non-zero");
         player.context.set_volume(percent.get()).await?;
