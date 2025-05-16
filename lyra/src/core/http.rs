@@ -13,11 +13,11 @@ use crate::{
     error::core::SetGlobalCommandsError,
 };
 
-use super::{model::CtxHead, r#static::application};
+use super::{model::ctx_head::CtxHead, r#static::application};
 
-pub struct Client(Arc<twilight_http::Client>);
+pub struct InteractionClient(Arc<twilight_http::Client>);
 
-impl Client {
+impl InteractionClient {
     pub const fn new(client: Arc<twilight_http::Client>) -> Self {
         Self(client)
     }

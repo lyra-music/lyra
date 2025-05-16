@@ -5,10 +5,13 @@ use twilight_model::id::{Id, marker::InteractionMarker};
 
 use crate::core::r#static::application;
 
-use super::{
-    followup::FollowupTrait,
-    response::{
-        Respond, RespondAppCommand, RespondWithDefer, RespondWithMessage, RespondWithModal,
+use super::response::{
+    Respond, RespondAppCommand,
+    followup::Followup,
+    initial::{
+        defer::RespondWithDefer,
+        message::{create::RespondWithMessage, update::RespondWithUpdate},
+        modal::RespondWithModal,
     },
 };
 
@@ -60,8 +63,10 @@ impl Respond for CtxHead {
     }
 }
 
-impl FollowupTrait for CtxHead {}
+impl Followup for CtxHead {}
 impl RespondWithMessage for CtxHead {}
 impl RespondWithDefer for CtxHead {}
 impl RespondWithModal for CtxHead {}
 impl RespondAppCommand for CtxHead {}
+
+impl RespondWithUpdate for CtxHead {}

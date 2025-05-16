@@ -11,12 +11,19 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         AutocompleteCtx, SlashCtx, check,
-        macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
     component::queue::Remove,
-    core::model::{CacheAware, InteractionClient},
+    core::{
+        http::InteractionClient,
+        model::{
+            CacheAware,
+            response::initial::{
+                autocomplete::RespondAutocomplete, message::create::RespondWithMessage,
+            },
+        },
+    },
     error::{CommandResult, command::AutocompleteResult},
 };
 
@@ -134,7 +141,8 @@ impl BotAutocomplete for Autocomplete {
             kind,
         };
         let choices = generate_remove_range_autocomplete_choices(&options, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
@@ -164,10 +172,11 @@ impl BotSlashCommand for RemoveRange {
         if queue_len == 1 {
             let remove = InteractionClient::mention_command::<Remove>();
 
-            sus!(
-                format!("The queue only has one track; Use {remove} instead."),
-                ctx
-            );
+            ctx.susp(format!(
+                "The queue only has one track; Use {remove} instead."
+            ))
+            .await?;
+            return Ok(());
         }
 
         super::validate_input_position(self.start, queue_len)?;
@@ -189,7 +198,8 @@ impl BotSlashCommand for RemoveRange {
                 )
             };
 
-            bad!(message, ctx);
+            ctx.wrng(message).await?;
+            return Ok(());
         }
 
         #[allow(clippy::cast_possible_truncation)]

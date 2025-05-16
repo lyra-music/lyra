@@ -174,7 +174,7 @@ pub enum AutoJoinOrCheckInVoiceWithUserError {
 #[error(transparent)]
 pub enum HandleSuppressedAutoJoinError {
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
-    FollowUp(#[from] super::FollowupError),
+    Respond(#[from] crate::error::core::RespondError),
     AutoJoinSuppressed(#[from] AutoJoinSuppressedError),
 }
 

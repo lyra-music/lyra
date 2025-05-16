@@ -1,10 +1,8 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::command::{
-    check,
-    macros::{bad, out},
-    model::BotSlashCommand,
-    require,
+use crate::{
+    command::{check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 /// Jumps to a new track at least two tracks earlier.
@@ -34,15 +32,16 @@ impl BotSlashCommand for Backward {
         let queue_index = queue.index();
         let Some(index) = queue_index.checked_sub(tracks) else {
             if queue_index == 0 {
-                bad!("No where else to jump to.", ctx);
+                ctx.wrng("No where else to jump to.").await?;
+                return Ok(());
             }
-            bad!(
+            ctx.wrng(
                 format!(
                     "**Cannot jump past the start of the queue**; Maximum backward jump is `{} tracks`.",
                     queue_index,
                 ),
-                ctx
-            );
+            ).await?;
+            return Ok(());
         };
 
         queue.downgrade_repeat_mode();
@@ -54,6 +53,7 @@ impl BotSlashCommand for Backward {
 
         *queue.index_mut() = index;
         drop(data_w);
-        out!(txt, ctx);
+        ctx.out(txt).await?;
+        Ok(())
     }
 }

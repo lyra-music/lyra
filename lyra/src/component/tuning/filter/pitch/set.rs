@@ -2,15 +2,11 @@ use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{
         ApplyFilter, UpdateFilter, check_user_is_dj_and_require_unsuppressed_player,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -76,7 +72,8 @@ impl BotSlashCommand for Set {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetPitch::new(self.multiplier) else {
-            bad!("Multiplier must not be zero", ctx);
+            ctx.wrng("Multiplier must not be zero").await?;
+            return Ok(());
         };
 
         let multiplier = update.multiplier();
@@ -84,9 +81,10 @@ impl BotSlashCommand for Set {
         player.update_filter(update).await?;
         player.data().write().await.pitch_mut().set(multiplier);
 
-        out!(
-            format!("{emoji} Set the playback pitch to `{multiplier}`×."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji} Set the playback pitch to `{multiplier}`×."
+        ))
+        .await?;
+        Ok(())
     }
 }

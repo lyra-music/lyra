@@ -3,8 +3,10 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
-    core::model::{DatabaseAware, OwnedHttpAware},
+    command::{SlashCtx, model::BotSlashCommand, require},
+    core::model::{
+        DatabaseAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
@@ -58,9 +60,10 @@ impl BotSlashCommand for Toggle {
             ("🔕", "Not sending")
         };
 
-        out!(
-            format!("{emoji} **{action}** now-playing track messages from now on."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji} **{action}** now-playing track messages from now on."
+        ))
+        .await?;
+        Ok(())
     }
 }

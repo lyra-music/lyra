@@ -7,12 +7,16 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         AutocompleteCtx, SlashCtx, check,
-        macros::{bad, out, sus},
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
     component::queue::normalize_queue_position,
-    core::model::CacheAware,
+    core::model::{
+        CacheAware,
+        response::initial::{
+            autocomplete::RespondAutocomplete, message::create::RespondWithMessage,
+        },
+    },
     error::{CommandResult, command::AutocompleteResult},
     lavalink::CorrectTrackInfo,
 };
@@ -130,7 +134,8 @@ impl BotAutocomplete for Autocomplete {
             kind,
         };
         let choices = generate_move_choices(&options, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
@@ -158,23 +163,22 @@ impl BotSlashCommand for Move {
         let queue_len = queue.len();
 
         if queue_len == 1 {
-            sus!(
-                "Nowhere to move the track as it is the only track in the queue.",
-                ctx
-            );
+            ctx.susp("Nowhere to move the track as it is the only track in the queue.")
+                .await?;
+            return Ok(());
         }
 
         super::validate_input_position(self.track, queue_len)?;
         super::validate_input_position(self.position, queue_len)?;
 
         if self.track == self.position {
-            bad!(
+            ctx.wrng(
                 format!(
                     "**Invalid new position: `{}`**; New position must be different from the old position.",
                     self.position
                 ),
-                ctx
-            );
+            ).await?;
+            return Ok(());
         }
 
         #[allow(clippy::cast_possible_truncation)]
@@ -215,6 +219,7 @@ impl BotSlashCommand for Move {
             .await?;
         drop(data_w);
 
-        out!(message, ctx);
+        ctx.out(message).await?;
+        Ok(())
     }
 }

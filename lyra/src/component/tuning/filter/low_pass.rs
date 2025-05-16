@@ -3,13 +3,9 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -82,15 +78,19 @@ impl BotSlashCommand for On {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetLowPass::new(self.smoothing) else {
-            bad!(
-                format!("Smoothing must not be `{}`.", SetLowPass::DEFAULT_SMOOTHING),
-                ctx
-            );
+            ctx.wrng(format!(
+                "Smoothing must not be `{}`.",
+                SetLowPass::DEFAULT_SMOOTHING
+            ))
+            .await?;
+            return Ok(());
         };
         let settings = update.settings();
 
         player.update_filter(Some(update)).await?;
-        out!(format!("😶‍🌫️🟢 Enabled low pass ({settings})."), ctx);
+        ctx.out(format!("😶‍🌫️🟢 Enabled low pass ({settings})."))
+            .await?;
+        Ok(())
     }
 }
 
@@ -105,6 +105,7 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetLowPass>).await?;
-        out!("😶‍🌫️🔴 Disabled low pass.", ctx);
+        ctx.out("😶‍🌫️🔴 Disabled low pass.").await?;
+        Ok(())
     }
 }

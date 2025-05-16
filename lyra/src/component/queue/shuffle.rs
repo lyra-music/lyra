@@ -3,11 +3,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         SlashCtx, check,
-        macros::{bad, out},
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::{CommandResult, lavalink::UpdateNowPlayingMessageError},
     lavalink::{IndexerType, OwnedPlayerData},
 };
@@ -46,15 +46,16 @@ pub async fn shuffle(
                 .await?;
 
             let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle.");
-            out!(content, ?ctx);
+            ctx.out(content).await?;
             Ok(())
         }
         IndexerType::Fair => {
-            bad!(
+            ctx.wrng(
                 // The shuffle button on the playback controller will be disabled, so no need to use `controller_fmt` here
                 "Cannot enable shuffle as fair queue is currently enabled.",
-                ctx
-            );
+            )
+            .await?;
+            Ok(())
         }
         IndexerType::Standard => {
             data.write()
@@ -63,7 +64,7 @@ pub async fn shuffle(
                 .await?;
 
             let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle.");
-            out!(content, ?ctx);
+            ctx.out(content).await?;
             Ok(())
         }
     }

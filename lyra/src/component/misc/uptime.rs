@@ -5,8 +5,8 @@ use twilight_mention::{
 };
 
 use crate::{
-    command::{SlashCtx, macros::out, model::BotSlashCommand},
-    core::model::BotStateAware,
+    command::{SlashCtx, model::BotSlashCommand},
+    core::model::{BotStateAware, response::initial::message::create::RespondWithMessage},
     error::CommandResult,
 };
 
@@ -19,6 +19,7 @@ impl BotSlashCommand for Uptime {
     async fn run(self, mut ctx: SlashCtx) -> CommandResult {
         let started = lyra_ext::unix_time() - ctx.bot().info().uptime();
         let stamp = Timestamp::new(started.as_secs(), Some(TimestampStyle::RelativeTime));
-        out!(format!("⏱️ {}.", stamp.mention()), ctx);
+        ctx.out(format!("⏱️ {}.", stamp.mention())).await?;
+        Ok(())
     }
 }

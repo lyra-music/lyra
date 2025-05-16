@@ -1,13 +1,11 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        macros::{bad, out},
-        require,
-    },
+    command::require,
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 /// Enables the player equaliser with custom settings.
@@ -86,19 +84,17 @@ impl crate::command::model::BotSlashCommand for Custom {
         ];
 
         let Some(filter) = SetEqualiser::new(equaliser) else {
-            bad!(
-                format!(
-                    "**At least one band gain must be changed**; Band gains must not all be `{}`.",
-                    SetEqualiser::DEFAULT_GAIN
-                ),
-                ctx
-            );
+            ctx.wrng(format!(
+                "**At least one band gain must be changed**; Band gains must not all be `{}`.",
+                SetEqualiser::DEFAULT_GAIN
+            ))
+            .await?;
+            return Ok(());
         };
 
         player.update_filter(Some(filter)).await?;
-        out!(
-            "🎛️🟢 Enabled player equaliser (**`Custom Settings`**).",
-            ctx
-        );
+        ctx.out("🎛️🟢 Enabled player equaliser (**`Custom Settings`**).")
+            .await?;
+        Ok(())
     }
 }

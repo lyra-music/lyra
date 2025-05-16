@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::command::{check, macros::out, model::BotSlashCommand, require};
+use crate::{
+    command::{check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
+};
 
 /// Restarts the current track; Equivalent to seeking to 0:00.
 #[derive(CreateCommand, CommandModel)]
@@ -25,6 +28,7 @@ impl BotSlashCommand for Restart {
         player
             .seek_to_with(Duration::ZERO, &mut data.write().await)
             .await?;
-        out!("◀️ Restarted.", ctx);
+        ctx.out("◀️ Restarted.").await?;
+        Ok(())
     }
 }

@@ -1,10 +1,11 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, require},
+    command::require,
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 lyra_proc::read_equaliser_presets_as!(EqualiserPreset);
@@ -39,12 +40,11 @@ impl crate::command::model::BotSlashCommand for Preset {
         let update = Some(SetEqualiser::from(self.preset));
 
         player.update_filter(update).await?;
-        out!(
-            format!(
-                "🎛️🟢 Enabled player equaliser (Preset: **`{}`**).",
-                preset_name
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🎛️🟢 Enabled player equaliser (Preset: **`{}`**).",
+            preset_name
+        ))
+        .await?;
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::core::model::RespondAutocomplete;
+use crate::core::model::response::initial::autocomplete::RespondAutocomplete;
 
 use super::{Ctx, GuildMarker, Kind, Location};
 

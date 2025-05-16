@@ -14,7 +14,7 @@ use crate::{
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
-    core::model::CacheAware,
+    core::model::{CacheAware, response::initial::autocomplete::RespondAutocomplete},
     error::{CommandResult, command::AutocompleteResult},
 };
 
@@ -92,7 +92,8 @@ impl BotAutocomplete for Autocomplete {
             .expect("exactly one autocomplete option should be focused");
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 

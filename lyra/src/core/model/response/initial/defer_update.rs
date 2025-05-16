@@ -1,6 +1,6 @@
 use twilight_model::http::interaction::InteractionResponseType;
 
-use super::{EmptyResponseResult, Respond};
+use crate::core::model::response::{EmptyResponseResult, Respond};
 
 pub trait RespondWithDeferUpdate: Respond {
     async fn defer_update(&mut self) -> EmptyResponseResult {

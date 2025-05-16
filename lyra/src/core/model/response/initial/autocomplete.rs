@@ -3,7 +3,7 @@ use twilight_model::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use super::{EmptyResponseResult, Respond};
+use crate::core::model::response::{EmptyResponseResult, Respond};
 
 pub trait RespondAutocomplete: Respond {
     async fn autocomplete(

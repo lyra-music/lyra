@@ -1,3 +1,10 @@
+use followup::Followup;
+use initial::{
+    defer::RespondWithDefer,
+    defer_update::RespondWithDeferUpdate,
+    message::{create::RespondWithMessage, update::RespondWithUpdate},
+    modal::RespondWithModal,
+};
 use twilight_http::{Response, client::InteractionClient, response::marker::EmptyBody};
 use twilight_model::{
     channel::message::AllowedMentions,
@@ -6,21 +13,9 @@ use twilight_model::{
 };
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-mod autocomplete;
-mod defer;
-mod defer_update;
-mod message;
-mod modal;
-
-pub use {
-    autocomplete::RespondAutocomplete,
-    defer::RespondWithDefer,
-    defer_update::RespondWithDeferUpdate,
-    message::{RespondWithMessage, RespondWithUpdate, ResponseBuilder},
-    modal::RespondWithModal,
-};
-
-use super::followup::FollowupTrait;
+pub mod either;
+pub mod followup;
+pub mod initial;
 
 pub type EmptyResponse = Response<EmptyBody>;
 pub type EmptyResponseResult = Result<EmptyResponse, twilight_http::Error>;
@@ -74,18 +69,18 @@ pub trait RespondComponent:
     + RespondWithDefer
     + RespondWithMessage
     + RespondWithUpdate
-    + FollowupTrait
+    + Followup
 {
 }
 
-pub trait RespondAppCommandModal: RespondWithMessage + RespondWithDefer + FollowupTrait {}
+pub trait RespondAppCommandModal: RespondWithMessage + RespondWithDefer + Followup {}
 
 pub trait RespondComponentModal:
-    RespondWithMessage + RespondWithDefer + RespondWithDeferUpdate + RespondWithUpdate + FollowupTrait
+    RespondWithMessage + RespondWithDefer + RespondWithDeferUpdate + RespondWithUpdate + Followup
 {
 }
 
 pub trait RespondAppCommand:
-    RespondWithModal + RespondWithDefer + RespondWithMessage + FollowupTrait
+    RespondWithModal + RespondWithDefer + RespondWithMessage + Followup
 {
 }

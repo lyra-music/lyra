@@ -18,16 +18,21 @@ use crate::{
     CommandError, LavalinkAware,
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
-        model::{ComponentCtx, Ctx, NonPingInteraction},
+        model::{ComponentCtx, NonPingInteraction},
         require,
         util::MessageLinkAware,
     },
     component::{connection::Join, queue::Play},
     core::{
-        r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
+        r#const::exit_code::DUBIOUS,
+        http::InteractionClient,
         model::{
-            BotState, CtxHead, Followup, InteractionClient, OwnedBotState, Respond,
-            RespondWithMessage,
+            BotState, OwnedBotState,
+            ctx_head::CtxHead,
+            response::{
+                Respond, either::RespondOrFollowup, followup::Followup,
+                initial::message::create::RespondWithMessage,
+            },
         },
         r#static::component::NowPlayingButtonType,
     },
@@ -43,6 +48,7 @@ use crate::{
             declare::{CommandExecuteError, Fuunacee},
             util::AutoJoinSuppressedError,
         },
+        core::{RespondError, RespondOrFollowupError},
         gateway::{ProcessError, ProcessResult},
     },
 };
@@ -268,11 +274,14 @@ impl Context {
     }
 }
 
+type UnitRespondResult = Result<(), RespondError>;
+type UnitRespondOrFollowupResult = Result<(), RespondOrFollowupError>;
+
 #[allow(clippy::too_many_lines)]
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
-    i: CtxHead,
+    mut i: CtxHead,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         //: possibly deferred from /play {{{
@@ -341,7 +350,7 @@ async fn match_error(
         Fe::NotInVoice => {
             let join = InteractionClient::mention_command::<Join>();
             let play = InteractionClient::mention_command::<Play>();
-            i.caut(format!(
+            i.warn(format!(
                 "Not currently connected to a voice channel. Use {} or {} first.",
                 join, play
             ))
@@ -349,7 +358,7 @@ async fn match_error(
             Ok(())
         }
         Fe::InVoiceWithSomeoneElse(e) => {
-            i.nope(e.pretty_display()).await?;
+            i.nope(e.pretty_display().to_string()).await?;
             Ok(())
         }
         Fe::InVoiceWithoutSomeoneElse(e) => {
@@ -368,7 +377,7 @@ async fn match_error(
             Ok(())
         }
         Fe::QueueNotSeekable(e) => {
-            i.nope(e.pretty_display()).await?;
+            i.nope(e.pretty_display().to_string()).await?;
             Ok(())
         }
         Fe::QueueEmpty => {
@@ -377,13 +386,13 @@ async fn match_error(
         }
         Fe::PositionOutOfRange(e) => Ok(match_position_out_of_range(e, i).await?),
         Fe::NotUsersTrack(e) => {
-            i.nope(e.pretty_display()).await?;
+            i.nope(e.pretty_display().to_string()).await?;
             Ok(())
         }
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
         Fe::PollVoided(e) => {
-            // TODO: #44
+            //: TODO #44 {{{
 
             //out_upd!(
             //    format!(
@@ -392,7 +401,9 @@ async fn match_error(
             //    ),
             //    i
             //);
+            drop(e);
             todo!()
+            //: }}}
         }
         Fe::ConfirmationTimedOut => {
             i.suspf("Confirmation timed out.").await?;
@@ -422,7 +433,7 @@ async fn match_error(
     }
 }
 
-async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitFollowupResult {
+async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitRespondOrFollowupResult {
     match error {
         SuppressedError::Muted => {
             i.wrng_f("Currently server muted.").await?;
@@ -438,7 +449,7 @@ async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitFollow
 async fn match_autojoin_suppressed(
     error: &AutoJoinSuppressedError,
     i: CtxHead,
-) -> UnitFollowupResult {
+) -> UnitRespondResult {
     match error {
         AutoJoinSuppressedError::Muted => {
             i.suspf("Can't use this command as is currently server muted.")
@@ -459,7 +470,7 @@ async fn match_autojoin_suppressed(
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
     mut i: CtxHead,
-) -> UnitFollowupResult {
+) -> UnitRespondOrFollowupResult {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
@@ -498,7 +509,7 @@ async fn match_autojoin_attempt_failed(
 
 async fn match_position_out_of_range(
     error: &PositionOutOfRangeError,
-    i: CtxHead,
+    mut i: CtxHead,
 ) -> UnitRespondResult {
     let message = match error {
         PositionOutOfRangeError::OutOfRange {
@@ -518,12 +529,13 @@ async fn match_position_out_of_range(
         }
     };
 
-    i.wrng(message).await;
+    i.wrng(message).await?;
+    Ok(())
 }
 
 async fn match_another_poll_ongoing(
     error: &AnotherPollOngoingError,
-    i: CtxHead,
+    mut i: CtxHead,
 ) -> UnitRespondResult {
     let message_link = error.message.link();
 
@@ -566,9 +578,10 @@ async fn match_another_poll_ongoing(
     Ok(())
 }
 
-async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitFollowupResult {
+async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitRespondResult {
     let PollLossError { source, kind } = error;
 
+    #[allow(unused)]
     let source_txt = match kind {
         PollLossErrorKind::UnanimousLoss => "",
         PollLossErrorKind::TimedOut => "Poll timed out: ",
@@ -580,5 +593,6 @@ async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitFollowupResul
     //    format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
     //    i
     //);
+    drop(source);
     todo!()
 }

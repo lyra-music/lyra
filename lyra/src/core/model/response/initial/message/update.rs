@@ -1,4 +1,6 @@
-use super::{InteractionResponseType2, Respond, ResponseBuilder};
+use crate::core::model::response::Respond;
+
+use super::{InteractionResponseType2, ResponseBuilder};
 
 pub trait RespondWithUpdate: Respond {
     fn update(&mut self) -> ResponseBuilder<'_, Self>

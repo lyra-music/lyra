@@ -4,11 +4,11 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         SlashCtx, check,
-        macros::out_or_upd,
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::{CommandResult, component::queue::RepeatError},
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
@@ -92,6 +92,7 @@ pub async fn repeat(
 
     let message = format!("{} {}.", mode.emoji(), mode);
     let content = controller_fmt(ctx, via_controller, &message);
-    out_or_upd!(content, ?ctx);
+    //out_or_upd!(content, ?ctx); TODO: #44
+    ctx.out(content).await?;
     Ok(())
 }

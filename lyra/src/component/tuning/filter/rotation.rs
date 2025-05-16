@@ -3,13 +3,9 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -59,15 +55,17 @@ impl BotSlashCommand for On {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetRotation::new(self.frequency) else {
-            bad!("Frequency must not be zero.", ctx);
+            ctx.wrng("Frequency must not be zero.").await?;
+            return Ok(());
         };
         let frequency = update.frequency();
 
         player.update_filter(Some(update)).await?;
-        out!(
-            format!("🍳🟢 Enabled rotation (Frequency: `{frequency} Hz.`)"),
-            ctx
-        );
+        ctx.out(format!(
+            "🍳🟢 Enabled rotation (Frequency: `{frequency} Hz.`)"
+        ))
+        .await?;
+        Ok(())
     }
 }
 
@@ -82,6 +80,7 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetRotation>).await?;
-        out!("🍳🔴 Disabled rotation.", ctx);
+        ctx.out("🍳🔴 Disabled rotation.").await?;
+        Ok(())
     }
 }

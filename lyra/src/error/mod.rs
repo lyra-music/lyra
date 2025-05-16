@@ -245,11 +245,3 @@ impl From<UninitializedFieldError> for BuildError {
         Self::UninitializedField(e.field_name())
     }
 }
-
-#[derive(thiserror::Error, Debug)]
-pub enum ResponseBuilderError {
-    #[error(transparent)]
-    TwilightHttp(#[from] twilight_http::Error),
-    #[error(transparent)]
-    Builder(#[from] BuildError),
-}

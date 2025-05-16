@@ -4,11 +4,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         SlashCtx,
-        macros::{bad, out},
         model::BotSlashCommand,
         require::{self, PlayerInterface},
     },
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::{CommandResult, command::require::SetSpeedError},
 };
 
@@ -124,16 +124,18 @@ impl BotSlashCommand for Speed {
 
         let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
         else {
-            bad!("Multiplier must not be zero.", ctx);
+            ctx.wrng("Multiplier must not be zero.").await?;
+            return Ok(());
         };
 
         let multiplier = update.multiplier();
         let emoji = update.tier().emoji();
         player.set_speed(update).await?;
 
-        out!(
-            format!("{emoji} Set the playback speed to `{multiplier}`×."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji} Set the playback speed to `{multiplier}`×."
+        ))
+        .await?;
+        Ok(())
     }
 }

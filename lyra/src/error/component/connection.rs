@@ -62,9 +62,9 @@ pub mod join {
     #[error(transparent)]
     pub enum HandleResponseError {
         Cache(#[from] crate::error::Cache),
-        DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
-        Followup(#[from] crate::error::command::FollowupError),
-        RespondOrFollowup(#[from] crate::error::command::RespondOrFollowupError),
+        Respond(#[from] crate::error::core::RespondError),
+        RespondOrFollowup(#[from] crate::error::core::RespondOrFollowupError),
+        DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
     }
 
     #[derive(thiserror::Error, Debug)]
@@ -154,11 +154,11 @@ pub mod join {
                 HandleResponseError::RespondOrFollowup(e) => Self::Other(
                     ResidualError::HandleResponse(HandleResponseError::RespondOrFollowup(e)),
                 ),
-                HandleResponseError::DeserializeBody(e) => Self::Other(
-                    ResidualError::HandleResponse(HandleResponseError::DeserializeBody(e)),
+                HandleResponseError::DeserialiseBodyFromHttp(e) => Self::Other(
+                    ResidualError::HandleResponse(HandleResponseError::DeserialiseBodyFromHttp(e)),
                 ),
-                HandleResponseError::Followup(e) => Self::Other(ResidualError::HandleResponse(
-                    HandleResponseError::Followup(e),
+                HandleResponseError::Respond(e) => Self::Other(ResidualError::HandleResponse(
+                    HandleResponseError::Respond(e),
                 )),
             }
         }

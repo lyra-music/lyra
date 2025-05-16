@@ -8,8 +8,13 @@ use crate::{
     command::model::PartialInteractionData,
     core::{
         model::{
-            Followup, OwnedBotState, RespondComponent, RespondWithDefer, RespondWithDeferUpdate,
-            RespondWithUpdate,
+            OwnedBotState,
+            response::{
+                RespondComponent,
+                initial::{
+                    defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
+                },
+            },
         },
         r#static::component::NowPlayingButtonType,
     },
@@ -58,8 +63,6 @@ impl<U: Location> Ctx<ComponentMarker, U> {
     }
 }
 
-impl<U: Location> Followup for Ctx<ComponentMarker, U> {}
-impl<U: Location> RespondWithDefer for Ctx<ComponentMarker, U> {}
 impl<U: Location> RespondWithDeferUpdate for Ctx<ComponentMarker, U> {}
 impl<U: Location> RespondWithUpdate for Ctx<ComponentMarker, U> {}
 impl<U: Location> RespondComponent for Ctx<ComponentMarker, U> {}

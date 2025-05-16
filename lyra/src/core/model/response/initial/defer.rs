@@ -1,6 +1,6 @@
 use twilight_model::{channel::message::MessageFlags, http::interaction::InteractionResponseType};
 
-use super::{EmptyResponseResult, Respond};
+use crate::core::model::response::{EmptyResponseResult, Respond};
 
 pub trait RespondWithDefer: Respond {
     async fn raw_defer(&mut self, ephemeral: bool) -> EmptyResponseResult {

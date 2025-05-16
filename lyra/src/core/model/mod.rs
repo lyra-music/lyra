@@ -1,6 +1,5 @@
-mod ctx_head;
-mod followup;
-mod response;
+pub mod ctx_head;
+pub mod response;
 
 use std::{
     collections::HashMap,
@@ -24,17 +23,9 @@ use twilight_model::{
 };
 use twilight_standby::Standby;
 
-use crate::{LavalinkAware, error::core::DeserialiseBodyFromHttpError, lavalink::Lavalink};
-
-pub use {
-    crate::core::http::Client as InteractionClient,
-    ctx_head::CtxHead,
-    followup::FollowupTrait as Followup,
-    response::{
-        Respond, RespondAppCommandModal, RespondAutocomplete, RespondComponent,
-        RespondComponentModal, RespondWithDefer, RespondWithDeferUpdate, RespondWithMessage,
-        RespondWithModal, RespondWithUpdate,
-    },
+use crate::{
+    LavalinkAware, core::http::InteractionClient, error::core::DeserialiseBodyFromHttpError,
+    lavalink::Lavalink,
 };
 
 use super::r#static::application;

@@ -2,7 +2,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{SlashCtx, model::BotSlashCommand},
-    core::model::RespondWithMessage,
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 

@@ -28,13 +28,24 @@ use crate::{
     LavalinkAware,
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
-        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol},
-        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
+        model::{
+            BotAutocomplete, BotMessageCommand, BotSlashCommand, DeferCtxKind, FollowupCtxKind,
+            GuildCtx, RespondViaMessage,
+        },
         require, util,
     },
     core::{
         r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
-        model::UserIdAware,
+        model::{
+            UserIdAware,
+            response::{
+                either::RespondOrFollowup,
+                initial::{
+                    autocomplete::RespondAutocomplete, defer::RespondWithDefer,
+                    message::create::RespondWithMessage,
+                },
+            },
+        },
     },
     error::{
         CommandResult, LoadFailed as LoadFailedError,
@@ -303,12 +314,13 @@ impl BotAutocomplete for Autocomplete {
             TrackLoadType::Empty => Vec::new(),
         };
 
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
 async fn play(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind + DeferCtxKind>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
     ctx.defer().await?;
@@ -318,20 +330,19 @@ async fn play(
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    crit_or_fol!(
-                        format!("Failed to load tracks for query: `{}`.", query),
-                        ctx
-                    );
+                    ctx.unkn_f(format!("Failed to load tracks for query: `{}`.", query))
+                        .await?;
+                    Ok(())
                 }
                 QueryError::SearchResult(query) | QueryError::NoMatches(query) => {
-                    bad_or_fol!(
+                    ctx.wrng_f(
                         format!(
                             "**Given query is not a URL: `{}`**; Use the command's autocomplete to search for tracks instead. \n\
                             -# If the autocomplete results are empty, try using a different search query.",
                             query
                         ),
-                        ctx
-                    );
+                    ).await?;
+                    Ok(())
                 }
             },
             LoadTrackProcessManyError::Lavalink(e) => Err(e.into()),
@@ -340,7 +351,7 @@ async fn play(
 }
 
 async fn handle_load_track_results(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     results: LoadTrackResults,
 ) -> Result<(), play::HandleLoadTrackResultsError> {
     let (tracks, playlists) = results.split();
@@ -418,7 +429,9 @@ async fn handle_load_track_results(
         .queue_mut()
         .enqueue(total_tracks, ctx.user_id());
     player.play(first_track.inner()).await?;
-    out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
+    ctx.out_f(format!("{} Added {}.", plus, enqueued_text))
+        .await?;
+    Ok(())
 }
 
 #[derive(CommandOption, CreateOption, Default)]
@@ -515,7 +528,9 @@ impl BotSlashCommand for File {
                 .as_ref()
                 .is_some_and(|ty| !ty.starts_with("audio"))
         }) {
-            bad!(format!("`{}` is not an audio file.", file.filename), ctx);
+            ctx.wrng(format!("`{}` is not an audio file.", file.filename))
+                .await?;
+            return Ok(());
         }
 
         let urls = files.into_iter().map(|f| f.url.into());
@@ -566,7 +581,9 @@ impl BotMessageCommand for AddToQueue {
 
         let queries = extract_queries(message);
         if queries.is_empty() {
-            bad!("No audio files or URLs found in this message.", ctx);
+            ctx.wrng("No audio files or URLs found in this message.")
+                .await?;
+            return Ok(());
         }
         Ok(play(&mut ctx, queries).await?)
     }

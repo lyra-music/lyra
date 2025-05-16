@@ -4,14 +4,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::{
-        SlashCtx,
-        macros::{note, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_player,
-    core::model::{BotStateAware, HttpAware},
+    core::model::{
+        BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
 };
@@ -54,7 +51,8 @@ impl BotSlashCommand for Up {
             let old_percent = data.read().await.volume();
 
             if old_percent >= MAX_PERCENT {
-                note!("Already at max playback volume.", ctx);
+                ctx.note("Already at max playback volume.").await?;
+                return Ok(());
             }
 
             (
@@ -73,11 +71,10 @@ impl BotSlashCommand for Up {
         player.context.set_volume(new_percent.get()).await?;
         data.write().await.set_volume(new_percent);
 
-        out!(
-            format!(
-                "{emoji}**`＋`** ~~{old_percent_str}~~ ➜ **`{new_percent}%`**{maxed_note}{warning}."
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji}**`＋`** ~~{old_percent_str}~~ ➜ **`{new_percent}%`**{maxed_note}{warning}."
+        ))
+        .await?;
+        Ok(())
     }
 }

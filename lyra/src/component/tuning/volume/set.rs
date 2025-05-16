@@ -3,8 +3,9 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -31,6 +32,7 @@ impl BotSlashCommand for Set {
         let emoji = super::volume_emoji(Some(percent));
         let warning = super::clipping_warning(percent);
 
-        out!(format!("{emoji} `{percent}`%{warning}."), ctx);
+        ctx.out(format!("{emoji} `{percent}`%{warning}.")).await?;
+        Ok(())
     }
 }

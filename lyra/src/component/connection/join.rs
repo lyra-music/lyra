@@ -22,14 +22,20 @@ use crate::{
     LavalinkAware,
     command::{
         SlashCtx, check,
-        macros::{bad, cant, nope, note, note_fol, out_or_fol, sus_fol},
-        model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
+        model::{BotSlashCommand, CtxKind, FollowupCtxKind, GuildCtx, RespondViaMessage},
         require::{self, InVoiceCachedVoiceState},
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
         r#const::connection::INACTIVITY_TIMEOUT,
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
+        model::{
+            BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware,
+            response::{
+                either::RespondOrFollowup, followup::Followup,
+                initial::message::create::RespondWithMessage,
+            },
+        },
+        r#static::application,
         traced,
     },
     error::{
@@ -316,7 +322,8 @@ async fn delete_empty_voice_notice(
         })
         .await?;
 
-    bot.interaction()
+    bot.http()
+        .interaction(application::id())
         .delete_followup(&ctx.interaction_token, ctx.message_id)
         .await?;
     Ok(())
@@ -332,26 +339,22 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 
 async fn handle_response(
     response: Response,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
-            out_or_fol!(
-                stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage),
-                ?ctx
-            );
+            ctx.out_f(stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage))
+                .await?;
             (voice, empty)
         }
         Response::Moved { from, to, empty } => {
             let stage = matches!(to.kind, JoinedChannelType::Stage);
-            out_or_fol!(
-                stage_fmt(
-                    &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
-                    stage,
-                ),
-                ?ctx
-            );
+            ctx.out_f(stage_fmt(
+                &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
+                stage,
+            ))
+            .await?;
             (to, empty)
         }
     };
@@ -369,8 +372,8 @@ async fn handle_response(
             joined.id,
         ));
 
-        let empty_voice_notice = note_fol!(empty_voice_notice_txt, ?ctx);
-        let empty_voice_notice_message_id = empty_voice_notice.model().await?.id;
+        let empty_voice_notice = ctx.note_f(empty_voice_notice_txt).await?;
+        let empty_voice_notice_message_id = empty_voice_notice.retrieve_message().await?.id;
         traced::tokio_spawn(delete_empty_voice_notice(DeleteEmptyVoiceNotice::new(
             ctx,
             empty_voice_notice_message_id,
@@ -381,22 +384,20 @@ async fn handle_response(
     let state = ctx.current_voice_state().ok_or(CacheError)?;
     let muted = state.mute();
     if muted {
-        sus_fol!(
-            "**Currently server muted**; Some features will be limited.",
-            ?ctx
-        );
+        ctx.suspf("**Currently server muted**; Some features will be limited.")
+            .await?;
     }
     Ok(state.into())
 }
 
 pub async fn auto(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
     Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
 }
 
 pub async fn join(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<InVoiceCachedVoiceState, JoinError> {
     Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
@@ -420,26 +421,32 @@ impl BotSlashCommand for Join {
 
         match e.flatten_partially_into() {
             Pfe::UserNotInVoice(_) => {
-                bad!("Please specify a voice channel, or join one.", ctx);
+                ctx.wrng("Please specify a voice channel, or join one.")
+                    .await?;
+                Ok(())
             }
             Pfe::UserNotStageManager(_) => {
-                nope!("Only **Stage Managers** can use a stage channel.", ctx);
+                ctx.nope("Only **Stage Managers** can use a stage channel.")
+                    .await?;
+                Ok(())
             }
             Pfe::UserNotAllowed(_) => {
-                nope!("You are not allowed to use that channel.", ctx);
+                ctx.nope("You are not allowed to use that channel.").await?;
+                Ok(())
             }
             Pfe::InVoiceAlready(e) => {
-                note!(format!("Already connected to {}.", e.0.mention()), ctx);
+                ctx.note(format!("Already connected to {}.", e.0.mention()))
+                    .await?;
+                Ok(())
             }
             Pfe::Forbidden(e) => {
-                cant!(
-                    format!(
-                        "**Insufficient permissions to join {}**: Missing {} permissions.",
-                        e.channel_id.mention(),
-                        e.missing.pretty_display_code()
-                    ),
-                    ctx
-                );
+                ctx.blck(format!(
+                    "**Insufficient permissions to join {}**: Missing {} permissions.",
+                    e.channel_id.mention(),
+                    e.missing.pretty_display_code()
+                ))
+                .await?;
+                Ok(())
             }
             Pfe::Other(e) => Err(e.into()),
         }

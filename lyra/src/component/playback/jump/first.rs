@@ -1,10 +1,8 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::command::{
-    check,
-    macros::{bad, out},
-    model::BotSlashCommand,
-    require,
+use crate::{
+    command::{check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 /// Jumps to the first track in the queue.
@@ -26,11 +24,13 @@ impl BotSlashCommand for First {
         }
         let queue_len = queue.len();
         if queue_len == 1 {
-            bad!("No where else to jump to.", ctx);
+            ctx.wrng("No where else to jump to.").await?;
+            return Ok(());
         }
 
         if queue.position().get() == 1 {
-            bad!("Cannot jump to the current track.", ctx);
+            ctx.wrng("Cannot jump to the current track.").await?;
+            return Ok(());
         }
 
         queue.downgrade_repeat_mode();
@@ -42,6 +42,7 @@ impl BotSlashCommand for First {
 
         *queue.index_mut() = 0;
         drop(data_w);
-        out!(txt, ctx);
+        ctx.out(txt).await?;
+        Ok(())
     }
 }

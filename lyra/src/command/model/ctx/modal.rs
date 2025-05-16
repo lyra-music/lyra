@@ -2,9 +2,12 @@ use std::marker::PhantomData;
 
 use twilight_model::application::interaction::{InteractionData, modal::ModalInteractionData};
 
-use crate::core::model::{
-    Followup, RespondAppCommandModal, RespondComponentModal, RespondWithDefer,
-    RespondWithDeferUpdate, RespondWithModal, RespondWithUpdate,
+use crate::core::model::response::{
+    RespondAppCommandModal, RespondComponentModal,
+    initial::{
+        defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
+        modal::RespondWithModal,
+    },
 };
 
 use super::{AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location};
@@ -23,7 +26,7 @@ pub type ModalFromComponent = Marker<ComponentSrcMarker>;
 impl<T: ModalSrcMarker> Kind for Marker<T> {}
 #[allow(unused)]
 pub type Modal = Ctx<ModalFromAppCmd>;
-pub type Guild = Ctx<ModalFromComponent, GuildMarker>;
+pub type Guild = Ctx<ModalFromAppCmd, GuildMarker>;
 
 pub trait RespondVia: Kind {}
 impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
@@ -39,9 +42,6 @@ impl<U: Location, S: ModalSrcMarker> Ctx<Marker<S>, U> {
         data
     }
 }
-
-impl<U: Location, M: ModalSrcMarker> Followup for Ctx<Marker<M>, U> {}
-impl<U: Location, M: ModalSrcMarker> RespondWithDefer for Ctx<Marker<M>, U> {}
 
 impl<U: Location> RespondAppCommandModal for Ctx<ModalFromAppCmd, U> {}
 

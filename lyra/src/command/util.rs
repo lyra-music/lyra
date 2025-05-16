@@ -23,9 +23,9 @@ use twilight_model::{
 
 use super::{
     check,
-    macros::note_fol,
     model::{
-        CommandDataAware, CtxKind, GuildCtx, GuildModalCtx, RespondViaMessage, RespondViaModal,
+        AppCtxKind, AppCtxMarker, CtxKind, FollowupCtxKind, GuildCtx, GuildModalCtx,
+        RespondViaMessage,
     },
     require::{self, InVoice},
 };
@@ -40,6 +40,7 @@ use crate::{
         model::{
             AvatarAware, BotStateAware, CacheAware, DiscriminatorAware, GuildAvatarAware,
             OwnedBotStateAware, UserGlobalNameAware, UserIdAware, UserNickAware, UsernameAware,
+            response::{followup::Followup, initial::modal::RespondWithModal},
         },
     },
     error::{
@@ -243,7 +244,7 @@ pub fn controller_fmt<'a>(
 }
 
 pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<(), AutoJoinOrCheckInVoiceWithUserError> {
     if let Ok(in_voice) = require::in_voice(ctx) {
         let in_voice = in_voice.and_unsuppressed()?;
@@ -266,7 +267,7 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
 
 async fn handle_suppressed_auto_join(
     error: SuppressedError,
-    ctx: &GuildCtx<impl RespondViaMessage>,
+    ctx: &GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<(), HandleSuppressedAutoJoinError> {
     let bot_user_id = ctx.bot().user_id();
     match error {
@@ -291,13 +292,12 @@ async fn handle_suppressed_auto_join(
 
             let duration = unix_time() + r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT;
             let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
-            let requested_to_speak = note_fol!(
-                &format!(
+            let requested_to_speak = ctx
+                .notef(&format!(
                     "Requested to speak. **Accept the request in {} to continue.**",
                     timestamp.mention()
-                ),
-                ?ctx
-            );
+                ))
+                .await?;
             let requested_to_speak_message = requested_to_speak.model().await?;
             let wait_for_speaker =
                 tokio::time::timeout(r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, wait_for_speaker);
@@ -314,7 +314,7 @@ async fn handle_suppressed_auto_join(
 }
 
 pub async fn prompt_for_confirmation(
-    mut ctx: GuildCtx<impl CommandDataAware + RespondViaModal>,
+    mut ctx: GuildCtx<AppCtxMarker<impl AppCtxKind>>,
 ) -> Result<(GuildModalCtx, bool), PromptForConfirmationError> {
     let text_input = TextInput {
         custom_id: String::new(),
@@ -335,7 +335,7 @@ pub async fn prompt_for_confirmation(
     ctx.modal(
         modal_custom_id.clone(),
         ctx.command_name_full(),
-        [text_input],
+        [text_input.into()],
     )
     .await?;
 

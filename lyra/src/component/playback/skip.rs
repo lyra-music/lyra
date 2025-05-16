@@ -3,11 +3,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         check,
-        macros::out,
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::component::playback::PlayPauseError,
     lavalink::OwnedPlayerData,
 };
@@ -54,5 +54,6 @@ pub async fn skip(
     drop(data_w);
     let message = format!("⏭️ ~~`{current_track_title}`~~.");
     let content = controller_fmt(ctx, via_controller, &message);
-    out!(content, ctx);
+    ctx.out(content).await?;
+    Ok(())
 }

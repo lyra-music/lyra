@@ -6,10 +6,10 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         check,
-        macros::out,
         model::{BotSlashCommand, SlashCtx},
         require,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
     lavalink::Event,
 };
@@ -38,6 +38,7 @@ impl BotSlashCommand for Clear {
         ctx.get_conn().dispatch(Event::QueueClear).await?;
 
         data.write().await.queue_mut().clear();
-        out!("⏹️ Cleared the queue.", ctx);
+        ctx.out("⏹️ Cleared the queue.").await?;
+        Ok(())
     }
 }

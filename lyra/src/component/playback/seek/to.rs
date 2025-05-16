@@ -4,14 +4,11 @@ use lyra_ext::pretty::duration_display::{DurationDisplay, FromPrettyStr};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        check,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{check, model::BotSlashCommand, require},
     component::playback::Restart,
-    core::model::InteractionClient,
+    core::{
+        http::InteractionClient, model::response::initial::message::create::RespondWithMessage,
+    },
 };
 
 /// Seeks the current track to a new position.
@@ -38,44 +35,44 @@ impl BotSlashCommand for To {
         let timestamp_unchecked = self.timestamp;
         let timestamp = if let Ok(secs) = timestamp_unchecked.parse::<f64>() {
             if secs < 0. {
-                bad!("Timestamp as total seconds must be positive.", ctx);
+                ctx.wrng("Timestamp as total seconds must be positive.")
+                    .await?;
+                return Ok(());
             }
 
             Duration::from_secs_f64(secs)
         } else if let Ok(duration) = Duration::from_pretty_str(&timestamp_unchecked) {
             duration
         } else {
-            bad!(
+            ctx.wrng(
                 format!(
                     "**Invalid timestamp: `{}`**; \
                     Timestamp must either be in the format like `1m23s` or `4:56`, or as the total seconds like `78s`.",
                     timestamp_unchecked,
                 ),
-                ctx
-            );
+            ).await?;
+            return Ok(());
         };
 
         let current_track_length = u128::from(current_track.track.data().info.length);
 
         if timestamp.is_zero() {
-            bad!(
-                format!(
-                    "Timestamp must not be 0:00.\n\
+            ctx.wrng(format!(
+                "Timestamp must not be 0:00.\n\
                     -# To restart the track, use {} instead.",
-                    InteractionClient::mention_command::<Restart>()
-                ),
-                ctx
-            );
+                InteractionClient::mention_command::<Restart>()
+            ))
+            .await?;
+            return Ok(());
         }
         if timestamp.as_millis() > current_track_length {
-            bad!(
-                format!(
-                    "**Invalid timestamp: `{}`**; Timestamp must be within the track length of `{}`.",
-                    timestamp.pretty_display(),
-                    current_track_length.pretty_display(),
-                ),
-                ctx
-            );
+            ctx.wrng(format!(
+                "**Invalid timestamp: `{}`**; Timestamp must be within the track length of `{}`.",
+                timestamp.pretty_display(),
+                current_track_length.pretty_display(),
+            ))
+            .await?;
+            return Ok(());
         }
 
         let old_position = data_r.timestamp();
@@ -84,13 +81,12 @@ impl BotSlashCommand for To {
         player
             .seek_to_with(timestamp, &mut data.write().await)
             .await?;
-        out!(
-            format!(
-                "🕹️ ~~`{}`~~ ➜ **`{}`**.",
-                old_position.pretty_display(),
-                timestamp.pretty_display(),
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🕹️ ~~`{}`~~ ➜ **`{}`**.",
+            old_position.pretty_display(),
+            timestamp.pretty_display(),
+        ))
+        .await?;
+        Ok(())
     }
 }

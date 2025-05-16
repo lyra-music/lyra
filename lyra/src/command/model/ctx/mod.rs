@@ -1,6 +1,8 @@
 mod autocomplete;
 mod command_data;
 mod component;
+mod defer;
+mod followup;
 mod menu;
 mod message;
 mod modal;
@@ -31,8 +33,8 @@ use crate::{
     core::{
         model::{
             BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, OwnedBotState,
-            OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, Respond, UserAware,
-            UserPermissionsAware,
+            OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, UserAware,
+            UserPermissionsAware, response::Respond,
         },
         r#static::application,
     },
@@ -46,10 +48,11 @@ use super::PartialInteractionData;
 use self::modal::Marker as ModalMarker;
 pub use self::{
     autocomplete::Autocomplete,
-    command_data::Aware as CommandDataAware,
+    defer::DeferCtxKind,
+    followup::FollowupCtxKind,
     menu::{Message, User},
     message::RespondVia as RespondViaMessage,
-    modal::{Guild as GuildModal, RespondVia as RespondViaModal},
+    modal::Guild as GuildModal,
 };
 
 type RespondResult<T> = Result<T, twilight_http::Error>;

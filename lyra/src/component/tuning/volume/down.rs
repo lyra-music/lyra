@@ -4,9 +4,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
-    core::model::{BotStateAware, HttpAware},
+    core::model::{
+        BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
 };
@@ -54,9 +56,10 @@ impl BotSlashCommand for Down {
             (String::from("Muted"), "")
         };
 
-        out!(
-            format!("{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}."
+        ))
+        .await?;
+        Ok(())
     }
 }

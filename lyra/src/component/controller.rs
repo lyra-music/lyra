@@ -3,13 +3,14 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{
-        macros::{note, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{model::BotSlashCommand, require},
     component::config::now_playing::Toggle as ConfigNowPlayingToggle,
-    core::model::{CacheAware, InteractionClient, OwnedHttpAware},
+    core::{
+        http::InteractionClient,
+        model::{
+            CacheAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
+        },
+    },
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
 };
@@ -35,24 +36,23 @@ impl BotSlashCommand for Bump {
 
         let track = require::current_track(data_r.queue())?;
         let Some(msg_id) = data_r.now_playing_message_id() else {
-            note!(
-                format!(
-                    "Now-playing track messages sending are disabled in this server.\n\
+            ctx.note(format!(
+                "Now-playing track messages sending are disabled in this server.\n\
                     -# Moderators can enable the feature by using {}.",
-                    InteractionClient::mention_command::<ConfigNowPlayingToggle>()
-                ),
-                ctx
-            );
+                InteractionClient::mention_command::<ConfigNowPlayingToggle>()
+            ))
+            .await?;
+            return Ok(());
         };
         let channel_id = ctx.channel_id();
         let channel_messages = ctx.cache().channel_messages(channel_id);
         if channel_messages.is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id)) {
-            note!(
+            ctx.note(
                 "The now-playing track message is already at the bottom of the current text channel.",
-                ctx
-            );
+            ).await?;
+            Ok(())
         } else {
-            out!("🔽 Bumped the now-playing track message.", ?ctx);
+            ctx.out("🔽 Bumped the now-playing track message.").await?;
             let lava_data = ctx.lavalink().data();
             let guild_id = ctx.guild_id().into();
             let msg_data = NowPlayingData::new(&lava_data, guild_id, &data_r, track.track).await?;

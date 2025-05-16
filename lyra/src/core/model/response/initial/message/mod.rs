@@ -1,22 +1,27 @@
-mod create;
-mod update;
+pub mod create;
+pub mod update;
 
 use std::pin::Pin;
 
 use derive_builder::Builder;
 use twilight_model::{
-    channel::message::{AllowedMentions, Component, Embed, MessageFlags},
+    channel::{
+        Message,
+        message::{AllowedMentions, Component, Embed, MessageFlags},
+    },
     http::{
         attachment::Attachment,
         interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     },
 };
 
-use crate::error::{BuildError, ResponseBuilderError};
-
-use super::{EmptyResponse, Respond};
-
-pub use {create::RespondWithMessage, update::RespondWithUpdate};
+use crate::{
+    core::model::response::{EmptyResponse, Respond},
+    error::{
+        BuildError,
+        core::{DeserialiseBodyFromHttpError, RespondError},
+    },
+};
 
 enum InteractionResponseType2 {
     ChannelMessageWithSource,
@@ -94,8 +99,32 @@ impl<'a, T: Respond> From<Response<'a, T>>
     }
 }
 
+pub struct InitialResponseProxy<'a, T: Respond> {
+    ctx: &'a T,
+    response: EmptyResponse,
+}
+
+impl<'a, T: Respond> InitialResponseProxy<'a, T> {
+    pub(in crate::core::model::response) const fn new(ctx: &'a T, response: EmptyResponse) -> Self {
+        Self { ctx, response }
+    }
+
+    pub async fn retrieve_response(
+        self,
+    ) -> Result<twilight_http::Response<Message>, twilight_http::Error> {
+        self.ctx
+            .interaction_client()
+            .response(&self.ctx.interaction_token())
+            .await
+    }
+
+    pub async fn retrieve_message(self) -> Result<Message, DeserialiseBodyFromHttpError> {
+        Ok(self.retrieve_response().await?.model().await?)
+    }
+}
+
 impl<'a, T: Respond + Send> IntoFuture for ResponseBuilder<'a, T> {
-    type Output = Result<EmptyResponse, ResponseBuilderError>;
+    type Output = Result<InitialResponseProxy<'a, T>, RespondError>;
 
     type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'a>>;
 
@@ -118,12 +147,12 @@ impl<'a, T: Respond + Send> IntoFuture for ResponseBuilder<'a, T> {
                             },
                         )
                         .await
-                        .map_err(ResponseBuilderError::from);
+                        .map_err(RespondError::from);
 
                     if result.is_ok() {
                         ctx.acknowledge();
                     }
-                    result
+                    result.map(|r| InitialResponseProxy::new(ctx, r))
                 }
             }
         })

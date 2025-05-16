@@ -1,7 +1,7 @@
 use twilight_model::{channel::message::Component, http::interaction::InteractionResponseType};
 use twilight_util::builder::InteractionResponseDataBuilder;
 
-use super::{EmptyResponseResult, Respond};
+use crate::core::model::response::{EmptyResponseResult, Respond};
 
 pub trait RespondWithModal: Respond {
     async fn modal(

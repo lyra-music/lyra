@@ -12,11 +12,10 @@ use crate::{
     LavalinkAndGuildIdAware, LavalinkAware,
     command::{
         SlashCtx, check,
-        macros::{caut, out},
         model::{BotSlashCommand, CtxKind, GuildCtx},
         require,
     },
-    core::model::HttpAware,
+    core::model::{HttpAware, response::initial::message::create::RespondWithMessage},
     error::{
         CommandResult,
         component::connection::leave::{self, DisconnectCleanupError},
@@ -88,11 +87,14 @@ impl BotSlashCommand for Leave {
         let mut ctx = require::guild(ctx)?;
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
-                out!(format!("📎 ~~{}~~.", voice.mention()), ctx);
+                ctx.out(format!("📎 ~~{}~~.", voice.mention())).await?;
+                Ok(())
             }
             Err(e) => match e.match_not_in_voice_into() {
                 leave::NotInVoiceMatchedError::NotInVoice(_) => {
-                    caut!("Not currently connected to a voice channel.", ctx);
+                    ctx.warn("Not currently connected to a voice channel.")
+                        .await?;
+                    Ok(())
                 }
                 leave::NotInVoiceMatchedError::Other(e) => Err(e.into()),
             },

@@ -34,7 +34,11 @@ use crate::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },
-        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
+        model::{
+            BotStateAware, CacheAware, HttpAware, UserIdAware,
+            ctx_head::CtxHead,
+            response::initial::message::{create::RespondWithMessage, update::RespondWithUpdate},
+        },
     },
     error::{
         Cache as CacheError,
@@ -328,7 +332,7 @@ async fn wait_for_poll_actions(
 }
 
 enum EmbedUpdate<'a> {
-    InteractionResponse(crate::core::model::ResponseProxy<'a>),
+    InteractionResponse(CtxHead),
     Http {
         client: &'a twilight_http::Client,
         channel_id: Id<ChannelMarker>,
@@ -339,7 +343,13 @@ enum EmbedUpdate<'a> {
 impl EmbedUpdate<'_> {
     async fn update_embed(self, embed: Embed) -> Result<(), UpdateEmbedError> {
         match self {
-            EmbedUpdate::InteractionResponse(i) => i.update_message_embeds_only([embed]).await?,
+            EmbedUpdate::InteractionResponse(mut i) => {
+                i.update()
+                    .embeds([embed])
+                    .await?
+                    .retrieve_response()
+                    .await?
+            }
             EmbedUpdate::Http {
                 client,
                 channel_id,
@@ -458,9 +468,11 @@ pub async fn start(
         &embed_latent,
     )?;
     let message = super::util::MessageLinkComponent::from(
-        ctx.respond_embeds_and_components([embed.clone()], [row])
+        ctx.respond()
+            .embeds([embed.clone()])
+            .components([row])
             .await?
-            .model()
+            .retrieve_message()
             .await?,
     );
 
@@ -560,9 +572,10 @@ async fn wait_for_votes(
                     vote,
                     interaction,
                 } => {
-                    let i = ctx.bot().interaction().ctx(&interaction);
+                    let mut i = ctx.bot().interaction().ctx(&interaction);
                     if !users_in_voice.contains(&user_id) {
-                        nope!("You are not eligible to cast a vote to this poll.", ?i);
+                        i.nope("You are not eligible to cast a vote to this poll.")
+                            .await?;
                         continue;
                     }
 
@@ -571,10 +584,8 @@ async fn wait_for_votes(
                             e.insert(vote);
                         }
                         Entry::Occupied(e) => {
-                            caut!(
-                                format!("You've already casted a vote: **{}**.", e.get()),
-                                ?i
-                            );
+                            i.warn(format!("You've already casted a vote: **{}**.", e.get()))
+                                .await?;
                             continue;
                         }
                     }
@@ -624,13 +635,13 @@ async fn wait_for_votes(
                     .await?;
                 }
                 PollAction::DjUpvote(inter) => {
-                    let i = ctx.bot().interaction().ctx(&inter);
-                    hid!(format!("🪄 Superseded this poll to win."), ?i);
+                    let mut i = ctx.bot().interaction().ctx(&inter);
+                    i.hid(format!("🪄 Superseded this poll to win.")).await?;
                     return Ok(Resolution::SupersededWinViaDj);
                 }
                 PollAction::DjDownvote(inter) => {
-                    let i = ctx.bot().interaction().ctx(&inter);
-                    hid!(format!("🪄 Superseded this poll to lose."), ?i);
+                    let mut i = ctx.bot().interaction().ctx(&inter);
+                    i.hid(format!("🪄 Superseded this poll to lose.")).await?;
                     return Ok(Resolution::SupersededLossViaDj);
                 }
                 PollAction::AlternateDjCast => return Ok(Resolution::SupersededWinViaDj),

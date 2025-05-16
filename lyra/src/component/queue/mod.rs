@@ -32,15 +32,18 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 
 use crate::{
     command::{
-        macros::{note_fol, out},
-        model::{GuildCtx, RespondViaMessage},
+        model::{FollowupCtxKind, GuildCtx, RespondViaMessage},
         require::PlayerInterface,
     },
     core::{
         r#const::{
             discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
         },
-        model::{CacheAware, InteractionClient},
+        http::InteractionClient,
+        model::{
+            CacheAware,
+            response::{either::RespondOrFollowup, initial::message::create::RespondWithMessage},
+        },
     },
     error::{PositionOutOfRange as PositionOutOfRangeError, component::queue::RemoveTracksError},
     lavalink::{CorrectTrackInfo, QueueItem},
@@ -210,7 +213,7 @@ fn validate_input_positions(
 async fn remove_range(
     start: i64,
     end: i64,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     #[allow(clippy::cast_possible_truncation)]
@@ -240,7 +243,7 @@ async fn remove_range(
 
 async fn remove(
     positions: Box<[NonZeroUsize]>,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
@@ -264,7 +267,7 @@ async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
     queue_cleared: bool,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
@@ -306,15 +309,17 @@ async fn impl_remove(
         .await?;
     drop(data_w);
 
-    out!(format!("{} Removed {}.", minus, removed_text), ?ctx);
+    ctx.out(format!("{} Removed {}.", minus, removed_text))
+        .await?;
 
     if queue_cleared {
         let clear = InteractionClient::mention_command::<Clear>();
 
-        note_fol!(
-            format!("For clearing the entire queue, use {} instead.", clear),
-            ctx
-        );
+        ctx.note_f(format!(
+            "For clearing the entire queue, use {} instead.",
+            clear
+        ))
+        .await?;
     }
     Ok(())
 }

@@ -10,7 +10,6 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         check,
-        macros::{bad, out},
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
@@ -18,7 +17,12 @@ use crate::{
         generate_position_choices, generate_position_choices_from_fuzzy_match,
         generate_position_choices_from_input, validate_input_position,
     },
-    core::model::CacheAware,
+    core::model::{
+        CacheAware,
+        response::initial::{
+            autocomplete::RespondAutocomplete, message::create::RespondWithMessage,
+        },
+    },
 };
 
 async fn generate_skip_to_choices(
@@ -67,7 +71,8 @@ impl BotAutocomplete for Autocomplete {
         };
 
         let choices = generate_skip_to_choices(track, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
@@ -95,7 +100,8 @@ impl BotSlashCommand for To {
 
         let queue_len = queue.len();
         if queue_len == 1 {
-            bad!("No where else to jump to.", ctx);
+            ctx.wrng("No where else to jump to.").await?;
+            return Ok(());
         }
 
         let input = self.track;
@@ -104,7 +110,8 @@ impl BotSlashCommand for To {
         #[allow(clippy::cast_possible_truncation)]
         let position = input.unsigned_abs() as usize;
         if position == queue.position().get() {
-            bad!("Cannot jump to the current track.", ctx);
+            ctx.wrng("Cannot jump to the current track.").await?;
+            return Ok(());
         }
 
         queue.downgrade_repeat_mode();
@@ -117,6 +124,7 @@ impl BotSlashCommand for To {
 
         *queue.index_mut() = index;
         drop(data_w);
-        out!(txt, ctx);
+        ctx.out(txt).await?;
+        Ok(())
     }
 }
