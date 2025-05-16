@@ -35,9 +35,9 @@ impl RepeatMode {
     }
     pub const fn description(&self) -> &str {
         match self {
-            Self::Off => "Disabled Repeat.",
-            Self::All => "Repeating the entire queue.",
-            Self::Track => "Repeating only the current track.",
+            Self::Off => "Disabled Repeat",
+            Self::All => "Repeating the entire queue",
+            Self::Track => "Repeating only the current track",
         }
     }
 }
