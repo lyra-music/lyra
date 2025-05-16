@@ -7,6 +7,7 @@ pub mod runner;
 
 pub use command::Result as CommandResult;
 
+use derive_builder::UninitializedFieldError;
 use thiserror::Error;
 use twilight_mention::Mention;
 use twilight_model::id::{
@@ -226,3 +227,29 @@ pub struct ConfirmationTimedOut;
 #[derive(Error, Debug)]
 #[error("unrecognised voice connection")]
 pub struct UnrecognisedConnection;
+
+/// Errors encountered during object initialization.
+#[non_exhaustive]
+#[derive(Error, Debug)]
+pub enum BuildError {
+    /// A field was not initialized before calling `.build()` in a builder.
+    #[error("Uninitialized field: {0}")]
+    UninitializedField(&'static str),
+    /// A validation check failed.
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+}
+
+impl From<UninitializedFieldError> for BuildError {
+    fn from(e: UninitializedFieldError) -> Self {
+        Self::UninitializedField(e.field_name())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ResponseBuilderError {
+    #[error(transparent)]
+    TwilightHttp(#[from] twilight_http::Error),
+    #[error(transparent)]
+    Builder(#[from] BuildError),
+}

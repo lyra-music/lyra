@@ -29,7 +29,6 @@ use twilight_util::builder::embed::{
 
 use crate::{
     LavalinkAware,
-    command::macros::{caut, hid, nope},
     core::{
         r#const::{
             colours,
@@ -329,7 +328,7 @@ async fn wait_for_poll_actions(
 }
 
 enum EmbedUpdate<'a> {
-    InteractionResponse(crate::core::model::InteractionInterface<'a>),
+    InteractionResponse(crate::core::model::ResponseProxy<'a>),
     Http {
         client: &'a twilight_http::Client,
         channel_id: Id<ChannelMarker>,
@@ -561,7 +560,7 @@ async fn wait_for_votes(
                     vote,
                     interaction,
                 } => {
-                    let i = ctx.bot().interaction().interfaces(&interaction);
+                    let i = ctx.bot().interaction().ctx(&interaction);
                     if !users_in_voice.contains(&user_id) {
                         nope!("You are not eligible to cast a vote to this poll.", ?i);
                         continue;
@@ -625,12 +624,12 @@ async fn wait_for_votes(
                     .await?;
                 }
                 PollAction::DjUpvote(inter) => {
-                    let i = ctx.bot().interaction().interfaces(&inter);
+                    let i = ctx.bot().interaction().ctx(&inter);
                     hid!(format!("🪄 Superseded this poll to win."), ?i);
                     return Ok(Resolution::SupersededWinViaDj);
                 }
                 PollAction::DjDownvote(inter) => {
-                    let i = ctx.bot().interaction().interfaces(&inter);
+                    let i = ctx.bot().interaction().ctx(&inter);
                     hid!(format!("🪄 Superseded this poll to lose."), ?i);
                     return Ok(Resolution::SupersededLossViaDj);
                 }

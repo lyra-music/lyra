@@ -18,11 +18,7 @@ use crate::{
     CommandError, LavalinkAware,
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
-        macros::{
-            bad, bad_or_fol, cant_or_fol, caut, crit, crit_or_fol, err, err_or_fol, hid,
-            hid_or_fol, nope, nope_or_fol, note, out_upd, sus, sus_fol,
-        },
-        model::{ComponentCtx, NonPingInteraction},
+        model::{ComponentCtx, Ctx, NonPingInteraction},
         require,
         util::MessageLinkAware,
     },
@@ -30,8 +26,8 @@ use crate::{
     core::{
         r#const::exit_code::{DUBIOUS, PROHIBITED, WARNING},
         model::{
-            BotState, InteractionClient, InteractionInterface, OwnedBotState, UnitFollowupResult,
-            UnitRespondResult,
+            BotState, CtxHead, Followup, InteractionClient, OwnedBotState, Respond,
+            RespondWithMessage,
         },
         r#static::component::NowPlayingButtonType,
     },
@@ -90,7 +86,7 @@ impl Process for Context {
 impl Context {
     async fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
-        let i = bot.interaction().interfaces(&self.inner);
+        let mut i = bot.interaction().ctx(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
             unreachable!()
@@ -142,25 +138,27 @@ impl Context {
             return Ok(());
         };
 
-        let acknowledged = rx.try_recv().is_ok();
+        if rx.try_recv().is_ok() {
+            i.acknowledge()
+        }
         match source.flatten_until_user_not_allowed_as() {
             Fuunacee::UserNotAllowed => {
-                nope!("You are not allowed to use commands in this context.", i);
+                i.nope("You are not allowed to use commands in this context.")
+                    .await?;
+                Ok(())
             }
             Fuunacee::Command => {
                 let CommandExecuteError::Command(error) = source else {
                     unreachable!()
                 };
-                match_error(error, name, acknowledged, i).await
+                match_error(error, name, i).await
             }
             _ => {
-                crit!(
-                    format!(
-                        "Something unexpectedly went wrong: ```rs\n{source:#?}```\
-                        Please report this to the bot developers."
-                    ),
-                    ?i
-                );
+                i.unkn(format!(
+                    "Something unexpectedly went wrong: ```rs\n{source:#?}```
+                    Please report this to the bot developers."
+                ))
+                .await?;
                 Err(ProcessError::CommandExecute { name, source })
             }
         }
@@ -274,8 +272,7 @@ impl Context {
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
-    acknowledged: bool,
-    i: InteractionInterface<'_>,
+    i: CtxHead,
 ) -> Result<(), ProcessError> {
     match error.flatten_as() {
         //: possibly deferred from /play {{{
@@ -283,36 +280,32 @@ async fn match_error(
         Fe::Cache => {
             tracing::warn!("cache error: {:#?}", error);
 
-            crit_or_fol!(
-                "Something isn't working at the moment, try again later.",
-                (i, acknowledged)
-            );
+            i.unkn_f("Something isn't working at the moment, try again later.")
+                .await?;
+            Ok(())
         }
         Fe::InVoiceWithoutUser(e) => {
-            nope_or_fol!(
-                format!(
-                    "You are not with the bot in {}.\n\
+            i.nope_f(format!(
+                "You are not with the bot in {}.\n\
                     -# Members who are a ***DJ*** bypass this.",
-                    e.0.mention(),
-                ),
-                (i, acknowledged)
-            );
+                e.0.mention(),
+            ))
+            .await?;
+            Ok(())
         }
-        Fe::Suppressed(e) => Ok(match_suppressed(e, (i, acknowledged)).await?),
+        Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
-        Fe::AutoJoinAttemptFailed(e) => {
-            Ok(match_autojoin_attempt_failed(e, (i, acknowledged)).await?)
-        }
+        Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
         Fe::Lavalink(e) => {
             if let LavalinkError::TrackError(e) = e {
-                hid_or_fol!(
-                    format!("💔 Error loading this track: {}", e.message),
-                    (i, acknowledged)
-                );
+                i.hid_f(format!("💔 Error loading this track: {}", e.message))
+                    .await;
+                Ok(())
             } else {
-                err_or_fol!(
-                    format!("Something went wrong with lavalink: ```rs\n{error:#?}```"), ?(i,acknowledged)
-                );
+                i.erro_f(format!(
+                    "Something went wrong with lavalink: ```rs\n{error:#?}```"
+                ))
+                .await?;
                 Err(ProcessError::CommandExecute {
                     name: command_name,
                     source: error.into(),
@@ -325,7 +318,7 @@ async fn match_error(
         | Fe::Sqlx
         | Fe::TaskJoin
         | Fe::GatewaySend => {
-            err_or_fol!(format!("Something went wrong: ```rs\n{error:#?}```"), ?(i, acknowledged));
+            i.erro_f(format!("Something went wrong: ```rs\n{error:#?}```"));
             Err(ProcessError::CommandExecute {
                 name: command_name,
                 source: error.into(),
@@ -334,10 +327,13 @@ async fn match_error(
         //:
         //: }}}
         Fe::UserNotDj => {
-            nope!("You need to be a ***DJ*** to do that.", i);
+            i.nope("You need to be a ***DJ*** to do that.").await?;
+            Ok(())
         }
         Fe::UserNotAccessManager => {
-            nope!("You need to be an ***Access Manager*** to do that.", i);
+            i.nope("You need to be an ***Access Manager*** to do that.")
+                .await?;
+            Ok(())
         }
         // Fe::UserNotPlaylistManager(_) => {
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
@@ -345,64 +341,79 @@ async fn match_error(
         Fe::NotInVoice => {
             let join = InteractionClient::mention_command::<Join>();
             let play = InteractionClient::mention_command::<Play>();
-            caut!(
-                format!(
-                    "Not currently connected to a voice channel. Use {} or {} first.",
-                    join, play
-                ),
-                i
-            );
+            i.caut(format!(
+                "Not currently connected to a voice channel. Use {} or {} first.",
+                join, play
+            ))
+            .await?;
+            Ok(())
         }
         Fe::InVoiceWithSomeoneElse(e) => {
-            nope!(e.pretty_display(), i);
+            i.nope(e.pretty_display()).await?;
+            Ok(())
         }
         Fe::InVoiceWithoutSomeoneElse(e) => {
-            bad!(format!("Not enough people are in {}.", e.0.mention()), i);
+            i.wrng(format!("Not enough people are in {}.", e.0.mention()))
+                .await?;
+            Ok(())
         }
 
         Fe::Stopped => todo!(),
         Fe::NotPlaying => {
-            bad!("Currently not playing anything.", i);
+            i.wrng("Currently not playing anything.").await?;
+            Ok(())
         }
         Fe::Paused => {
-            bad!("Currently paused.", i);
+            i.wrng("Currently paused.").await?;
+            Ok(())
         }
         Fe::QueueNotSeekable(e) => {
-            nope!(e.pretty_display(), i);
+            i.nope(e.pretty_display()).await?;
+            Ok(())
         }
         Fe::QueueEmpty => {
-            bad!("The queue is currently empty.", i);
+            i.wrng("The queue is currently empty.").await?;
+            Ok(())
         }
         Fe::PositionOutOfRange(e) => Ok(match_position_out_of_range(e, i).await?),
         Fe::NotUsersTrack(e) => {
-            nope!(e.pretty_display(), i);
+            i.nope(e.pretty_display()).await?;
+            Ok(())
         }
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
         Fe::PollVoided(e) => {
-            out_upd!(
-                format!(
-                    "{WARNING} This poll has been voided as: {}.",
-                    e.pretty_display()
-                ),
-                i
-            );
+            // TODO: #44
+
+            //out_upd!(
+            //    format!(
+            //        "{WARNING} This poll has been voided as: {}.",
+            //        e.pretty_display()
+            //    ),
+            //    i
+            //);
+            todo!()
         }
         Fe::ConfirmationTimedOut => {
-            sus_fol!("Confirmation timed out.", i);
+            i.suspf("Confirmation timed out.").await?;
+            Ok(())
         }
         Fe::NoPlayer => {
             let play = InteractionClient::mention_command::<Play>();
-            caut!(format!("Not yet played anything. Use {} first.", play), i);
+            i.warn(format!("Not yet played anything. Use {} first.", play))
+                .await?;
+            Ok(())
         }
         Fe::UnrecognisedConnection => {
-            crit!(
-                "The bot wasn't disconnected properly last session. Please wait for it to automatically leave the voice channel, then try again.",
-                i
-            );
+            i.unkn(
+                "The bot wasn't disconnected properly last session. \
+                Please wait for it to automatically leave the voice channel, then try again.",
+            )
+            .await?;
+            Ok(())
         }
         _ => {
-            err!(format!("Something went wrong: ```rs\n{error:#?}```"), ?(i, acknowledged));
+            i.erro(format!("Something went wrong: ```rs\n{error:#?}```"));
             Err(ProcessError::CommandExecute {
                 name: command_name,
                 source: error.into(),
@@ -411,83 +422,83 @@ async fn match_error(
     }
 }
 
-async fn match_suppressed(
-    error: &SuppressedError,
-    mut ia: (InteractionInterface<'_>, bool),
-) -> UnitFollowupResult {
+async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitFollowupResult {
     match error {
         SuppressedError::Muted => {
-            bad_or_fol!("Currently server muted.", ia);
+            i.wrng_f("Currently server muted.").await?;
         }
         SuppressedError::NotSpeaker => {
-            bad_or_fol!("Not currently a speaker in this stage channel.", ia);
+            i.wrng_f("Not currently a speaker in this stage channel.")
+                .await?;
         }
-    }
+    };
+    Ok(())
 }
 
 async fn match_autojoin_suppressed(
     error: &AutoJoinSuppressedError,
-    i: InteractionInterface<'_>,
+    i: CtxHead,
 ) -> UnitFollowupResult {
     match error {
         AutoJoinSuppressedError::Muted => {
-            sus_fol!("Can't use this command as is currently server muted.", i);
+            i.suspf("Can't use this command as is currently server muted.")
+                .await;
         }
         AutoJoinSuppressedError::StillNotSpeaker { last_followup_id } => {
-            i.update_followup(
-                *last_followup_id,
-                &format!(
-                    "{DUBIOUS} Timed out waiting to become speaker. Inform stage moderators to invite to speak and reinvoke this command."
-                )
-            ).await?;
-            Ok(())
+            i.update_followup(*last_followup_id)
+                .content(format!(
+                    "{DUBIOUS} Timed out waiting to become speaker. \
+                    Inform stage moderators to invite to speak and reinvoke this command."
+                ))
+                .await?;
         }
     }
+    Ok(())
 }
 
 async fn match_autojoin_attempt_failed(
     error: &AutoJoinAttemptFailedError,
-    mut ia: (InteractionInterface<'_>, bool),
+    mut i: CtxHead,
 ) -> UnitFollowupResult {
     match error {
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
-            bad_or_fol!(
-                format!(
-                    "Please join a voice channel, or use {} to connect to a channel.",
-                    join
-                ),
-                ia
-            );
+            i.wrng_f(format!(
+                "Please join a voice channel, or use {} to connect to a channel.",
+                join
+            ))
+            .await?;
         }
         AutoJoinAttemptFailedError::UserNotAllowed(_) => {
-            nope_or_fol!(
-                "Attempting to join your currently connected channel failed as you are not allowed to use the bot here.",
-                ia
-            );
+            i.nope_f(
+                "Attempting to join your currently connected channel failed as \
+                you are not allowed to use the bot here.",
+            )
+            .await?;
         }
         AutoJoinAttemptFailedError::Forbidden(e) => {
-            cant_or_fol!(
-                format!(
-                    "**Attempting to join {} failed due to insufficient permissions**: Missing {} permissions.",
-                    e.channel_id.mention(),
-                    e.missing.pretty_display_code()
-                ),
-                ia
-            );
+            i.blck_f(format!(
+                "**Attempting to join {} failed due to insufficient permissions**: \
+                Missing {} permissions.",
+                e.channel_id.mention(),
+                e.missing.pretty_display_code()
+            ))
+            .await?;
         }
         AutoJoinAttemptFailedError::UserNotStageManager(_) => {
-            nope_or_fol!(
-                "Attempting to join your currently connected stage failed as you are not a **Stage Manager**.",
-                ia
-            );
+            i.nope_f(
+                "Attempting to join your currently connected stage failed as \
+                you are not a **Stage Manager**.",
+            )
+            .await?;
         }
-    }
+    };
+    Ok(())
 }
 
 async fn match_position_out_of_range(
     error: &PositionOutOfRangeError,
-    i: InteractionInterface<'_>,
+    i: CtxHead,
 ) -> UnitRespondResult {
     let message = match error {
         PositionOutOfRangeError::OutOfRange {
@@ -495,68 +506,67 @@ async fn match_position_out_of_range(
             queue_len,
         } => {
             format!(
-                "Invalid track position: `{position}`; Track position must be from `1` to `{queue_len}`."
+                "Invalid track position: `{position}`; \
+                Track position must be from `1` to `{queue_len}`."
             )
         }
         PositionOutOfRangeError::OnlyTrack(p) => {
             format!(
-                "Invalid track position: `{p}`; Track position must be `1` as the queue currently only has one track."
+                "Invalid track position: `{p}`; \
+                Track position must be `1` as the queue currently only has one track."
             )
         }
     };
 
-    bad!(message, i);
+    i.wrng(message).await;
 }
 
 async fn match_another_poll_ongoing(
     error: &AnotherPollOngoingError,
-    i: InteractionInterface<'_>,
+    i: CtxHead,
 ) -> UnitRespondResult {
     let message_link = error.message.link();
 
     match error.alternate_vote {
         Some(AlternateVoteResponse::Casted) => {
-            note!(
-                format!(
-                    "The ongoing poll at {message_link} may resolve this. Your vote has automatically been casted."
-                ),
-                i
-            );
+            i.note(format!(
+                "The ongoing poll at {message_link} may resolve this. \
+                Your vote has automatically been casted."
+            ))
+            .await?;
         }
         Some(AlternateVoteResponse::DjCasted) => {
-            hid!(
-                format!("Superseded the ongoing poll at {message_link} to win."),
-                i
-            );
+            i.hid(format!(
+                "Superseded the ongoing poll at {message_link} to win."
+            ))
+            .await?;
         }
         Some(AlternateVoteResponse::CastDenied) => {
-            nope!(
-                format!(
-                    "The ongoing poll at {message_link} may resolve this, although you are not eligible to cast a vote there."
-                ),
-                i
-            );
+            i.nope(format!(
+                "The ongoing poll at {message_link} may resolve this, \
+                although you are not eligible to cast a vote there."
+            ))
+            .await?;
         }
         Some(AlternateVoteResponse::CastedAlready(casted)) => {
-            caut!(
-                format!(
-                    "The ongoing poll at {message_link} may resolve this, although you've already casted a vote: **{casted}**."
-                ),
-                i
-            );
+            i.warn(format!(
+                "The ongoing poll at {message_link} may resolve this, \
+                although you've already casted a vote: **{casted}**."
+            ))
+            .await?;
         }
         None => {
-            sus!(
-                format!(
-                    "Another poll is needed to resolve that. Please resolve the ongoing poll at {message_link} first."
-                ),
-                i
-            );
+            i.susp(format!(
+                "Another poll is needed to resolve that. \
+                Please resolve the ongoing poll at {message_link} first."
+            ))
+            .await?;
         }
-    }
+    };
+    Ok(())
 }
 
-async fn match_poll_loss(error: &PollLossError, i: InteractionInterface<'_>) -> UnitFollowupResult {
+async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitFollowupResult {
     let PollLossError { source, kind } = error;
 
     let source_txt = match kind {
@@ -565,8 +575,10 @@ async fn match_poll_loss(error: &PollLossError, i: InteractionInterface<'_>) -> 
         PollLossErrorKind::SupersededLossViaDj => "The poll was superseded to lose by a DJ: ",
     };
 
-    out_upd!(
-        format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
-        i
-    );
+    // TODO: #44
+    //out_upd!(
+    //    format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
+    //    i
+    //);
+    todo!()
 }

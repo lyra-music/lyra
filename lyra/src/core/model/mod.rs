@@ -1,4 +1,6 @@
-mod interaction;
+mod ctx_head;
+mod followup;
+mod response;
 
 use std::{
     collections::HashMap,
@@ -24,9 +26,15 @@ use twilight_standby::Standby;
 
 use crate::{LavalinkAware, error::core::DeserialiseBodyFromHttpError, lavalink::Lavalink};
 
-pub use self::interaction::{
-    AcknowledgementAware, Client as InteractionClient, Interface as InteractionInterface,
-    MessageResponse, UnitFollowupResult, UnitRespondResult,
+pub use {
+    crate::core::http::Client as InteractionClient,
+    ctx_head::CtxHead,
+    followup::FollowupTrait as Followup,
+    response::{
+        Respond, RespondAppCommandModal, RespondAutocomplete, RespondComponent,
+        RespondComponentModal, RespondWithDefer, RespondWithDeferUpdate, RespondWithMessage,
+        RespondWithModal, RespondWithUpdate,
+    },
 };
 
 use super::r#static::application;
@@ -352,7 +360,7 @@ impl BotState {
     }
 
     pub fn interaction(&self) -> InteractionClient {
-        InteractionClient::new(self.http.interaction(application::id()))
+        InteractionClient::new(self.http.clone())
     }
 
     pub fn user(&self) -> CurrentUser {

@@ -18,7 +18,11 @@ use crate::{
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
-        model::{BotState, DatabaseAware, OwnedBotStateAware, UserIdAware, UserPermissionsAware},
+        model::{
+            BotState, DatabaseAware, HttpAware, OwnedBotStateAware, UserIdAware,
+            UserPermissionsAware,
+        },
+        r#static::application,
         traced,
     },
     error::{
@@ -831,7 +835,8 @@ async fn send_superseded_win_notice(
 ) -> Result<(), twilight_http::Error> {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
-    bot.interaction()
+    bot.http()
+        .interaction(application::id())
         .create_followup(&interaction_token)
         .flags(MessageFlags::EPHEMERAL)
         .content("🪄 The poll was superseded to win by a DJ.")

@@ -1,0 +1,131 @@
+mod create;
+mod update;
+
+use std::pin::Pin;
+
+use derive_builder::Builder;
+use twilight_model::{
+    channel::message::{AllowedMentions, Component, Embed, MessageFlags},
+    http::{
+        attachment::Attachment,
+        interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
+    },
+};
+
+use crate::error::{BuildError, ResponseBuilderError};
+
+use super::{EmptyResponse, Respond};
+
+pub use {create::RespondWithMessage, update::RespondWithUpdate};
+
+enum InteractionResponseType2 {
+    ChannelMessageWithSource,
+    UpdateMessage,
+}
+
+impl From<InteractionResponseType2> for InteractionResponseType {
+    fn from(value: InteractionResponseType2) -> Self {
+        match value {
+            InteractionResponseType2::ChannelMessageWithSource => {
+                InteractionResponseType::ChannelMessageWithSource
+            }
+            InteractionResponseType2::UpdateMessage => InteractionResponseType::UpdateMessage,
+        }
+    }
+}
+
+#[derive(Builder)]
+#[builder(
+    setter(into, strip_option),
+    pattern = "owned",
+    build_fn(error = "BuildError")
+)]
+pub struct Response<'a, T: Respond> {
+    #[builder(private)]
+    pub(crate) inner: &'a mut T,
+    #[builder(private)]
+    pub(crate) interaction_response_type: InteractionResponseType2,
+    /// Allowed mentions of the response.
+    #[builder(default)]
+    pub(crate) allowed_mentions: Option<AllowedMentions>,
+    /// List of attachments on the response.
+    #[builder(default)]
+    pub(crate) attachments: Option<Vec<Attachment>>,
+    /// List of components on the response.
+    #[builder(default)]
+    pub(crate) components: Option<Vec<Component>>,
+    /// Content of the response.
+    #[builder(default)]
+    pub(crate) content: Option<String>,
+    /// Embeds of the response.
+    #[builder(default)]
+    pub(crate) embeds: Option<Vec<Embed>>,
+    /// Interaction response data flags.
+    ///
+    /// The supported flags are [`MessageFlags::SUPPRESS_EMBEDS`] and
+    /// [`MessageFlags::EPHEMERAL`].
+    #[builder(default)]
+    pub(crate) flags: Option<MessageFlags>,
+    /// Whether the response is TTS.
+    #[builder(default)]
+    pub(crate) tts: Option<bool>,
+}
+
+impl<'a, T: Respond> From<Response<'a, T>>
+    for (&'a mut T, InteractionResponseType, InteractionResponseData)
+{
+    fn from(value: Response<'a, T>) -> Self {
+        (
+            value.inner,
+            value.interaction_response_type.into(),
+            InteractionResponseData {
+                allowed_mentions: value.allowed_mentions,
+                attachments: value.attachments,
+                components: value.components,
+                content: value.content,
+                embeds: value.embeds,
+                flags: value.flags,
+                tts: value.tts,
+                choices: None,
+                custom_id: None,
+                title: None,
+            },
+        )
+    }
+}
+
+impl<'a, T: Respond + Send> IntoFuture for ResponseBuilder<'a, T> {
+    type Output = Result<EmptyResponse, ResponseBuilderError>;
+
+    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'a>>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move {
+            match self.build() {
+                Err(e) => Err(e.into()),
+                Ok(resp) => {
+                    let (ctx, kind, data) = resp.into();
+                    let token = ctx.interaction_token();
+                    let client = ctx.interaction_client();
+
+                    let result = client
+                        .create_response(
+                            ctx.interaction_id(),
+                            &token,
+                            &InteractionResponse {
+                                kind,
+                                data: Some(data),
+                            },
+                        )
+                        .await
+                        .map_err(ResponseBuilderError::from);
+
+                    if result.is_ok() {
+                        ctx.acknowledge();
+                    }
+                    result
+                }
+            }
+        })
+    }
+}

@@ -7,17 +7,20 @@ mod modal;
 
 use std::{marker::PhantomData, sync::Arc};
 
+use modal::{ModalFromAppCmd, ModalFromComponent};
 use tokio::sync::oneshot;
 use twilight_cache_inmemory::{InMemoryCache, Reference, model::CachedMember};
 use twilight_gateway::{Latency, MessageSender};
-use twilight_http::Client as HttpClient;
+use twilight_http::{Client as HttpClient, client::InteractionClient};
 use twilight_model::{
     channel::Channel,
     gateway::payload::incoming::InteractionCreate,
     guild::{PartialMember, Permissions},
     id::{
         Id,
-        marker::{ChannelMarker, GuildMarker as TwilightGuildMarker, UserMarker},
+        marker::{
+            ChannelMarker, GuildMarker as TwilightGuildMarker, InteractionMarker, UserMarker,
+        },
     },
     user::User as TwilightUser,
 };
@@ -25,10 +28,13 @@ use twilight_model::{
 use crate::{
     LavalinkAware,
     command::{model::NonPingInteraction, require::CachedVoiceStateRef},
-    core::model::{
-        BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, InteractionInterface,
-        OwnedBotState, OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, UserAware,
-        UserPermissionsAware,
+    core::{
+        model::{
+            BotState, BotStateAware, CacheAware, DatabaseAware, HttpAware, OwnedBotState,
+            OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, Respond, UserAware,
+            UserPermissionsAware,
+        },
+        r#static::application,
     },
     error::{Cache, CacheResult, NotInGuild},
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
@@ -114,8 +120,11 @@ impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
     }
 }
 
-impl<T: Kind, U: Location> Ctx<T, U> {
-    pub fn into_modal_interaction(self, inner: Box<InteractionCreate>) -> Ctx<ModalMarker, U> {
+impl<U: Location> Ctx<ComponentMarker, U> {
+    pub fn into_modal_interaction(
+        self,
+        inner: Box<InteractionCreate>,
+    ) -> Ctx<ModalFromComponent, U> {
         Ctx {
             inner,
             bot: self.bot,
@@ -125,19 +134,30 @@ impl<T: Kind, U: Location> Ctx<T, U> {
             data: None,
             acknowledged: false,
             acknowledgement: None,
-            kind: PhantomData::<fn(ModalMarker) -> ModalMarker>,
+            kind: PhantomData::<fn(ModalFromComponent) -> ModalFromComponent>,
         }
     }
+}
 
+impl<A: AppCtxKind, U: Location> Ctx<AppCtxMarker<A>, U> {
+    pub fn into_modal_interaction(self, inner: Box<InteractionCreate>) -> Ctx<ModalFromAppCmd, U> {
+        Ctx {
+            inner,
+            bot: self.bot,
+            latency: self.latency,
+            sender: self.sender,
+            location: self.location,
+            data: None,
+            acknowledged: false,
+            acknowledgement: None,
+            kind: PhantomData::<fn(ModalFromAppCmd) -> ModalFromAppCmd>,
+        }
+    }
+}
+
+impl<T: Kind, U: Location> Ctx<T, U> {
     pub const fn latency(&self) -> &Latency {
         &self.latency
-    }
-
-    pub fn acknowledge(&mut self) {
-        self.acknowledged = true;
-        if let Some(tx) = std::mem::take(&mut self.acknowledgement) {
-            let _ = tx.send(());
-        }
     }
 
     #[inline]
@@ -151,10 +171,6 @@ impl<T: Kind, U: Location> Ctx<T, U> {
 
     pub fn interaction_token(&self) -> &str {
         &self.inner.token
-    }
-
-    pub fn interface(&self) -> InteractionInterface {
-        self.bot.interaction().interfaces(&self.inner)
     }
 
     pub fn guild_id_expected(&self) -> Id<TwilightGuildMarker> {
@@ -226,6 +242,28 @@ impl<T: Kind> Ctx<T, GuildMarker> {
     pub fn current_voice_state(&self) -> Option<CachedVoiceStateRef> {
         let user = self.bot().user_id();
         self.cache().voice_state(user, self.guild_id())
+    }
+}
+
+impl<T: Kind, U: Location> Respond for Ctx<T, U> {
+    fn is_acknowledged(&self) -> bool {
+        self.acknowledged
+    }
+
+    fn acknowledge(&mut self) {
+        self.acknowledged = true;
+    }
+
+    fn interaction_id(&self) -> Id<InteractionMarker> {
+        self.inner.id
+    }
+
+    fn interaction_token(&self) -> &str {
+        &self.inner.token
+    }
+
+    fn interaction_client<'a>(&'a self) -> InteractionClient<'a> {
+        self.http().interaction(application::id())
     }
 }
 

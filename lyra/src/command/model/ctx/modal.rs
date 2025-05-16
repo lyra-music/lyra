@@ -1,23 +1,37 @@
-use twilight_model::{
-    application::interaction::{InteractionData, modal::ModalInteractionData},
-    channel::message::Component,
+use std::marker::PhantomData;
+
+use twilight_model::application::interaction::{InteractionData, modal::ModalInteractionData};
+
+use crate::core::model::{
+    Followup, RespondAppCommandModal, RespondComponentModal, RespondWithDefer,
+    RespondWithDeferUpdate, RespondWithModal, RespondWithUpdate,
 };
 
-use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location, UnitRespondResult,
-};
+use super::{AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location};
 
-pub struct Marker;
-impl Kind for Marker {}
+pub trait ModalSrcMarker {}
+
+pub struct AppCmdSrcMarker;
+impl ModalSrcMarker for AppCmdSrcMarker {}
+pub struct ComponentSrcMarker;
+impl ModalSrcMarker for ComponentSrcMarker {}
+
+pub struct Marker<T: ModalSrcMarker>(PhantomData<fn(T) -> T>);
+pub type ModalFromAppCmd = Marker<AppCmdSrcMarker>;
+pub type ModalFromComponent = Marker<ComponentSrcMarker>;
+
+impl<T: ModalSrcMarker> Kind for Marker<T> {}
 #[allow(unused)]
-pub type Modal = Ctx<Marker>;
-pub type Guild = Ctx<Marker, GuildMarker>;
+pub type Modal = Ctx<ModalFromAppCmd>;
+pub type Guild = Ctx<ModalFromComponent, GuildMarker>;
 
 pub trait RespondVia: Kind {}
 impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
 impl RespondVia for ComponentMarker {}
 
-impl<U: Location> Ctx<Marker, U> {
+impl<T: RespondVia, U: Location> RespondWithModal for Ctx<T, U> {}
+
+impl<U: Location, S: ModalSrcMarker> Ctx<Marker<S>, U> {
     pub fn submit_data(&self) -> &ModalInteractionData {
         let Some(InteractionData::ModalSubmit(ref data)) = self.inner.data else {
             unreachable!()
@@ -26,15 +40,11 @@ impl<U: Location> Ctx<Marker, U> {
     }
 }
 
-impl<T: RespondVia, U: Location> Ctx<T, U> {
-    pub async fn modal(
-        &mut self,
-        custom_id: impl Into<String> + Send,
-        title: impl Into<String> + Send,
-        text_inputs: impl IntoIterator<Item = impl Into<Component>> + Send,
-    ) -> UnitRespondResult {
-        let response = self.interface().modal(custom_id, title, text_inputs).await;
-        self.acknowledge();
-        response
-    }
-}
+impl<U: Location, M: ModalSrcMarker> Followup for Ctx<Marker<M>, U> {}
+impl<U: Location, M: ModalSrcMarker> RespondWithDefer for Ctx<Marker<M>, U> {}
+
+impl<U: Location> RespondAppCommandModal for Ctx<ModalFromAppCmd, U> {}
+
+impl<U: Location> RespondWithDeferUpdate for Ctx<ModalFromComponent, U> {}
+impl<U: Location> RespondWithUpdate for Ctx<ModalFromComponent, U> {}
+impl<U: Location> RespondComponentModal for Ctx<ModalFromComponent, U> {}

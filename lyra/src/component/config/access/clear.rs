@@ -4,13 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use super::AccessCategory;
 use crate::{
-    command::{
-        SlashCtx, check,
-        macros::{note, out, sus},
-        model::BotSlashCommand,
-        require,
-        util::prompt_for_confirmation,
-    },
+    command::{SlashCtx, check, model::BotSlashCommand, require, util::prompt_for_confirmation},
     component::config::access::AccessCategoryFlags,
     core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
     error::CommandResult,

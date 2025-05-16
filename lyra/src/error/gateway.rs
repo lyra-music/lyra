@@ -1,11 +1,10 @@
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error(transparent)]
 pub enum ProcessError {
     SetGlobalCommands(#[from] super::core::SetGlobalCommandsError),
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
     Http(#[from] twilight_http::Error),
+    ResponseBuilder(#[from] super::ResponseBuilderError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Sqlx(#[from] sqlx::Error),
     CoreFollowup(#[from] super::core::FollowupError),

@@ -1586,6 +1586,7 @@ dependencies = [
  "color-eyre",
  "const-str",
  "const_panic",
+ "derive_builder",
  "dotenvy",
  "dotenvy_macro",
  "futures",
