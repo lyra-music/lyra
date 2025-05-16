@@ -31,10 +31,8 @@ enum InteractionResponseType2 {
 impl From<InteractionResponseType2> for InteractionResponseType {
     fn from(value: InteractionResponseType2) -> Self {
         match value {
-            InteractionResponseType2::ChannelMessageWithSource => {
-                InteractionResponseType::ChannelMessageWithSource
-            }
-            InteractionResponseType2::UpdateMessage => InteractionResponseType::UpdateMessage,
+            InteractionResponseType2::ChannelMessageWithSource => Self::ChannelMessageWithSource,
+            InteractionResponseType2::UpdateMessage => Self::UpdateMessage,
         }
     }
 }
@@ -47,9 +45,9 @@ impl From<InteractionResponseType2> for InteractionResponseType {
 )]
 pub struct Response<'a, T: Respond> {
     #[builder(private)]
-    pub(crate) inner: &'a mut T,
+    pub(in crate::core::model::response) inner: &'a mut T,
     #[builder(private)]
-    pub(crate) interaction_response_type: InteractionResponseType2,
+    interaction_response_type: InteractionResponseType2,
     /// Allowed mentions of the response.
     #[builder(default)]
     pub(crate) allowed_mentions: Option<AllowedMentions>,
@@ -101,6 +99,7 @@ impl<'a, T: Respond> From<Response<'a, T>>
 
 pub struct InitialResponseProxy<'a, T: Respond> {
     ctx: &'a T,
+    #[expect(unused)]
     response: EmptyResponse,
 }
 
@@ -108,13 +107,15 @@ impl<'a, T: Respond> InitialResponseProxy<'a, T> {
     pub(in crate::core::model::response) const fn new(ctx: &'a T, response: EmptyResponse) -> Self {
         Self { ctx, response }
     }
+}
 
+impl<T: Respond + Sync> InitialResponseProxy<'_, T> {
     pub async fn retrieve_response(
         self,
     ) -> Result<twilight_http::Response<Message>, twilight_http::Error> {
         self.ctx
             .interaction_client()
-            .response(&self.ctx.interaction_token())
+            .response(self.ctx.interaction_token())
             .await
     }
 
@@ -140,7 +141,7 @@ impl<'a, T: Respond + Send> IntoFuture for ResponseBuilder<'a, T> {
                     let result = client
                         .create_response(
                             ctx.interaction_id(),
-                            &token,
+                            token,
                             &InteractionResponse {
                                 kind,
                                 data: Some(data),

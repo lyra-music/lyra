@@ -309,15 +309,13 @@ async fn impl_remove(
         .await?;
     drop(data_w);
 
-    ctx.out(format!("{} Removed {}.", minus, removed_text))
-        .await?;
+    ctx.out(format!("{minus} Removed {removed_text}.")).await?;
 
     if queue_cleared {
         let clear = InteractionClient::mention_command::<Clear>();
 
         ctx.note_f(format!(
-            "For clearing the entire queue, use {} instead.",
-            clear
+            "For clearing the entire queue, use {clear} instead.",
         ))
         .await?;
     }

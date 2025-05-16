@@ -17,59 +17,64 @@ use super::{
     initial::message::{InitialResponseProxy, ResponseBuilder, create::RespondWithMessage},
 };
 
-struct EitherResponse<'a, T: Respond> {
+pub struct EitherResponse<'a, T: Respond> {
     inner: ResponseBuilder<'a, T>,
     is_followup: bool,
 }
 
-impl<'a, T: Respond + Send> EitherResponse<'a, T> {
-    fn new(inner: ResponseBuilder<'a, T>, is_followup: bool) -> Self {
+impl<'a, T: Respond> EitherResponse<'a, T> {
+    const fn new(inner: ResponseBuilder<'a, T>, is_followup: bool) -> Self {
         Self { inner, is_followup }
     }
 
-    fn flags(self, flags: impl Into<MessageFlags>) -> Self {
+    pub fn flags(self, flags: impl Into<MessageFlags>) -> Self {
         Self {
             inner: self.inner.flags(flags),
             ..self
         }
     }
 
-    fn content(self, content: impl Into<String>) -> Self {
+    pub fn content(self, content: impl Into<String>) -> Self {
         Self {
             inner: self.inner.content(content),
             ..self
         }
     }
 
-    fn embeds(self, embeds: impl Into<Vec<Embed>>) -> Self {
+    #[expect(unused)]
+    pub fn embeds(self, embeds: impl Into<Vec<Embed>>) -> Self {
         Self {
             inner: self.inner.embeds(embeds),
             ..self
         }
     }
 
-    fn components(self, components: impl Into<Vec<Component>>) -> Self {
+    #[expect(unused)]
+    pub fn components(self, components: impl Into<Vec<Component>>) -> Self {
         Self {
             inner: self.inner.components(components),
             ..self
         }
     }
 
-    fn attachments(self, attachments: impl Into<Vec<Attachment>>) -> Self {
+    #[expect(unused)]
+    pub fn attachments(self, attachments: impl Into<Vec<Attachment>>) -> Self {
         Self {
             inner: self.inner.attachments(attachments),
             ..self
         }
     }
 
-    fn allowed_mentions(self, mentions: impl Into<AllowedMentions>) -> Self {
+    #[expect(unused)]
+    pub fn allowed_mentions(self, mentions: impl Into<AllowedMentions>) -> Self {
         Self {
             inner: self.inner.allowed_mentions(mentions),
             ..self
         }
     }
 
-    fn tts(self, tts: bool) -> Self {
+    #[expect(unused)]
+    pub fn tts(self, tts: bool) -> Self {
         Self {
             inner: self.inner.tts(tts),
             ..self
@@ -82,16 +87,12 @@ enum InteractionResponse {
     Followup(Response<Message>),
 }
 
-struct ResponseProxy<'a, T: Respond> {
+pub struct ResponseProxy<'a, T: Respond> {
     ctx: &'a T,
     response: InteractionResponse,
 }
 
-impl<'a, T: Respond> ResponseProxy<'a, T> {
-    pub const fn response(&self) -> &InteractionResponse {
-        &self.response
-    }
-
+impl<T: Respond + Sync> ResponseProxy<'_, T> {
     pub async fn retrieve_message(self) -> Result<Message, DeserialiseBodyFromHttpError> {
         match self.response {
             InteractionResponse::Followup(resp) => Ok(resp.model().await?),
@@ -151,7 +152,7 @@ impl<'a, T: Respond + Send + Sync> IntoFuture for EitherResponse<'a, T> {
                 let result = client
                     .create_response(
                         ctx.interaction_id(),
-                        &token,
+                        token,
                         &twilight_model::http::interaction::InteractionResponse {
                             kind,
                             data: Some(data),
@@ -175,9 +176,10 @@ macro_rules! generate_hid_variants {
         $(
             ::paste::paste! {
                 #[inline]
+                #[allow(unused)]
                 fn [<$name _f>](&mut self, content: impl ::std::convert::Into<::std::string::String>) -> EitherResponse<'_, Self>
                 where
-                    Self: ::std::marker::Sized + ::std::marker::Send + $crate::core::model::response::initial::message::create::RespondWithMessage,
+                    Self: ::std::marker::Sized + ::std::marker::Send,
                 {
                     self.hid_f(format!("{} {}", $crate::core::r#const::exit_code::$emoji, content.into()))
                 }
@@ -189,25 +191,22 @@ macro_rules! generate_hid_variants {
 pub trait RespondOrFollowup: Respond + RespondWithMessage + Followup {
     fn respond_or_followup(&mut self) -> EitherResponse<'_, Self>
     where
-        Self: Sized + RespondWithMessage,
+        Self: Sized + Send,
     {
         let is_followup = self.is_acknowledged();
-        EitherResponse {
-            is_followup,
-            inner: self.respond(),
-        }
+        EitherResponse::new(self.respond(), is_followup)
     }
     #[inline]
     fn out_f(&mut self, content: impl Into<String>) -> EitherResponse<'_, Self>
     where
-        Self: Sized + RespondWithMessage + Send,
+        Self: Sized + Send,
     {
         self.respond_or_followup().content(content)
     }
     #[inline]
     fn hid_f(&mut self, content: impl Into<String>) -> EitherResponse<'_, Self>
     where
-        Self: Sized + RespondWithMessage + Send,
+        Self: Sized + Send,
     {
         self.respond_or_followup()
             .flags(MessageFlags::EPHEMERAL)

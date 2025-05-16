@@ -37,12 +37,15 @@ pub struct UpdateFollowup<'a, T: Respond> {
     attachments: Option<Vec<Attachment>>,
     /// List of components on the response.
     #[builder(default)]
+    #[expect(clippy::option_option)]
     components: Option<Option<Vec<Component>>>,
     /// Content of the response.
     #[builder(default)]
+    #[expect(clippy::option_option)]
     content: Option<Option<String>>,
     /// Embeds of the response.
     #[builder(default)]
+    #[expect(clippy::option_option)]
     embeds: Option<Option<Vec<Embed>>>,
     /// Specify multiple [`Id<AttachmentMarker>`]s already present in the target
     /// message to keep.
@@ -86,13 +89,13 @@ impl<'a, T: Respond + Send + Sync> IntoFuture for UpdateFollowupBuilder<'a, T> {
                 u = u.components(components.as_deref());
             }
             if let Some(ref attachments) = resp.attachments {
-                u = u.attachments(&attachments);
+                u = u.attachments(attachments);
             }
             if let Some(ref allowed_mentions) = resp.allowed_mentions {
                 u = u.allowed_mentions(Some(allowed_mentions)); // None is ignored
             }
             if let Some(ref attachment_ids) = resp.keep_attachment_ids {
-                u = u.keep_attachment_ids(&attachment_ids);
+                u = u.keep_attachment_ids(attachment_ids);
             }
 
             Ok(u.await?)

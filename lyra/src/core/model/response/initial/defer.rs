@@ -16,6 +16,7 @@ pub trait RespondWithDefer: Respond {
         self.raw_defer(false).await
     }
     #[inline]
+    #[expect(unused)]
     async fn defer_ephemeral(&mut self) -> EmptyResponseResult {
         self.raw_defer(true).await
     }

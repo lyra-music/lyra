@@ -55,8 +55,6 @@ pub use self::{
     modal::Guild as GuildModal,
 };
 
-type RespondResult<T> = Result<T, twilight_http::Error>;
-type UnitRespondResult = RespondResult<()>;
 type CachedBotMember<'a> = Reference<'a, (Id<TwilightGuildMarker>, Id<UserMarker>), CachedMember>;
 
 pub trait Kind {}
@@ -124,6 +122,7 @@ impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
 }
 
 impl<U: Location> Ctx<ComponentMarker, U> {
+    #[allow(unused)]
     pub fn into_modal_interaction(
         self,
         inner: Box<InteractionCreate>,
@@ -265,7 +264,7 @@ impl<T: Kind, U: Location> Respond for Ctx<T, U> {
         &self.inner.token
     }
 
-    fn interaction_client<'a>(&'a self) -> InteractionClient<'a> {
+    fn interaction_client(&self) -> InteractionClient<'_> {
         self.http().interaction(application::id())
     }
 }

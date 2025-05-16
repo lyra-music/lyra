@@ -15,6 +15,7 @@ macro_rules! generate_hid_variants {
         $(
             ::paste::paste! {
                 #[inline]
+                #[allow(unused)]
                 fn [<$name f>](&self, content: impl ::std::convert::Into<::std::string::String>) -> FollowupBuilder<'_, Self>
                 where
                     Self: ::std::marker::Sized,
@@ -34,6 +35,7 @@ pub trait Followup: Respond {
         FollowupBuilder::new(self)
     }
     #[inline]
+    #[expect(unused)]
     fn outf(&self, content: impl Into<String>) -> FollowupBuilder<'_, Self>
     where
         Self: Sized,
@@ -62,12 +64,13 @@ pub trait Followup: Respond {
     }
 
     #[inline]
+    #[expect(unused)]
     async fn delete_followup(
         &self,
         message_id: impl Into<Id<MessageMarker>>,
     ) -> EmptyResponseResult {
         self.interaction_client()
-            .delete_followup(&self.interaction_token(), message_id.into())
+            .delete_followup(self.interaction_token(), message_id.into())
             .await
     }
 

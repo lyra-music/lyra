@@ -9,11 +9,8 @@ use crate::{
     core::{
         model::{
             OwnedBotState,
-            response::{
-                RespondComponent,
-                initial::{
-                    defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
-                },
+            response::initial::{
+                defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
             },
         },
         r#static::component::NowPlayingButtonType,
@@ -65,4 +62,3 @@ impl<U: Location> Ctx<ComponentMarker, U> {
 
 impl<U: Location> RespondWithDeferUpdate for Ctx<ComponentMarker, U> {}
 impl<U: Location> RespondWithUpdate for Ctx<ComponentMarker, U> {}
-impl<U: Location> RespondComponent for Ctx<ComponentMarker, U> {}

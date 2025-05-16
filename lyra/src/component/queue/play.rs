@@ -330,16 +330,15 @@ async fn play(
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    ctx.unkn_f(format!("Failed to load tracks for query: `{}`.", query))
+                    ctx.unkn_f(format!("Failed to load tracks for query: `{query}`."))
                         .await?;
                     Ok(())
                 }
                 QueryError::SearchResult(query) | QueryError::NoMatches(query) => {
                     ctx.wrng_f(
                         format!(
-                            "**Given query is not a URL: `{}`**; Use the command's autocomplete to search for tracks instead. \n\
+                            "**Given query is not a URL: `{query}`**; Use the command's autocomplete to search for tracks instead. \n\
                             -# If the autocomplete results are empty, try using a different search query.",
-                            query
                         ),
                     ).await?;
                     Ok(())
@@ -429,8 +428,7 @@ async fn handle_load_track_results(
         .queue_mut()
         .enqueue(total_tracks, ctx.user_id());
     player.play(first_track.inner()).await?;
-    ctx.out_f(format!("{} Added {}.", plus, enqueued_text))
-        .await?;
+    ctx.out_f(format!("{plus} Added {enqueued_text}.")).await?;
     Ok(())
 }
 

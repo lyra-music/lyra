@@ -636,12 +636,12 @@ async fn wait_for_votes(
                 }
                 PollAction::DjUpvote(inter) => {
                     let mut i = ctx.bot().interaction().ctx(&inter);
-                    i.hid(format!("🪄 Superseded this poll to win.")).await?;
+                    i.hid("🪄 Superseded this poll to win.").await?;
                     return Ok(Resolution::SupersededWinViaDj);
                 }
                 PollAction::DjDownvote(inter) => {
                     let mut i = ctx.bot().interaction().ctx(&inter);
-                    i.hid(format!("🪄 Superseded this poll to lose.")).await?;
+                    i.hid("🪄 Superseded this poll to lose.").await?;
                     return Ok(Resolution::SupersededLossViaDj);
                 }
                 PollAction::AlternateDjCast => return Ok(Resolution::SupersededWinViaDj),

@@ -1,10 +1,3 @@
-use followup::Followup;
-use initial::{
-    defer::RespondWithDefer,
-    defer_update::RespondWithDeferUpdate,
-    message::{create::RespondWithMessage, update::RespondWithUpdate},
-    modal::RespondWithModal,
-};
 use twilight_http::{Response, client::InteractionClient, response::marker::EmptyBody};
 use twilight_model::{
     channel::message::AllowedMentions,
@@ -31,6 +24,7 @@ pub trait Respond {
         InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
     }
 
+    #[expect(async_fn_in_trait)]
     async fn raw_respond_and_acknowledge(
         &mut self,
         kind: InteractionResponseType,
@@ -40,7 +34,7 @@ pub trait Respond {
             .interaction_client()
             .create_response(
                 self.interaction_id(),
-                &self.interaction_token(),
+                self.interaction_token(),
                 &InteractionResponse { kind, data },
             )
             .await;
@@ -50,6 +44,7 @@ pub trait Respond {
         resp
     }
     #[inline]
+    #[expect(async_fn_in_trait)]
     async fn respond_and_acknowledge(
         &mut self,
         kind: InteractionResponseType,
@@ -58,29 +53,8 @@ pub trait Respond {
         self.raw_respond_and_acknowledge(kind, Some(data)).await
     }
     #[inline]
+    #[expect(async_fn_in_trait)]
     async fn empty_acknowledge(&mut self, kind: InteractionResponseType) -> EmptyResponseResult {
         self.raw_respond_and_acknowledge(kind, None).await
     }
-}
-
-pub trait RespondComponent:
-    RespondWithModal
-    + RespondWithDeferUpdate
-    + RespondWithDefer
-    + RespondWithMessage
-    + RespondWithUpdate
-    + Followup
-{
-}
-
-pub trait RespondAppCommandModal: RespondWithMessage + RespondWithDefer + Followup {}
-
-pub trait RespondComponentModal:
-    RespondWithMessage + RespondWithDefer + RespondWithDeferUpdate + RespondWithUpdate + Followup
-{
-}
-
-pub trait RespondAppCommand:
-    RespondWithModal + RespondWithDefer + RespondWithMessage + Followup
-{
 }

@@ -6,7 +6,7 @@ use twilight_model::id::{Id, marker::InteractionMarker};
 use crate::core::r#static::application;
 
 use super::response::{
-    Respond, RespondAppCommand,
+    Respond,
     followup::Followup,
     initial::{
         defer::RespondWithDefer,
@@ -67,6 +67,5 @@ impl Followup for CtxHead {}
 impl RespondWithMessage for CtxHead {}
 impl RespondWithDefer for CtxHead {}
 impl RespondWithModal for CtxHead {}
-impl RespondAppCommand for CtxHead {}
 
 impl RespondWithUpdate for CtxHead {}

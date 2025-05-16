@@ -46,9 +46,8 @@ impl BotSlashCommand for To {
         } else {
             ctx.wrng(
                 format!(
-                    "**Invalid timestamp: `{}`**; \
+                    "**Invalid timestamp: `{timestamp_unchecked}`**; \
                     Timestamp must either be in the format like `1m23s` or `4:56`, or as the total seconds like `78s`.",
-                    timestamp_unchecked,
                 ),
             ).await?;
             return Ok(());

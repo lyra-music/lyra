@@ -45,12 +45,14 @@ impl BotSlashCommand for Bump {
             return Ok(());
         };
         let channel_id = ctx.channel_id();
-        let channel_messages = ctx.cache().channel_messages(channel_id);
-        if channel_messages.is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id)) {
+        if ctx
+            .cache()
+            .channel_messages(channel_id)
+            .is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id))
+        {
             ctx.note(
                 "The now-playing track message is already at the bottom of the current text channel.",
             ).await?;
-            Ok(())
         } else {
             ctx.out("🔽 Bumped the now-playing track message.").await?;
             let lava_data = ctx.lavalink().data();
@@ -65,8 +67,7 @@ impl BotSlashCommand for Bump {
                 .new_now_playing_message_in(http, msg_data, channel_id)
                 .await?;
             drop(data_w);
-
-            Ok(())
         }
+        Ok(())
     }
 }

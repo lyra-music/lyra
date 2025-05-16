@@ -145,7 +145,7 @@ impl Context {
         };
 
         if rx.try_recv().is_ok() {
-            i.acknowledge()
+            i.acknowledge();
         }
         match source.flatten_until_user_not_allowed_as() {
             Fuunacee::UserNotAllowed => {
@@ -308,7 +308,7 @@ async fn match_error(
         Fe::Lavalink(e) => {
             if let LavalinkError::TrackError(e) = e {
                 i.hid_f(format!("💔 Error loading this track: {}", e.message))
-                    .await;
+                    .await?;
                 Ok(())
             } else {
                 i.erro_f(format!(
@@ -351,8 +351,7 @@ async fn match_error(
             let join = InteractionClient::mention_command::<Join>();
             let play = InteractionClient::mention_command::<Play>();
             i.warn(format!(
-                "Not currently connected to a voice channel. Use {} or {} first.",
-                join, play
+                "Not currently connected to a voice channel. Use {join} or {play} first.",
             ))
             .await?;
             Ok(())
@@ -391,7 +390,7 @@ async fn match_error(
         }
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
-        Fe::PollVoided(e) => {
+        Fe::PollVoided(_e) => {
             //: TODO #44 {{{
 
             //out_upd!(
@@ -401,7 +400,6 @@ async fn match_error(
             //    ),
             //    i
             //);
-            drop(e);
             todo!()
             //: }}}
         }
@@ -411,7 +409,7 @@ async fn match_error(
         }
         Fe::NoPlayer => {
             let play = InteractionClient::mention_command::<Play>();
-            i.warn(format!("Not yet played anything. Use {} first.", play))
+            i.warn(format!("Not yet played anything. Use {play} first."))
                 .await?;
             Ok(())
         }
@@ -442,7 +440,7 @@ async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitRespon
             i.wrng_f("Not currently a speaker in this stage channel.")
                 .await?;
         }
-    };
+    }
     Ok(())
 }
 
@@ -453,7 +451,7 @@ async fn match_autojoin_suppressed(
     match error {
         AutoJoinSuppressedError::Muted => {
             i.suspf("Can't use this command as is currently server muted.")
-                .await;
+                .await?;
         }
         AutoJoinSuppressedError::StillNotSpeaker { last_followup_id } => {
             i.update_followup(*last_followup_id)
@@ -475,8 +473,7 @@ async fn match_autojoin_attempt_failed(
         AutoJoinAttemptFailedError::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
             i.wrng_f(format!(
-                "Please join a voice channel, or use {} to connect to a channel.",
-                join
+                "Please join a voice channel, or use {join} to connect to a channel.",
             ))
             .await?;
         }
@@ -503,7 +500,7 @@ async fn match_autojoin_attempt_failed(
             )
             .await?;
         }
-    };
+    }
     Ok(())
 }
 
@@ -574,15 +571,15 @@ async fn match_another_poll_ongoing(
             ))
             .await?;
         }
-    };
+    }
     Ok(())
 }
 
+#[allow(clippy::unused_async)]
 async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitRespondResult {
-    let PollLossError { source, kind } = error;
+    let PollLossError { source: _, kind } = error;
 
-    #[allow(unused)]
-    let source_txt = match kind {
+    let _source_txt = match kind {
         PollLossErrorKind::UnanimousLoss => "",
         PollLossErrorKind::TimedOut => "Poll timed out: ",
         PollLossErrorKind::SupersededLossViaDj => "The poll was superseded to lose by a DJ: ",
@@ -593,6 +590,5 @@ async fn match_poll_loss(error: &PollLossError, _: CtxHead) -> UnitRespondResult
     //    format!("{PROHIBITED} {source_txt}{}", source.pretty_display()),
     //    i
     //);
-    drop(source);
     todo!()
 }

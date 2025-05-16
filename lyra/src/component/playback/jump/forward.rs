@@ -40,8 +40,7 @@ impl BotSlashCommand for Forward {
                 return Ok(());
             }
             ctx.wrng(format!(
-                "**Cannot jump past the end of the queue**; Maximum forward jump is `{} tracks`.",
-                maximum_jump,
+                "**Cannot jump past the end of the queue**; Maximum forward jump is `{maximum_jump} tracks`.",
             ))
             .await?;
             return Ok(());

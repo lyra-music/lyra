@@ -293,7 +293,7 @@ async fn handle_suppressed_auto_join(
             let duration = unix_time() + r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT;
             let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
             let requested_to_speak = ctx
-                .notef(&format!(
+                .notef(format!(
                     "Requested to speak. **Accept the request in {} to continue.**",
                     timestamp.mention()
                 ))

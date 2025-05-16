@@ -107,7 +107,7 @@ impl BotSlashCommand for On {
         };
 
         player.update_filter(Some(update)).await?;
-        ctx.out(format!("🍭🟢 Enabled distortion.")).await?;
+        ctx.out("🍭🟢 Enabled distortion.").await?;
         Ok(())
     }
 }

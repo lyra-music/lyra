@@ -37,8 +37,7 @@ impl BotSlashCommand for Backward {
             }
             ctx.wrng(
                 format!(
-                    "**Cannot jump past the start of the queue**; Maximum backward jump is `{} tracks`.",
-                    queue_index,
+                    "**Cannot jump past the start of the queue**; Maximum backward jump is `{queue_index} tracks`.",
                 ),
             ).await?;
             return Ok(());

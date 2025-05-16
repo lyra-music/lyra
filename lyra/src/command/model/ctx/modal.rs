@@ -2,12 +2,9 @@ use std::marker::PhantomData;
 
 use twilight_model::application::interaction::{InteractionData, modal::ModalInteractionData};
 
-use crate::core::model::response::{
-    RespondAppCommandModal, RespondComponentModal,
-    initial::{
-        defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
-        modal::RespondWithModal,
-    },
+use crate::core::model::response::initial::{
+    defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
+    modal::RespondWithModal,
 };
 
 use super::{AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location};
@@ -43,8 +40,5 @@ impl<U: Location, S: ModalSrcMarker> Ctx<Marker<S>, U> {
     }
 }
 
-impl<U: Location> RespondAppCommandModal for Ctx<ModalFromAppCmd, U> {}
-
 impl<U: Location> RespondWithDeferUpdate for Ctx<ModalFromComponent, U> {}
 impl<U: Location> RespondWithUpdate for Ctx<ModalFromComponent, U> {}
-impl<U: Location> RespondComponentModal for Ctx<ModalFromComponent, U> {}
