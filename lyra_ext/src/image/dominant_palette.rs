@@ -45,11 +45,9 @@ impl Get for DynamicImage {
 
         let mut res = Lab::sort_indexed_colors(&result.centroids, &result.indices);
         res.sort_unstable_by(|a, b| (b.percentage).total_cmp(&a.percentage));
-        let rgb = res
-            .par_iter()
+        res.par_iter()
             .map(|x| Srgb::from_color(x.centroid).into_format())
-            .collect::<Vec<_>>();
-        rgb
+            .collect::<Vec<_>>()
     }
 }
 

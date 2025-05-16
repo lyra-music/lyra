@@ -26,32 +26,55 @@ pub enum Error {
     UserNotDj(#[from] super::UserNotDj),
     RequireInVoiceWithSomeoneElse(#[from] require::InVoiceWithSomeoneElseError),
     PositionOutOfRange(#[from] super::PositionOutOfRange),
-    CheckRun(#[from] check::RunError),
-    Followup(#[from] FollowupError),
-    PromptForConfirmation(#[from] util::PromptForConfirmationError),
-    Join(#[from] super::component::connection::join::ResidualError),
     Leave(#[from] super::component::connection::leave::ResidualError),
-    Play(#[from] super::component::queue::play::Error),
-    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-    RemoveTracks(#[from] super::component::queue::RemoveTracksError),
-    TwilightHttp(#[from] twilight_http::Error),
-    Lavalink(#[from] lavalink_rs::error::LavalinkError),
     NoPlayer(#[from] super::lavalink::NoPlayerError),
     NotInGuild(#[from] super::NotInGuild),
     CheckUserOnlyIn(#[from] check::UserOnlyInError),
     Cache(#[from] super::Cache),
-    HandlePoll(#[from] check::HandlePollError),
     NotPlaying(#[from] super::NotPlaying),
     Paused(#[from] super::Paused),
     UnrecognisedConnection(#[from] super::UnrecognisedConnection),
-    PlayPause(#[from] super::component::playback::PlayPauseError),
-    Repeat(#[from] super::component::queue::RepeatError),
-    UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
-    SeekToWith(#[from] require::SeekToWithError),
     NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
-    NewNowPlayingMessage(#[from] super::lavalink::NewNowPlayingMessageError),
-    Respond(#[from] super::core::RespondError),
+    Lavalink(#[from] lavalink_rs::error::LavalinkError),
+
+    Play(Box<super::component::queue::play::Error>),
+    RemoveTracks(Box<super::component::queue::RemoveTracksError>),
+    PromptForConfirmation(Box<util::PromptForConfirmationError>),
+    TwilightHttp(Box<twilight_http::Error>),
+    Join(Box<super::component::connection::join::ResidualError>),
+    PlayPause(Box<super::component::playback::PlayPauseError>),
+    Repeat(Box<super::component::queue::RepeatError>),
+    UpdateNowPlayingMessage(Box<super::lavalink::UpdateNowPlayingMessageError>),
+    SeekToWith(Box<require::SeekToWithError>),
+    NewNowPlayingMessage(Box<super::lavalink::NewNowPlayingMessageError>),
+    Respond(Box<super::core::RespondError>),
 }
+
+macro_rules! declare_from_box_impls {
+    ($($variant: ident => $error: path),+$(,)?) => {
+        $(
+            impl ::std::convert::From<$error> for Error {
+                fn from(value: $error) -> Self {
+                    Self::$variant(Box::new(value))
+                }
+            }
+        )+
+    }
+}
+
+declare_from_box_impls!(
+    Play => super::component::queue::play::Error,
+    RemoveTracks => super::component::queue::RemoveTracksError,
+    PromptForConfirmation => util::PromptForConfirmationError,
+    TwilightHttp => twilight_http::Error,
+    Join => super::component::connection::join::ResidualError,
+    PlayPause => super::component::playback::PlayPauseError,
+    Repeat => super::component::queue::RepeatError,
+    UpdateNowPlayingMessage => super::lavalink::UpdateNowPlayingMessageError,
+    SeekToWith => require::SeekToWithError,
+    NewNowPlayingMessage => super::lavalink::NewNowPlayingMessageError,
+    Respond => super::core::RespondError,
+);
 
 pub enum FlattenedError<'a> {
     InVoiceWithoutUser(&'a super::InVoiceWithoutUser),
@@ -98,13 +121,6 @@ pub enum FlattenedError<'a> {
 pub use FlattenedError as Fe;
 
 impl<'a> Fe<'a> {
-    const fn from_core_followup_error(error: &'a super::core::FollowupError) -> Self {
-        match error {
-            super::core::FollowupError::TwilightHttp(_) => Self::TwilightHttp,
-            super::core::FollowupError::MessageValidation(_) => Self::MessageValidation,
-        }
-    }
-
     const fn from_require_unsuppressed_error(error: &'a require::UnsuppressedError) -> Self {
         match error {
             require::UnsuppressedError::Cache(_) => Self::Cache,
@@ -139,108 +155,10 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_run(error: &'a check::RunError) -> Self {
-        match error {
-            check::RunError::NotInVoice(_) => Self::NotInVoice,
-            check::RunError::QueueEmpty(_) => Self::QueueEmpty,
-            check::RunError::NotPlaying(_) => Self::NotPlaying,
-            check::RunError::Cache(_) => Self::Cache,
-            check::RunError::Paused(_) => Self::Paused,
-            check::RunError::Stopped(_) => Self::Stopped,
-            check::RunError::InVoiceWithoutUser(e) => Self::InVoiceWithoutUser(e),
-            check::RunError::NotSuppressed(e) => Self::from_require_unsuppressed_error(e),
-            check::RunError::HandleInVoiceWithSomeoneElse(e) => {
-                Self::from_handle_in_voice_with_someone_else_error(e)
-            }
-        }
-    }
-
-    const fn from_vote_resolvable(error: &'a check::PollResolvableError) -> Self {
-        match error {
-            check::PollResolvableError::InVoiceWithSomeoneElse(e) => {
-                Self::InVoiceWithSomeoneElse(e)
-            }
-            check::PollResolvableError::QueueNotSeekable(e) => Self::QueueNotSeekable(e),
-            check::PollResolvableError::NotUsersTrack(e) => Self::NotUsersTrack(e),
-        }
-    }
-
-    const fn from_update_embed(error: &'a poll::UpdateEmbedError) -> Self {
-        match error {
-            poll::UpdateEmbedError::Http(_) => Self::TwilightHttp,
-            poll::UpdateEmbedError::EmbedValidation(_) => Self::EmbedValidation,
-            poll::UpdateEmbedError::MessageValidation(_) => Self::MessageValidation,
-            poll::UpdateEmbedError::Followup(e) => Self::from_core_followup_error(e),
-            poll::UpdateEmbedError::Respond(e) => Self::from_respond(e),
-        }
-    }
-
-    const fn from_generate_embed(error: &'a poll::GenerateEmbedError) -> Self {
-        match error {
-            poll::GenerateEmbedError::ImageSourceUrl(_) => Self::ImageSourceUrl,
-            poll::GenerateEmbedError::EmbedValidation(_) => Self::EmbedValidation,
-        }
-    }
-
-    const fn from_wait_for_votes(error: &'a poll::WaitForVotesError) -> Self {
-        match error {
-            poll::WaitForVotesError::EventRecv(_) => Self::EventRecv,
-            poll::WaitForVotesError::UpdateEmbed(e) => Self::from_update_embed(e),
-            poll::WaitForVotesError::Respond(e) => Self::from_respond(e),
-        }
-    }
-
-    const fn from_start_poll(error: &'a poll::StartPollError) -> Self {
-        match error {
-            poll::StartPollError::Cache(_) => Self::Cache,
-            poll::StartPollError::DeserializeBody(_) => Self::DeserializeBody,
-            poll::StartPollError::GenerateEmbed(e) => Self::from_generate_embed(e),
-            poll::StartPollError::WaitForVotes(e) => Self::from_wait_for_votes(e),
-            poll::StartPollError::Respond(e) => Self::from_respond(e),
-            poll::StartPollError::DeserialiseBodyFromHttp(e) => {
-                Self::from_deserialize_body_from_http_error(e)
-            }
-        }
-    }
-
     const fn from_respond(error: &'a super::core::RespondError) -> Self {
         match error {
             super::core::RespondError::TwilightHttp(_) => Self::TwilightHttp,
             super::core::RespondError::Builder(_) => Self::Builder,
-        }
-    }
-
-    const fn from_handle_poll(error: &'a check::HandlePollError) -> Self {
-        match error {
-            check::HandlePollError::EventRecv(_) => Self::EventRecv,
-            check::HandlePollError::EventSend(_) => Self::EventSend,
-            check::HandlePollError::AnotherPollOngoing(e) => Self::AnotherPollOngoing(e),
-            check::HandlePollError::PollLoss(e) => Self::PollLoss(e),
-            check::HandlePollError::PollVoided(e) => Self::PollVoided(e),
-            check::HandlePollError::StartPoll(e) => Self::from_start_poll(e),
-            check::HandlePollError::DeserialiseBodyFromHttp(e) => {
-                Self::from_deserialize_body_from_http_error(e)
-            }
-        }
-    }
-
-    const fn from_handle_in_voice_with_someone_else_error(
-        error: &'a check::HandleInVoiceWithSomeoneElseError,
-    ) -> Self {
-        match error {
-            check::HandleInVoiceWithSomeoneElseError::PollResolvable(e) => {
-                Self::from_vote_resolvable(e)
-            }
-            check::HandleInVoiceWithSomeoneElseError::HandlePoll(e) => Self::from_handle_poll(e),
-        }
-    }
-
-    const fn from_followup(error: &'a FollowupError) -> Self {
-        match error {
-            FollowupError::DeserialiseBodyFromHttp(e) => {
-                Self::from_deserialize_body_from_http_error(e)
-            }
-            FollowupError::Followup(e) => Self::from_core_followup_error(e),
         }
     }
 
@@ -643,16 +561,12 @@ impl Error {
             Self::RequireInVoiceWithSomeoneElse(e) => {
                 Fe::from_require_in_voice_with_someone_else_error(e)
             }
-            Self::CheckRun(e) => Fe::from_run(e),
-            Self::Followup(e) => Fe::from_followup(e),
             Self::PromptForConfirmation(e) => Fe::from_prompt_for_confirmation(e),
             Self::Join(e) => Fe::from_join_residual(e),
             Self::Leave(e) => Fe::from_leave_residual(e),
             Self::Play(e) => Fe::from_play(e),
-            Self::DeserialiseBodyFromHttp(e) => Fe::from_deserialize_body_from_http_error(e),
             Self::RemoveTracks(e) => Fe::from_remove_tracks(e),
             Self::CheckUserOnlyIn(e) => Fe::from_check_user_only_in(e),
-            Self::HandlePoll(e) => Fe::from_handle_poll(e),
             Self::PlayPause(e) => Fe::from_play_pause(e),
             Self::Repeat(e) => Fe::from_repeat(e),
             Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),

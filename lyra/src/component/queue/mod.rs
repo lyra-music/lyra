@@ -172,12 +172,11 @@ fn normalize_queue_position(position: i64, queue_len: NonZeroUsize) -> Option<No
     let position_usize = position.unsigned_abs() as usize;
 
     (1..=queue_len.get()).contains(&position_usize).then(|| {
-        NonZeroUsize::new(
-            position
-                .is_positive()
-                .then_some(position_usize)
-                .unwrap_or_else(|| queue_len.get() - position_usize + 1),
-        )
+        NonZeroUsize::new(if position.is_positive() {
+            position_usize
+        } else {
+            queue_len.get() - position_usize + 1
+        })
     })?
 }
 

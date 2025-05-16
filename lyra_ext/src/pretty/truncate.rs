@@ -14,9 +14,10 @@ where
     {
         let trail = Self::TRAIL;
 
-        (self.grapheme_len() <= new_len)
-            .then_some(Cow::Borrowed(self))
-            .unwrap_or_else(|| {
+        if self.grapheme_len() <= new_len {
+            Cow::Borrowed(self)
+        } else {
+            {
                 let Some(len) = new_len.checked_sub(trail.grapheme_len()) else {
                     return Cow::Borrowed(Self::EMPTY);
                 };
@@ -24,7 +25,8 @@ where
                     return Cow::Borrowed(trail);
                 }
                 self.grapheme_truncate(len) + trail
-            })
+            }
+        }
     }
 }
 

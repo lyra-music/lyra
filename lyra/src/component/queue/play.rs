@@ -241,9 +241,11 @@ impl BotAutocomplete for Autocomplete {
         })
         .map(|q| {
             let source = self.source.unwrap_or_default();
-            (!regex::URL.is_match(&q))
-                .then(|| format!("{}{}", source.value(), q).into_boxed_str())
-                .unwrap_or_else(|| q.into_boxed_str())
+            if regex::URL.is_match(&q) {
+                q.into_boxed_str()
+            } else {
+                format!("{}{}", source.value(), q).into_boxed_str()
+            }
         })
         .expect("exactly one autocomplete option should be focused");
 
