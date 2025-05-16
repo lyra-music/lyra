@@ -36,7 +36,7 @@ lyra_ext = { path = "../lyra_ext" }
 paste = "1.0.15"
 const-str = "0.6.2"
 const_panic = { version = "0.2.12", features = ["derive"] }
-bitflags = "2.9.0"
+bitflags = "2.9.1"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "2.0.12"
