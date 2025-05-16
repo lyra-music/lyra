@@ -29,7 +29,7 @@ use crate::{
         Cache, InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError, NotUsersTrack as NotUsersTrackError,
         UserNotAccessManager as UserNotAccessManagerError, UserNotAllowed as UserNotAllowedError,
-        UserNotDj as UserNotDjError, UserNotStageManager as UserNotStageManagerError,
+        UserNotDj as UserNotDjError, UserNotStageModerator as UserNotStageModeratorError,
         command::check::{self, AlternateVoteResponse, PollResolvableError, UserOnlyInError},
     },
     gateway::GuildIdAware,
@@ -53,9 +53,8 @@ pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissi
 pub const ACCESS_MANAGER_PERMISSIONS: Permissions =
     Permissions::MANAGE_ROLES.union(Permissions::MANAGE_CHANNELS);
 
-pub const STAGE_MANAGER_PERMISSIONS: Permissions = Permissions::MANAGE_CHANNELS
-    .union(Permissions::MUTE_MEMBERS)
-    .union(Permissions::MOVE_MEMBERS);
+pub const STAGE_MODERATOR_PERMISSIONS: Permissions =
+    Permissions::MANAGE_CHANNELS.union(Permissions::MANAGE_ROLES);
 
 pub fn does_user_have_permissions(
     permissions: Permissions,
@@ -87,11 +86,11 @@ pub fn user_is_access_manager(
     Ok(())
 }
 
-pub fn user_is_stage_manager(
+pub fn user_is_stage_moderator(
     ctx: &impl UserPermissionsAware,
-) -> Result<(), UserNotStageManagerError> {
-    if !does_user_have_permissions(STAGE_MANAGER_PERMISSIONS, ctx) {
-        return Err(UserNotStageManagerError);
+) -> Result<(), UserNotStageModeratorError> {
+    if !does_user_have_permissions(STAGE_MODERATOR_PERMISSIONS, ctx) {
+        return Err(UserNotStageModeratorError);
     }
     Ok(())
 }

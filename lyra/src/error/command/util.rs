@@ -129,9 +129,11 @@ impl AutoJoinAttemptError {
         error: crate::error::component::connection::join::ConnectToNewError,
     ) -> Self {
         match error {
-            crate::error::component::connection::join::ConnectToNewError::UserNotStageManager(
+            crate::error::component::connection::join::ConnectToNewError::UserNotStageModerator(
                 e,
-            ) => Self::Failed(crate::error::AutoJoinAttemptFailed::UserNotStageManager(e)),
+            ) => Self::Failed(crate::error::AutoJoinAttemptFailed::UserNotStageModerator(
+                e,
+            )),
             crate::error::component::connection::join::ConnectToNewError::ImplConnectTo(e) => {
                 Self::from_impl_connect_to(e)
             }

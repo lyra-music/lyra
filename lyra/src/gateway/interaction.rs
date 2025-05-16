@@ -493,7 +493,7 @@ async fn match_autojoin_attempt_failed(
             ))
             .await?;
         }
-        AutoJoinAttemptFailedError::UserNotStageManager(_) => {
+        AutoJoinAttemptFailedError::UserNotStageModerator(_) => {
             i.nope_f(
                 "Attempting to join your currently connected stage failed as \
                 you are not a **Stage Manager**.",

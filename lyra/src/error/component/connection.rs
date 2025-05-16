@@ -31,7 +31,7 @@ pub mod join {
     #[derive(thiserror::Error, Debug)]
     #[error(transparent)]
     pub enum ConnectToError {
-        UserNotStageManager(#[from] crate::error::UserNotStageManager),
+        UserNotStageModerator(#[from] crate::error::UserNotStageModerator),
         InVoiceAlready(#[from] crate::error::InVoiceAlready),
         CheckUserOnlyIn(#[from] check::UserOnlyInError),
         ImplConnectTo(#[from] ImplConnectToError),
@@ -40,7 +40,7 @@ pub mod join {
     #[derive(thiserror::Error, Debug)]
     #[error(transparent)]
     pub enum ConnectToNewError {
-        UserNotStageManager(#[from] crate::error::UserNotStageManager),
+        UserNotStageModerator(#[from] crate::error::UserNotStageModerator),
         ImplConnectTo(#[from] ImplConnectToError),
     }
 
@@ -136,7 +136,7 @@ pub mod join {
 
     pub enum PartiallyFlattenedError {
         UserNotInVoice(crate::error::UserNotInVoice),
-        UserNotStageManager(crate::error::UserNotStageManager),
+        UserNotStageModerator(crate::error::UserNotStageModerator),
         UserNotAllowed(crate::error::UserNotAllowed),
         InVoiceAlready(crate::error::InVoiceAlready),
         Forbidden(crate::error::ConnectionForbidden),
@@ -217,7 +217,7 @@ pub mod join {
 
         fn from_connect_to(error: ConnectToError) -> Self {
             match error {
-                ConnectToError::UserNotStageManager(e) => Self::UserNotStageManager(e),
+                ConnectToError::UserNotStageModerator(e) => Self::UserNotStageModerator(e),
                 ConnectToError::InVoiceAlready(e) => Self::InVoiceAlready(e),
                 ConnectToError::CheckUserOnlyIn(e) => Self::from_check_user_only_in(e),
                 ConnectToError::ImplConnectTo(e) => Self::from_impl_connect_to(e),

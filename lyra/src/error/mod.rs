@@ -33,8 +33,8 @@ pub type CacheResult<T> = Result<T, Cache>;
 pub struct UserNotDj;
 
 #[derive(Debug, Error)]
-#[error("user is not a stage manager")]
-pub struct UserNotStageManager;
+#[error("user is not a stage moderator")]
+pub struct UserNotStageModerator;
 
 #[derive(Debug, Error)]
 #[error("user is not an access manager")]
@@ -106,7 +106,7 @@ pub enum AutoJoinAttemptFailed {
     UserNotInVoice(#[from] UserNotInVoice),
     UserNotAllowed(#[from] UserNotAllowed),
     Forbidden(#[from] ConnectionForbidden),
-    UserNotStageManager(#[from] UserNotStageManager),
+    UserNotStageModerator(#[from] UserNotStageModerator),
 }
 
 #[derive(Error, Debug)]

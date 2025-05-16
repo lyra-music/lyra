@@ -134,12 +134,12 @@ async fn impl_auto_join(ctx: &GuildCtx<impl CtxKind>) -> Result<Response, ImplAu
     Ok(connect_to_new(channel_id, channel_type, channel_parent_id, ctx).await?)
 }
 
-fn check_user_is_stage_manager(
+fn check_user_is_stage_moderator(
     channel_type: ChannelType,
     ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(), error::UserNotStageManager> {
+) -> Result<(), error::UserNotStageModerator> {
     if channel_type == ChannelType::GuildStageVoice {
-        check::user_is_stage_manager(ctx)?;
+        check::user_is_stage_moderator(ctx)?;
     }
     Ok(())
 }
@@ -150,7 +150,7 @@ async fn connect_to_new(
     channel_parent_id: Option<Id<ChannelMarker>>,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToNewError> {
-    check_user_is_stage_manager(channel_type, ctx)?;
+    check_user_is_stage_moderator(channel_type, ctx)?;
 
     Ok(impl_connect_to(
         channel_id,
@@ -169,7 +169,7 @@ async fn connect_to(
     channel_parent_id: Option<Id<ChannelMarker>>,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToError> {
-    check_user_is_stage_manager(channel_type, ctx)?;
+    check_user_is_stage_moderator(channel_type, ctx)?;
 
     let old_channel_id = match require::in_voice(ctx) {
         Ok(ref in_voice) => {
@@ -425,8 +425,8 @@ impl BotSlashCommand for Join {
                     .await?;
                 Ok(())
             }
-            Pfe::UserNotStageManager(_) => {
-                ctx.nope("Only **Stage Managers** can use a stage channel.")
+            Pfe::UserNotStageModerator(_) => {
+                ctx.nope("Only **Stage Moderators** can use a stage channel.")
                     .await?;
                 Ok(())
             }
