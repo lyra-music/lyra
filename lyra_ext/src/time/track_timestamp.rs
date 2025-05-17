@@ -34,7 +34,6 @@ impl Data {
         self.most_recent_operation = started;
         self.most_recent_position = started;
         self.paused = false;
-        self.speed = 1.0;
     }
 }
 
