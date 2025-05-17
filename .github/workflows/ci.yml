@@ -27,6 +27,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
@@ -41,6 +46,11 @@ jobs:
 
       - name: Setup Mold
         uses: rui314/setup-mold@v1
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
