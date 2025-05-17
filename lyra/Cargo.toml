@@ -5,7 +5,7 @@ description = "A featureful, self-hostable Discord music bot."
 version = "0.9.0-alpha.4"
 edition = "2024"
 # When bumping, bump in other Cargo.toml files, Dockerfile too
-rust-version = "1.86"
+rust-version = "1.87"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
 authors = ["fdnt7"]
