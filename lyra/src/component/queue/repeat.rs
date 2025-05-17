@@ -9,7 +9,7 @@ use crate::{
         util::controller_fmt,
     },
     core::model::response::initial::message::create::RespondWithMessage,
-    error::{CommandResult, component::queue::RepeatError},
+    error::CommandResult,
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
 
@@ -83,7 +83,7 @@ pub async fn repeat(
     data: OwnedPlayerData,
     mode: LavalinkRepeatMode,
     via_controller: bool,
-) -> Result<(), RepeatError> {
+) -> Result<(), crate::error::component::queue::repeat::Error> {
     ctx.get_conn().dispatch(Event::QueueRepeat);
     data.write()
         .await

@@ -16,7 +16,7 @@ pub enum ProcessError {
     PlaybackHandleVoiceStateUpdate(#[from] super::component::playback::HandleVoiceStateUpdateError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
     PlayPause(#[from] super::component::playback::PlayPauseError),
-    Repeat(#[from] super::component::queue::RepeatError),
+    Repeat(#[from] super::component::queue::repeat::Error),
     UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]
     CommandExecute {

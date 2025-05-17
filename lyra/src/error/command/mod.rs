@@ -43,7 +43,7 @@ pub enum Error {
     TwilightHttp(Box<twilight_http::Error>),
     Join(Box<super::component::connection::join::ResidualError>),
     PlayPause(Box<super::component::playback::PlayPauseError>),
-    Repeat(Box<super::component::queue::RepeatError>),
+    Repeat(Box<super::component::queue::repeat::Error>),
     UpdateNowPlayingMessage(Box<super::lavalink::UpdateNowPlayingMessageError>),
     SeekToWith(Box<require::SeekToWithError>),
     NewNowPlayingMessage(Box<super::lavalink::NewNowPlayingMessageError>),
@@ -69,7 +69,7 @@ declare_from_box_impls!(
     TwilightHttp => twilight_http::Error,
     Join => super::component::connection::join::ResidualError,
     PlayPause => super::component::playback::PlayPauseError,
-    Repeat => super::component::queue::RepeatError,
+    Repeat => super::component::queue::repeat::Error,
     UpdateNowPlayingMessage => super::lavalink::UpdateNowPlayingMessageError,
     SeekToWith => require::SeekToWithError,
     NewNowPlayingMessage => super::lavalink::NewNowPlayingMessageError,
@@ -460,15 +460,15 @@ impl<'a> Fe<'a> {
         }
     }
 
-    const fn from_repeat(error: &'a super::component::queue::RepeatError) -> Self {
+    const fn from_repeat(error: &'a super::component::queue::repeat::Error) -> Self {
         match error {
-            super::component::queue::RepeatError::UnrecognisedConnection(_) => {
+            super::component::queue::repeat::Error::UnrecognisedConnection(_) => {
                 Self::UnrecognisedConnection
             }
-            super::component::queue::RepeatError::UpdateNowPlayingMessage(e) => {
+            super::component::queue::repeat::Error::UpdateNowPlayingMessage(e) => {
                 Self::from_update_now_playing_message(e)
             }
-            super::component::queue::RepeatError::Respond(e) => Self::from_respond(e),
+            super::component::queue::repeat::Error::Respond(e) => Self::from_respond(e),
         }
     }
 
