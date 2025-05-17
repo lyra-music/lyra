@@ -254,6 +254,9 @@ impl<T: Kind, U: Location> Respond for Ctx<T, U> {
 
     fn acknowledge(&mut self) {
         self.acknowledged = true;
+        if let Some(tx) = std::mem::take(&mut self.acknowledgement) {
+            let _ = tx.send(());
+        }
     }
 
     fn interaction_id(&self) -> Id<InteractionMarker> {
