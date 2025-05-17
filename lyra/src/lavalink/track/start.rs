@@ -50,8 +50,7 @@ pub(super) async fn impl_start(
         return Ok(());
     }
 
-    let msg_data =
-        NowPlayingData::new_zeroed_timestamp(&lavalink_data, guild_id, &data_r, track).await?;
+    let msg_data = NowPlayingData::new(&lavalink_data, guild_id, &data_r, track).await?;
     drop(data_r);
 
     data.write()
