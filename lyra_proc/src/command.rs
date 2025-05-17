@@ -1,11 +1,29 @@
 use proc_macro::TokenStream;
 use quote::{__private::TokenStream as QuoteTokenStream, quote};
-use syn::{Data, DeriveInput, Fields, FieldsUnnamed, Path, Type, Variant};
+use syn::{Data, DeriveInput, Fields, FieldsUnnamed, Ident, Path, Type, TypePath, Variant};
+
+fn unwrap(type_path: &TypePath, from: impl Into<String>) -> Option<&Path> {
+    match type_path.path.segments.last() {
+        Some(segment) if segment.ident == from.into() => match &segment.arguments {
+            syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => match &args.args[0]
+            {
+                syn::GenericArgument::Type(Type::Path(inner_type_path)) => {
+                    Some(&inner_type_path.path)
+                }
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
 
 fn declare_commands(
     fields: &FieldsUnnamed,
     v: &Variant,
     c: (QuoteTokenStream, QuoteTokenStream),
+    name: &Ident,
+    root_name_aware_path: &Path,
 ) -> (QuoteTokenStream, QuoteTokenStream) {
     let sub_cmd = fields
         .unnamed
@@ -13,15 +31,36 @@ fn declare_commands(
         .expect("variant must have exactly one unnamed field");
     let v_ident = &v.ident;
     match sub_cmd.ty {
-        Type::Path(_) => {
+        Type::Path(ref type_path) => {
             let (sub_cmd_match, impl_resolved_command_data) = c;
+            let sub_cmd_inner = unwrap(type_path, "Box");
+            let impl_for_inner = sub_cmd_inner.map_or_else(
+                || quote!(),
+                |inner| {
+                    quote! {
+                        impl #root_name_aware_path for #inner {
+                            const ROOT_NAME: &'static str = #name::ROOT_NAME;
+                            const PARENT_NAME: ::std::option::Option<&'static str>
+                                = ::std::option::Option::Some(#name::NAME);
+                        }
+                    }
+                },
+            );
 
             (
                 quote! {
                     #sub_cmd_match
                     Self::#v_ident(sub_cmd) => sub_cmd.run(ctx).await,
                 },
-                impl_resolved_command_data,
+                quote! {
+                    #impl_resolved_command_data
+                    impl #root_name_aware_path for #sub_cmd {
+                        const ROOT_NAME: &'static str = #name::ROOT_NAME;
+                        const PARENT_NAME: ::std::option::Option<&'static str>
+                            = ::std::option::Option::Some(#name::NAME);
+                    }
+                    #impl_for_inner
+                },
             )
         }
         _ => panic!("the field must be a path"),
@@ -32,12 +71,17 @@ pub fn impl_bot_command_group(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
     let data = &input.data;
 
+    let root_name_aware_path =
+        syn::parse_str::<Path>("crate::command::model::CommandStructureAware")
+            .expect("path is valid");
     let (sub_cmd_matches, impls_resolved_command_data) = match data {
         Data::Enum(data) => {
             data.variants
                 .iter()
                 .fold((quote!(), quote!()), |c, v| match v.fields {
-                    Fields::Unnamed(ref fields) => declare_commands(fields, v, c),
+                    Fields::Unnamed(ref fields) => {
+                        declare_commands(fields, v, c, name, &root_name_aware_path)
+                    }
                     _ => panic!("all fields must be unnamed"),
                 })
         }

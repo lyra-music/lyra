@@ -3,12 +3,13 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
-/// Set the playback volume
+/// Sets the playback volume.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "set")]
 pub struct Set {
@@ -22,7 +23,7 @@ impl BotSlashCommand for Set {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let percent = NonZeroU16::new(self.percent.unsigned_abs() as u16)
             .expect("percent should be non-zero");
         player.context.set_volume(percent.get()).await?;
@@ -31,6 +32,7 @@ impl BotSlashCommand for Set {
         let emoji = super::volume_emoji(Some(percent));
         let warning = super::clipping_warning(percent);
 
-        out!(format!("{emoji} `{percent}`%{warning}."), ctx);
+        ctx.out(format!("{emoji} `{percent}`%{warning}.")).await?;
+        Ok(())
     }
 }

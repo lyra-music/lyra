@@ -1,10 +1,11 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, require},
+    command::require,
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 lyra_proc::read_equaliser_presets_as!(EqualiserPreset);
@@ -14,7 +15,7 @@ impl From<EqualiserPreset> for SetEqualiser {
         let gains = value.gains();
         Self(core::array::from_fn(|i| {
             lavalink_rs::model::player::Equalizer {
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 band: i as u8,
                 gain: gains[i],
             }
@@ -22,7 +23,7 @@ impl From<EqualiserPreset> for SetEqualiser {
     }
 }
 
-/// Enable the player equaliser from presets
+/// Enables the player equaliser from presets.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "preset")]
 pub struct Preset {
@@ -39,12 +40,10 @@ impl crate::command::model::BotSlashCommand for Preset {
         let update = Some(SetEqualiser::from(self.preset));
 
         player.update_filter(update).await?;
-        out!(
-            format!(
-                "🎛️🟢 Enabled player equaliser (Preset: **`{}`**).",
-                preset_name
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🎛️🟢 Enabled player equaliser (Preset: **`{preset_name}`**).",
+        ))
+        .await?;
+        Ok(())
     }
 }

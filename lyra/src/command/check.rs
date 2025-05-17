@@ -18,18 +18,19 @@ use crate::{
     command::model::{Ctx, CtxKind},
     component::config::access::CalculatorBuilder,
     core::{
-        model::{BotState, DatabaseAware, OwnedBotStateAware, UserIdAware, UserPermissionsAware},
+        model::{
+            BotState, DatabaseAware, HttpAware, OwnedBotStateAware, UserIdAware,
+            UserPermissionsAware,
+        },
+        r#static::application,
         traced,
     },
     error::{
         Cache, InVoiceWithSomeoneElse as InVoiceWithSomeoneElseError,
         InVoiceWithoutUser as InVoiceWithoutUserError, NotUsersTrack as NotUsersTrackError,
         UserNotAccessManager as UserNotAccessManagerError, UserNotAllowed as UserNotAllowedError,
-        UserNotDj as UserNotDjError, UserNotStageManager as UserNotStageManagerError,
-        command::check::{
-            self, AlternateVoteResponse, PollResolvableError, SendSupersededWinNoticeError,
-            UserOnlyInError,
-        },
+        UserNotDj as UserNotDjError, UserNotStageModerator as UserNotStageModeratorError,
+        command::check::{self, AlternateVoteResponse, PollResolvableError, UserOnlyInError},
     },
     gateway::GuildIdAware,
     lavalink::{
@@ -52,9 +53,8 @@ pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissi
 pub const ACCESS_MANAGER_PERMISSIONS: Permissions =
     Permissions::MANAGE_ROLES.union(Permissions::MANAGE_CHANNELS);
 
-pub const STAGE_MANAGER_PERMISSIONS: Permissions = Permissions::MANAGE_CHANNELS
-    .union(Permissions::MUTE_MEMBERS)
-    .union(Permissions::MOVE_MEMBERS);
+pub const STAGE_MODERATOR_PERMISSIONS: Permissions =
+    Permissions::MANAGE_CHANNELS.union(Permissions::MANAGE_ROLES);
 
 pub fn does_user_have_permissions(
     permissions: Permissions,
@@ -86,11 +86,11 @@ pub fn user_is_access_manager(
     Ok(())
 }
 
-pub fn user_is_stage_manager(
+pub fn user_is_stage_moderator(
     ctx: &impl UserPermissionsAware,
-) -> Result<(), UserNotStageManagerError> {
-    if !does_user_have_permissions(STAGE_MANAGER_PERMISSIONS, ctx) {
-        return Err(UserNotStageManagerError);
+) -> Result<(), UserNotStageModeratorError> {
+    if !does_user_have_permissions(STAGE_MODERATOR_PERMISSIONS, ctx) {
+        return Err(UserNotStageModeratorError);
     }
     Ok(())
 }
@@ -212,6 +212,7 @@ impl InVoiceWithUserResult<'_> {
 
 pub trait ResolveWithPoll {
     type Error;
+    #[expect(unused)] // TODO: #44
     fn or_else_try_resolve_with(self, topic: PollTopic)
     -> Result<Option<PollStarter>, Self::Error>;
 }
@@ -242,6 +243,7 @@ impl ResolveWithPoll for InVoiceWithUserOnlyResult {
 }
 
 pub trait StartPoll: Sized {
+    #[expect(unused)] // TODO: #44
     async fn and_then_start(
         self,
         ctx: &mut GuildCtx<impl RespondViaMessage>,
@@ -462,7 +464,7 @@ pub fn all_users_track(
 //     Ok(())
 // }
 //
-// #[allow(clippy::struct_excessive_bools)]
+// #[expect(clippy::struct_excessive_bools)]
 // struct Checks {
 //     in_voice_with_user: InVoiceWithUserFlag,
 //     queue_not_empty: bool,
@@ -829,11 +831,11 @@ async fn handle_poll(
 async fn send_superseded_win_notice(
     interaction_token: String,
     bot: Arc<BotState>,
-) -> Result<(), SendSupersededWinNoticeError> {
+) -> Result<(), twilight_http::Error> {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
-    bot.interaction()
-        .await?
+    bot.http()
+        .interaction(application::id())
         .create_followup(&interaction_token)
         .flags(MessageFlags::EPHEMERAL)
         .content("🪄 The poll was superseded to win by a DJ.")

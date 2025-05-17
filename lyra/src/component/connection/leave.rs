@@ -12,17 +12,16 @@ use crate::{
     LavalinkAndGuildIdAware, LavalinkAware,
     command::{
         SlashCtx, check,
-        macros::{caut, out},
         model::{BotSlashCommand, CtxKind, GuildCtx},
         require,
     },
-    core::model::HttpAware,
+    core::model::{HttpAware, response::initial::message::create::RespondWithMessage},
     error::{
         CommandResult,
         component::connection::leave::{self, DisconnectCleanupError},
     },
     gateway::{GuildIdAware, SenderAware},
-    lavalink::{DelegateMethods, Event, UnwrappedData, delete_now_playing_message},
+    lavalink::{DelegateMethods, Event, UnwrappedData},
 };
 
 pub(super) struct LeaveResponse(pub(super) Id<ChannelMarker>);
@@ -48,7 +47,12 @@ pub(super) async fn disconnect_cleanup(
 
     lavalink.handle_for(guild_id).dispatch(Event::QueueClear);
     if let Some(player_ctx) = lavalink.get_player_context(guild_id) {
-        delete_now_playing_message(cx, &player_ctx.data_unwrapped()).await;
+        player_ctx
+            .data_unwrapped()
+            .write()
+            .await
+            .delete_now_playing_message(cx)
+            .await;
     }
     lavalink.drop_connection(guild_id);
     lavalink.delete_player(guild_id).await?;
@@ -64,16 +68,16 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let conn = ctx.get_conn();
     conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
-    conn.notify_change().await?;
+    conn.disable_vsu_handler().await?;
     disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 
     let response = LeaveResponse(channel_id);
-    tracing::debug!("guild {guild_id} {response}");
+    tracing::info!("guild {guild_id} {response}");
     Ok(response)
 }
 
-/// Leaves the currently connected voice/stage channel and clears the queue
+/// Leaves the currently connected voice/stage channel and clears the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "leave", dm_permission = false)]
 pub struct Leave;
@@ -83,11 +87,14 @@ impl BotSlashCommand for Leave {
         let mut ctx = require::guild(ctx)?;
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
-                out!(format!("📎 ~~{}~~.", voice.mention()), ctx);
+                ctx.out(format!("📎 ~~{}~~.", voice.mention())).await?;
+                Ok(())
             }
             Err(e) => match e.match_not_in_voice_into() {
                 leave::NotInVoiceMatchedError::NotInVoice(_) => {
-                    caut!("Not currently connected to a voice channel.", ctx);
+                    ctx.warn("Not currently connected to a voice channel.")
+                        .await?;
+                    Ok(())
                 }
                 leave::NotInVoiceMatchedError::Other(e) => Err(e.into()),
             },

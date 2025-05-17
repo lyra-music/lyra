@@ -41,6 +41,7 @@ impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
     }
 }
 
+#[expect(unused)]
 impl<U: Location> Ctx<UserMarker, U> {
     #[inline]
     pub const fn target_user_id(&self) -> Id<TwilightUserMarker> {

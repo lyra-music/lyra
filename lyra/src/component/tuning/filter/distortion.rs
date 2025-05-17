@@ -3,13 +3,9 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -62,7 +58,7 @@ pub enum Distortion {
     Off(Off),
 }
 
-/// Enable Distortion: If used correctly, can generate some rather unique audio effects.
+/// Enables Distortion: If used correctly, can generate some rather unique audio effects.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {
@@ -100,18 +96,19 @@ impl BotSlashCommand for On {
             scale: self.scale,
         };
         let Some(update) = SetDistortion::new(distortion) else {
-            bad!(
+            ctx.wrng(
                 format!(
                     "**At least one setting must be changed**: Offset settings must not all be `{}`, and scale settings must not all be `{}`.",
                     SetDistortion::DEFAULT_OFFSET,
                     SetDistortion::DEFAULT_SCALE,
                 ),
-                ctx
-            );
+            ).await?;
+            return Ok(());
         };
 
         player.update_filter(Some(update)).await?;
-        out!(format!("🍭🟢 Enabled distortion."), ctx);
+        ctx.out("🍭🟢 Enabled distortion.").await?;
+        Ok(())
     }
 }
 
@@ -126,6 +123,7 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetDistortion>).await?;
-        out!("🍭🔴 Disabled distortion.", ctx);
+        ctx.out("🍭🔴 Disabled distortion.").await?;
+        Ok(())
     }
 }

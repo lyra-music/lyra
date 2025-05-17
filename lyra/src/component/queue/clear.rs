@@ -6,15 +6,15 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         check,
-        macros::out,
         model::{BotSlashCommand, SlashCtx},
         require,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
     lavalink::Event,
 };
 
-/// Clears the queue
+/// Clears the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "clear", dm_permission = false)]
 pub struct Clear;
@@ -33,11 +33,12 @@ impl BotSlashCommand for Clear {
         let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
         check::all_users_track(queue, positions, in_voice_with_user)?;
 
-        player.acquire_advance_lock_and_stop_with(queue).await?;
+        player.disable_advancing_and_stop_with(queue).await?;
         drop(data_r);
         ctx.get_conn().dispatch(Event::QueueClear).await?;
 
         data.write().await.queue_mut().clear();
-        out!("⏹️ Cleared the queue.", ctx);
+        ctx.out("⏹️ Cleared the queue.").await?;
+        Ok(())
     }
 }

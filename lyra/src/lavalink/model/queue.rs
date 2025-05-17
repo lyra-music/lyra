@@ -2,10 +2,13 @@ use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use twilight_model::id::{Id, marker::UserMarker};
 
-use super::queue_indexer::{Indexer, IndexerType};
+use super::{
+    PlaylistAwareTrackData, PlaylistMetadata,
+    queue_indexer::{Indexer, IndexerType},
+};
 
 #[derive(Hash, Copy, Clone)]
 pub enum RepeatMode {
@@ -32,9 +35,9 @@ impl RepeatMode {
     }
     pub const fn description(&self) -> &str {
         match self {
-            Self::Off => "Disabled Repeat.",
-            Self::All => "Repeating the entire queue.",
-            Self::Track => "Repeating only the current track.",
+            Self::Off => "Disabled Repeat",
+            Self::All => "Repeating the entire queue",
+            Self::Track => "Repeating only the current track",
         }
     }
 }
@@ -47,13 +50,13 @@ impl std::fmt::Display for RepeatMode {
 
 #[derive(Debug)]
 pub struct Item {
-    track: TrackData,
+    track: PlaylistAwareTrackData,
     enqueued: Duration,
     pub(super) requester: Id<UserMarker>,
 }
 
 impl Item {
-    fn new(track: TrackData, requester: Id<UserMarker>) -> Self {
+    fn new(track: PlaylistAwareTrackData, requester: Id<UserMarker>) -> Self {
         Self {
             track,
             requester,
@@ -66,7 +69,11 @@ impl Item {
     }
 
     pub const fn data(&self) -> &TrackData {
-        &self.track
+        self.track.inner()
+    }
+
+    pub fn playlist_data(&self) -> Option<&PlaylistMetadata> {
+        self.track.playlist()
     }
 
     pub const fn enqueued(&self) -> Duration {
@@ -74,7 +81,7 @@ impl Item {
     }
 
     pub fn into_data(self) -> TrackData {
-        self.track
+        self.track.into_inner()
     }
 }
 
@@ -83,17 +90,17 @@ pub struct Queue {
     index: usize,
     indexer: Indexer,
     repeat_mode: RepeatMode,
-    advance_lock: Notify,
+    advancing_enabler: watch::Sender<bool>,
 }
 
 impl Queue {
-    pub(super) const fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             inner: VecDeque::new(),
             indexer: Indexer::Standard,
             index: 0,
             repeat_mode: RepeatMode::Off,
-            advance_lock: Notify::const_new(),
+            advancing_enabler: watch::channel(true).0,
         }
     }
 
@@ -132,7 +139,7 @@ impl Queue {
         (current, position)
     }
 
-    pub fn enqueue(&mut self, tracks: Vec<TrackData>, requester: Id<UserMarker>) {
+    pub fn enqueue(&mut self, tracks: Vec<PlaylistAwareTrackData>, requester: Id<UserMarker>) {
         match self.indexer {
             Indexer::Fair(ref mut indexer) => indexer.enqueue(tracks.len(), requester),
             Indexer::Shuffled(ref mut indexer) => indexer.enqueue(tracks.len(), self.index),
@@ -243,15 +250,39 @@ impl Queue {
         }
     }
 
-    pub fn acquire_advance_lock(&self) {
-        tracing::trace!("acquired queue advance lock");
-        self.advance_lock.notify_one();
+    pub fn subscribe_to_advance_enabler(&self) -> watch::Receiver<bool> {
+        self.advancing_enabler.subscribe()
     }
 
-    pub async fn not_advance_locked(&self) -> bool {
-        let future = self.advance_lock.notified();
-        let duration = crate::core::r#const::misc::QUEUE_ADVANCE_LOCKED_TIMEOUT;
-        tokio::time::timeout(duration, future).await.is_err()
+    fn set_advancing_state(&self, state: bool) {
+        self.advancing_enabler.send_replace(state);
+    }
+
+    pub fn disable_advancing(&self) {
+        tracing::debug!("disabling queue advancing");
+        self.set_advancing_state(false);
+    }
+
+    pub fn enable_advancing(&self) {
+        tracing::debug!("enabling queue advancing");
+        self.set_advancing_state(true);
+    }
+
+    pub async fn advancing_disabled(&self) -> bool {
+        let mut rx = self.subscribe_to_advance_enabler();
+        let disabled = tokio::time::timeout(
+            crate::core::r#const::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
+            rx.wait_for(|&r| !r),
+        )
+        .await
+        .is_ok()
+            || !*rx.borrow();
+
+        if disabled {
+            self.enable_advancing();
+        }
+
+        disabled
     }
 
     pub fn iter_positions_and_items(

@@ -59,8 +59,8 @@ impl PlayerInterface {
         self.context.data_unwrapped()
     }
 
-    pub async fn acquire_advance_lock_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
-        queue.acquire_advance_lock();
+    pub async fn disable_advancing_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
+        queue.disable_advancing();
         self.context.stop_now().await?;
         Ok(())
     }
@@ -299,6 +299,7 @@ pub fn current_track(queue: &Queue) -> Result<CurrentTrack, NotPlaying> {
     })
 }
 
+#[must_use]
 pub struct CurrentTrack<'a> {
     pub track: &'a QueueItem,
     pub position: NonZeroUsize,

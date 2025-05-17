@@ -5,7 +5,7 @@ use twilight_model::id::{Id, marker::MessageMarker};
 #[error(transparent)]
 pub enum PromptForConfirmationError {
     StandbyCanceled(#[from] twilight_standby::future::Canceled),
-    Respond(#[from] super::RespondError),
+    TwilightHttp(#[from] twilight_http::Error),
     ConfirmationTimedout(#[from] crate::error::ConfirmationTimedOut),
 }
 
@@ -129,9 +129,11 @@ impl AutoJoinAttemptError {
         error: crate::error::component::connection::join::ConnectToNewError,
     ) -> Self {
         match error {
-            crate::error::component::connection::join::ConnectToNewError::UserNotStageManager(
+            crate::error::component::connection::join::ConnectToNewError::UserNotStageModerator(
                 e,
-            ) => Self::Failed(crate::error::AutoJoinAttemptFailed::UserNotStageManager(e)),
+            ) => Self::Failed(crate::error::AutoJoinAttemptFailed::UserNotStageModerator(
+                e,
+            )),
             crate::error::component::connection::join::ConnectToNewError::ImplConnectTo(e) => {
                 Self::from_impl_connect_to(e)
             }
@@ -174,7 +176,7 @@ pub enum AutoJoinOrCheckInVoiceWithUserError {
 #[error(transparent)]
 pub enum HandleSuppressedAutoJoinError {
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
-    FollowUp(#[from] super::FollowupError),
+    Respond(#[from] crate::error::core::RespondError),
     AutoJoinSuppressed(#[from] AutoJoinSuppressedError),
 }
 

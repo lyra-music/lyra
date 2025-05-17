@@ -14,6 +14,7 @@ pub enum UpdateEmbedError {
     EmbedValidation(#[from] twilight_validate::embed::EmbedValidationError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
     Followup(#[from] crate::error::core::FollowupError),
+    Respond(#[from] crate::error::core::RespondError),
 }
 
 #[derive(Error, Debug)]
@@ -21,16 +22,16 @@ pub enum UpdateEmbedError {
 pub enum StartPollError {
     GenerateEmbed(#[from] GenerateEmbedError),
     Cache(#[from] crate::error::Cache),
-    Respond(#[from] super::RespondError),
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
     WaitForVotes(#[from] WaitForVotesError),
+    Respond(#[from] crate::error::core::RespondError),
+    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
 }
 
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum WaitForVotesError {
-    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
-    TwilightHttp(#[from] twilight_http::Error),
+    Respond(#[from] crate::error::core::RespondError),
     UpdateEmbed(#[from] UpdateEmbedError),
     EventRecv(#[from] tokio::sync::broadcast::error::RecvError),
 }

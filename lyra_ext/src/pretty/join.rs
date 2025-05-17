@@ -9,9 +9,9 @@ pub trait Join<J> {
 pub trait PrettyJoiner {
     type Joiner;
 
-    fn sep() -> Self::Joiner;
-    fn and() -> Self::Joiner;
-    fn or() -> Self::Joiner;
+    const SEP: Self::Joiner;
+    const AND: Self::Joiner;
+    const OR: Self::Joiner;
 
     fn pretty_join<J>(&self, sep: J, last_sep: J) -> <Self as Join<J>>::Joined
     where
@@ -23,19 +23,19 @@ pub trait PrettyJoiner {
     where
         Self: Join<Self::Joiner>,
     {
-        Join::pretty_join(self, Self::sep(), last_sep)
+        Join::pretty_join(self, Self::SEP, last_sep)
     }
     fn pretty_join_with_and(&self) -> <Self as Join<Self::Joiner>>::Joined
     where
         Self: Join<Self::Joiner>,
     {
-        Join::pretty_join(self, Self::sep(), Self::and())
+        Join::pretty_join(self, Self::SEP, Self::AND)
     }
     fn pretty_join_with_or(&self) -> <Self as Join<Self::Joiner>>::Joined
     where
         Self: Join<Self::Joiner>,
     {
-        Join::pretty_join(self, Self::sep(), Self::or())
+        Join::pretty_join(self, Self::SEP, Self::OR)
     }
 }
 
@@ -61,15 +61,9 @@ impl<S: Borrow<str>> Join<&str> for [S] {
 impl<S: Borrow<str>> PrettyJoiner for [S] {
     type Joiner = &'static str;
 
-    fn sep() -> Self::Joiner {
-        ", "
-    }
-    fn and() -> Self::Joiner {
-        " and "
-    }
-    fn or() -> Self::Joiner {
-        " or "
-    }
+    const SEP: Self::Joiner = ", ";
+    const AND: Self::Joiner = " and ";
+    const OR: Self::Joiner = " or ";
 }
 
 #[cfg(test)]

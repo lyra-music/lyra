@@ -22,14 +22,20 @@ use crate::{
     LavalinkAware,
     command::{
         SlashCtx, check,
-        macros::{bad, cant, nope, note, note_fol, out_or_fol, sus_fol},
-        model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
+        model::{BotSlashCommand, CtxKind, FollowupCtxKind, GuildCtx, RespondViaMessage},
         require::{self, InVoiceCachedVoiceState},
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
         r#const::connection::INACTIVITY_TIMEOUT,
-        model::{BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware},
+        model::{
+            BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware,
+            response::{
+                either::RespondOrFollowup, followup::Followup,
+                initial::message::create::RespondWithMessage,
+            },
+        },
+        r#static::application,
         traced,
     },
     error::{
@@ -128,12 +134,12 @@ async fn impl_auto_join(ctx: &GuildCtx<impl CtxKind>) -> Result<Response, ImplAu
     Ok(connect_to_new(channel_id, channel_type, channel_parent_id, ctx).await?)
 }
 
-fn check_user_is_stage_manager(
+fn check_user_is_stage_moderator(
     channel_type: ChannelType,
     ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(), error::UserNotStageManager> {
+) -> Result<(), error::UserNotStageModerator> {
     if channel_type == ChannelType::GuildStageVoice {
-        check::user_is_stage_manager(ctx)?;
+        check::user_is_stage_moderator(ctx)?;
     }
     Ok(())
 }
@@ -144,7 +150,7 @@ async fn connect_to_new(
     channel_parent_id: Option<Id<ChannelMarker>>,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToNewError> {
-    check_user_is_stage_manager(channel_type, ctx)?;
+    check_user_is_stage_moderator(channel_type, ctx)?;
 
     Ok(impl_connect_to(
         channel_id,
@@ -163,7 +169,7 @@ async fn connect_to(
     channel_parent_id: Option<Id<ChannelMarker>>,
     ctx: &GuildCtx<impl CtxKind>,
 ) -> Result<Response, ConnectToError> {
-    check_user_is_stage_manager(channel_type, ctx)?;
+    check_user_is_stage_moderator(channel_type, ctx)?;
 
     let old_channel_id = match require::in_voice(ctx) {
         Ok(ref in_voice) => {
@@ -221,7 +227,7 @@ async fn impl_connect_to(
     let response = old_channel_id.map_or_else(
         || {
             let connection = Connection::new(channel_id, ctx.channel_id());
-            connection.notify_change();
+            connection.disable_vsu_handler();
             lavalink.new_connection_with(guild_id, connection);
             Response::Joined {
                 voice: joined,
@@ -231,7 +237,7 @@ async fn impl_connect_to(
         |from| {
             let conn = lavalink.handle_for(guild_id);
             conn.set_channel(channel_id);
-            conn.notify_change();
+            conn.disable_vsu_handler();
             Response::Moved {
                 from,
                 to: joined,
@@ -245,7 +251,7 @@ async fn impl_connect_to(
 
     if let Ok(player) = require::player(ctx) {
         if old_channel_id.is_some() {
-            tracing::trace!("waiting for voice server update...");
+            tracing::debug!("waiting for voice server update...");
             let _ = ctx
                 .bot()
                 .standby()
@@ -257,7 +263,7 @@ async fn impl_connect_to(
                     }
                 })
                 .await;
-            tracing::trace!("voice server update received");
+            tracing::debug!("voice server update received");
             player.update_voice_channel(voice_is_empty).await?;
         }
     }
@@ -271,7 +277,7 @@ async fn impl_connect_to(
             .await?;
     }
 
-    tracing::debug!("guild {guild_id} {response}");
+    tracing::info!("guild {guild_id} {response}");
     Ok(response)
 }
 
@@ -303,21 +309,21 @@ async fn delete_empty_voice_notice(
     ctx: DeleteEmptyVoiceNotice,
 ) -> Result<(), DeleteEmptyVoiceNoticeError> {
     let bot = ctx.bot.clone();
+    let bot_user_id = bot.user_id();
+    let channel_id = ctx.channel_id;
 
     bot.standby()
         .wait_for(ctx.guild_id, move |e: &Event| {
             let Event::VoiceStateUpdate(voice_state) = e else {
                 return false;
             };
-            voice_state.channel_id.is_some_and(|id| {
-                id == ctx.channel_id
-                    && users_in_voice(&ctx.bot, ctx.channel_id).is_some_and(|n| n >= 1)
-            })
+            (voice_state.user_id == bot_user_id && voice_state.channel_id != Some(channel_id)) // bot changed channel
+                || users_in_voice(&ctx.bot, channel_id).is_some_and(|n| n >= 1) // bot not alone
         })
         .await?;
 
-    bot.interaction()
-        .await?
+    bot.http()
+        .interaction(application::id())
         .delete_followup(&ctx.interaction_token, ctx.message_id)
         .await?;
     Ok(())
@@ -333,32 +339,27 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 
 async fn handle_response(
     response: Response,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
             let stage = matches!(voice.kind, JoinedChannelType::Stage);
-            out_or_fol!(
-                stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage),
-                ?ctx
-            );
+            ctx.out_f(stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage))
+                .await?;
             (voice, empty)
         }
         Response::Moved { from, to, empty } => {
             let stage = matches!(to.kind, JoinedChannelType::Stage);
-            out_or_fol!(
-                stage_fmt(
-                    &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
-                    stage,
-                ),
-                ?ctx
-            );
+            ctx.out_f(stage_fmt(
+                &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
+                stage,
+            ))
+            .await?;
             (to, empty)
         }
     };
 
     if empty {
-        let text_channel_id = ctx.channel_id();
         let duration = unix_time() + INACTIVITY_TIMEOUT;
         let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
         let empty_voice_notice_txt = format!(
@@ -369,11 +370,10 @@ async fn handle_response(
         traced::tokio_spawn(start_inactivity_timeout(
             super::InactivityTimeoutContext::from(&*ctx),
             joined.id,
-            text_channel_id,
         ));
 
-        let empty_voice_notice = note_fol!(empty_voice_notice_txt, ?ctx);
-        let empty_voice_notice_message_id = empty_voice_notice.model().await?.id;
+        let empty_voice_notice = ctx.note_f(empty_voice_notice_txt).await?;
+        let empty_voice_notice_message_id = empty_voice_notice.retrieve_message().await?.id;
         traced::tokio_spawn(delete_empty_voice_notice(DeleteEmptyVoiceNotice::new(
             ctx,
             empty_voice_notice_message_id,
@@ -384,28 +384,26 @@ async fn handle_response(
     let state = ctx.current_voice_state().ok_or(CacheError)?;
     let muted = state.mute();
     if muted {
-        sus_fol!(
-            "**Currently server muted**; Some features will be limited.",
-            ?ctx
-        );
+        ctx.suspf("**Currently server muted**; Some features will be limited.")
+            .await?;
     }
     Ok(state.into())
 }
 
 pub async fn auto(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
     Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
 }
 
 pub async fn join(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<InVoiceCachedVoiceState, JoinError> {
     Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
 }
 
-/// Joins a voice/stage channel
+/// Joins a voice/stage channel.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "join", contexts = "guild")]
 pub struct Join {
@@ -423,26 +421,32 @@ impl BotSlashCommand for Join {
 
         match e.flatten_partially_into() {
             Pfe::UserNotInVoice(_) => {
-                bad!("Please specify a voice channel, or join one.", ctx);
+                ctx.wrng("Please specify a voice channel, or join one.")
+                    .await?;
+                Ok(())
             }
-            Pfe::UserNotStageManager(_) => {
-                nope!("Only **Stage Managers** can use a stage channel.", ctx);
+            Pfe::UserNotStageModerator(_) => {
+                ctx.nope("Only **Stage Moderators** can use a stage channel.")
+                    .await?;
+                Ok(())
             }
             Pfe::UserNotAllowed(_) => {
-                nope!("You are not allowed to use that channel.", ctx);
+                ctx.nope("You are not allowed to use that channel.").await?;
+                Ok(())
             }
             Pfe::InVoiceAlready(e) => {
-                note!(format!("Already connected to {}.", e.0.mention()), ctx);
+                ctx.note(format!("Already connected to {}.", e.0.mention()))
+                    .await?;
+                Ok(())
             }
             Pfe::Forbidden(e) => {
-                cant!(
-                    format!(
-                        "**Insufficient permissions to join {}**: Missing {} permissions.",
-                        e.channel_id.mention(),
-                        e.missing.pretty_display_code()
-                    ),
-                    ctx
-                );
+                ctx.blck(format!(
+                    "**Insufficient permissions to join {}**: Missing {} permissions.",
+                    e.channel_id.mention(),
+                    e.missing.pretty_display_code()
+                ))
+                .await?;
+                Ok(())
             }
             Pfe::Other(e) => Err(e.into()),
         }

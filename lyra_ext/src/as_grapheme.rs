@@ -12,9 +12,11 @@ pub trait AsGrapheme: UnicodeSegmentation {
         Self: ToOwned,
         Self::Owned: for<'a> FromIterator<&'a str>,
     {
-        (self.grapheme_len() <= new_len)
-            .then_some(Cow::Borrowed(self))
-            .unwrap_or_else(|| Cow::Owned(self.graphemes(true).take(new_len).collect()))
+        if self.grapheme_len() <= new_len {
+            Cow::Borrowed(self)
+        } else {
+            Cow::Owned(self.graphemes(true).take(new_len).collect())
+        }
     }
 }
 

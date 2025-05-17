@@ -1,37 +1,23 @@
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
+#[error(transparent)]
 pub enum ProcessError {
-    #[error(transparent)]
+    SetGlobalCommands(#[from] super::core::SetGlobalCommandsError),
     EventSend(#[from] tokio::sync::broadcast::error::SendError<crate::lavalink::Event>),
-    #[error(transparent)]
-    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-    #[error(transparent)]
     Http(#[from] twilight_http::Error),
-    #[error(transparent)]
+    Respond(#[from] super::core::RespondError),
+    RespondOrFollowup(#[from] super::core::RespondOrFollowupError),
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
-    #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
-    #[error(transparent)]
     CoreFollowup(#[from] super::core::FollowupError),
-    #[error(transparent)]
     Cache(#[from] super::Cache),
-    #[error(transparent)]
     ConnectionHandleVoiceStateUpdate(
         #[from] super::component::connection::HandleVoiceStateUpdateError,
     ),
-    #[error(transparent)]
     PlaybackHandleVoiceStateUpdate(#[from] super::component::playback::HandleVoiceStateUpdateError),
-    #[error(transparent)]
-    Respond(#[from] super::command::RespondError),
-    #[error(transparent)]
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
-    #[error(transparent)]
     PlayPause(#[from] super::component::playback::PlayPauseError),
-    #[error(transparent)]
-    Repeat(#[from] super::component::queue::RepeatError),
-    #[error(transparent)]
-    Shuffle(#[from] super::component::queue::ShuffleError),
+    Repeat(#[from] super::component::queue::repeat::Error),
+    UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]
     CommandExecute {
         name: Box<str>,

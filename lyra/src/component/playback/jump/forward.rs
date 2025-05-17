@@ -2,11 +2,9 @@ use std::num::NonZeroUsize;
 
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::command::{
-    check,
-    macros::{bad, out},
-    model::BotSlashCommand,
-    require,
+use crate::{
+    command::{check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 /// Jumps to a new track at least two tracks later.
@@ -29,7 +27,7 @@ impl BotSlashCommand for Forward {
         let queue = require::queue_not_empty_mut(&mut data_w)?;
         let current_track = require::current_track(queue)?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let jump = self.tracks.unsigned_abs() as usize;
         let queue_len = queue.len();
 
@@ -38,15 +36,14 @@ impl BotSlashCommand for Forward {
         if new_position.get() > queue_len {
             let maximum_jump = queue_len - queue_position.get();
             if maximum_jump == 0 {
-                bad!("No where else to jump to.", ctx);
+                ctx.wrng("No where else to jump to.").await?;
+                return Ok(());
             }
-            bad!(
-                format!(
-                    "**Cannot jump past the end of the queue**; Maximum forward jump is `{} tracks`.",
-                    maximum_jump,
-                ),
-                ctx
-            );
+            ctx.wrng(format!(
+                "**Cannot jump past the end of the queue**; Maximum forward jump is `{maximum_jump} tracks`.",
+            ))
+            .await?;
+            return Ok(());
         }
 
         let skipped =
@@ -54,7 +51,7 @@ impl BotSlashCommand for Forward {
         check::all_users_track(queue, skipped, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
-        queue.acquire_advance_lock();
+        queue.disable_advancing();
 
         let track = queue[new_position].data();
         let txt = format!("↪️ Jumped to `{}` (`#{}`).", track.info.title, new_position);
@@ -62,6 +59,7 @@ impl BotSlashCommand for Forward {
 
         *queue.index_mut() = new_position.get() - 1;
         drop(data_w);
-        out!(txt, ctx);
+        ctx.out(txt).await?;
+        Ok(())
     }
 }

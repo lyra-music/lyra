@@ -1,19 +1,11 @@
-use twilight_model::application::command::CommandOptionChoice;
+use crate::core::model::response::initial::autocomplete::RespondAutocomplete;
 
-use super::{Ctx, GuildMarker, Kind, Location, UnitRespondResult};
+use super::{Ctx, GuildMarker, Kind, Location};
 
 pub struct Marker;
 impl Kind for Marker {}
 pub type Autocomplete = Ctx<Marker>;
+#[expect(unused)]
 pub type GuildAutocompleteCtx = Ctx<Marker, GuildMarker>;
 
-impl<U: Location> Ctx<Marker, U> {
-    pub async fn autocomplete(
-        &mut self,
-        choices: impl IntoIterator<Item = CommandOptionChoice> + Send,
-    ) -> UnitRespondResult {
-        let response = self.interface().await?.autocomplete(choices).await;
-        self.acknowledge();
-        Ok(response?)
-    }
-}
+impl<U: Location> RespondAutocomplete for Ctx<Marker, U> {}

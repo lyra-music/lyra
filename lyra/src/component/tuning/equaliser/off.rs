@@ -1,11 +1,12 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, require},
+    command::require,
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
-/// Disable the player equaliser
+/// Disables the player equaliser.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "off")]
 pub struct Off;
@@ -16,6 +17,7 @@ impl crate::command::model::BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<super::SetEqualiser>).await?;
-        out!("🎛️🔴 Disabled equaliser.", ctx);
+        ctx.out("🎛️🔴 Disabled equaliser.").await?;
+        Ok(())
     }
 }

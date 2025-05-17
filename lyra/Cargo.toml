@@ -2,10 +2,10 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.9.0-alpha.4"
+version = "0.9.0-rc.1"
 edition = "2024"
 # When bumping, bump in other Cargo.toml files, Dockerfile too
-rust-version = "1.86"
+rust-version = "1.87"
 license = "GPL-3.0"
 repository = "https://github.com/lyra-music/lyra"
 authors = ["fdnt7"]
@@ -23,8 +23,6 @@ vergen-git2 = { version = "1.0.7", features = [
 unsafe_code = "forbid"
 
 [lints.clippy]
-multiple_unsafe_ops_per_block = "forbid"
-undocumented_unsafe_blocks = "forbid"
 enum_glob_use = "forbid"
 unwrap_used = "forbid"
 try_err = "forbid"
@@ -38,7 +36,7 @@ lyra_ext = { path = "../lyra_ext" }
 paste = "1.0.15"
 const-str = "0.6.2"
 const_panic = { version = "0.2.12", features = ["derive"] }
-bitflags = "2.9.0"
+bitflags = "2.9.1"
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "2.0.12"
@@ -104,3 +102,4 @@ reqwest = { version = "0.12.15", default-features = false, features = [
     "rustls-tls-native-roots",
 ] }
 rustls = "0.23.27"
+derive_builder = "0.20.2"

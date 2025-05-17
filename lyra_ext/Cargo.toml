@@ -1,15 +1,13 @@
 [package]
 name = "lyra_ext"
-version = "0.9.0-alpha.4"
-rust-version = "1.86"
+version = "0.9.0-rc.1"
+rust-version = "1.87"
 edition = "2024"
 
 [lints.rust]
 unsafe_code = "forbid"
 
 [lints.clippy]
-multiple_unsafe_ops_per_block = "forbid"
-undocumented_unsafe_blocks = "forbid"
 enum_glob_use = "forbid"
 unwrap_used = "forbid"
 try_err = "forbid"

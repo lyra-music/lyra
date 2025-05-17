@@ -2,10 +2,14 @@ use lyra_ext::num::u64_to_i64_truncating;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
-    core::model::DatabaseAware,
+    LavalinkAware,
+    command::{SlashCtx, model::BotSlashCommand, require},
+    core::model::{
+        DatabaseAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
+    lavalink::{DelegateMethods, NowPlayingData},
 };
 use lyra_proc::BotCommandGroup;
 
@@ -16,7 +20,7 @@ pub enum NowPlaying {
     Toggle(Toggle),
 }
 
-/// Toggles whether now-playing track messages should be automatically sent or not
+/// Toggles whether now-playing track messages should be automatically sent or not.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "toggle")]
 pub struct Toggle;
@@ -32,15 +36,34 @@ impl BotSlashCommand for Toggle {
         .await?
         .now_playing;
 
+        let maybe_data = require::player(&ctx).map(|p| p.data());
         let (emoji, action) = if new_now_playing {
+            if let Ok(data) = maybe_data {
+                let data_r = data.read().await;
+                if let Ok(track) = require::current_track(data_r.queue()) {
+                    let (c_data, gid) = (ctx.lavalink().data(), ctx.guild_id().into());
+                    let np_data = NowPlayingData::new(&c_data, gid, &data_r, track.track).await?;
+                    drop(data_r);
+                    data.write()
+                        .await
+                        .new_now_playing_message_in(ctx.http_owned(), np_data, ctx.channel_id())
+                        .await?;
+                }
+            }
             ("🔔", "Sending")
         } else {
+            if let Ok(data) = maybe_data {
+                if data.read().await.now_playing_message_id().is_some() {
+                    data.write().await.delete_now_playing_message(&ctx).await;
+                }
+            }
             ("🔕", "Not sending")
         };
 
-        out!(
-            format!("{emoji} **{action}** now-playing track messages from now on."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji} **{action}** now-playing track messages from now on."
+        ))
+        .await?;
+        Ok(())
     }
 }

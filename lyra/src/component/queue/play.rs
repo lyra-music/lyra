@@ -28,13 +28,24 @@ use crate::{
     LavalinkAware,
     command::{
         AutocompleteCtx, MessageCtx, SlashCtx,
-        macros::{bad, bad_or_fol, crit_or_fol, out_or_fol},
-        model::{BotAutocomplete, BotMessageCommand, BotSlashCommand, GuildCtx, RespondViaMessage},
+        model::{
+            BotAutocomplete, BotMessageCommand, BotSlashCommand, DeferCtxKind, FollowupCtxKind,
+            GuildCtx, RespondViaMessage,
+        },
         require, util,
     },
     core::{
         r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
-        model::UserIdAware,
+        model::{
+            UserIdAware,
+            response::{
+                either::RespondOrFollowup,
+                initial::{
+                    autocomplete::RespondAutocomplete, defer::RespondWithDefer,
+                    message::create::RespondWithMessage,
+                },
+            },
+        },
     },
     error::{
         CommandResult, LoadFailed as LoadFailedError,
@@ -42,7 +53,10 @@ use crate::{
         component::queue::play::{self, LoadTrackProcessManyError, QueryError},
     },
     gateway::GuildIdAware,
-    lavalink::{CorrectPlaylistInfo, CorrectTrackInfo, UnwrappedData, UnwrappedPlayerInfoUri},
+    lavalink::{
+        CorrectPlaylistInfo, CorrectTrackInfo, PlaylistAwareTrackData, PlaylistMetadata,
+        UnwrappedData, UnwrappedPlayerInfoUri, make_playlist_aware,
+    },
 };
 
 struct LoadTrackContext {
@@ -101,8 +115,7 @@ impl LoadTrackContext {
 }
 
 struct Playlist {
-    uri: Box<str>,
-    info: PlaylistInfo,
+    metadata: PlaylistMetadata,
     tracks: Box<[TrackData]>,
 }
 
@@ -110,14 +123,14 @@ impl Playlist {
     fn new(loaded: LoadedTracks, uri: Box<str>) -> Self {
         match loaded.load_type {
             TrackLoadType::Playlist => {
-                let Some(TrackLoadData::Playlist(data)) = loaded.data else {
+                let Some(TrackLoadData::Playlist(mut data)) = loaded.data else {
                     panic!("loaded playlist missing playlist load data")
                 };
 
+                let tracks = std::mem::take(&mut data.tracks).into();
                 Self {
-                    uri,
-                    info: data.info,
-                    tracks: data.tracks.into(),
+                    metadata: PlaylistMetadata::new(uri, data),
+                    tracks,
                 }
             }
             _ => panic!("`loaded resources not a playlist"),
@@ -146,15 +159,15 @@ impl LoadTrackResults {
     }
 }
 
-impl From<LoadTrackResults> for Vec<TrackData> {
+impl From<LoadTrackResults> for Vec<PlaylistAwareTrackData> {
     fn from(value: LoadTrackResults) -> Self {
         value
             .0
             .into_vec()
             .into_iter()
             .flat_map(|result| match result {
-                LoadTrackResult::Track(t) => Self::from([t]),
-                LoadTrackResult::Playlist(p) => p.tracks.into_vec(),
+                LoadTrackResult::Track(t) => Self::from([t.into()]),
+                LoadTrackResult::Playlist(p) => make_playlist_aware(p.tracks, p.metadata),
             })
             .collect()
     }
@@ -180,8 +193,8 @@ impl AutocompleteResultPrettify for TrackData {
         let track_info = &mut self.info;
 
         let track_length = Duration::from_millis(track_info.length);
-        let title = track_info.take_and_correct_title();
         let author = track_info.take_and_correct_author();
+        let title = track_info.take_and_correct_title();
 
         format!(
             "⌛{} 👤{} 🎵{}",
@@ -228,9 +241,11 @@ impl BotAutocomplete for Autocomplete {
         })
         .map(|q| {
             let source = self.source.unwrap_or_default();
-            (!regex::URL.is_match(&q))
-                .then(|| format!("{}{}", source.value(), q).into_boxed_str())
-                .unwrap_or_else(|| q.into_boxed_str())
+            if regex::URL.is_match(&q) {
+                q.into_boxed_str()
+            } else {
+                format!("{}{}", source.value(), q).into_boxed_str()
+            }
         })
         .expect("exactly one autocomplete option should be focused");
 
@@ -301,112 +316,122 @@ impl BotAutocomplete for Autocomplete {
             TrackLoadType::Empty => Vec::new(),
         };
 
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
 async fn play(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind + DeferCtxKind>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
     ctx.defer().await?;
     let load_ctx = LoadTrackContext::from(&*ctx);
     match load_ctx.process_many(queries).await {
-        Ok(results) => {
-            let (tracks, playlists) = results.split();
-
-            let tracks_len = tracks.len();
-            let track_text = match tracks_len {
-                0 => String::new(),
-                1..=ADD_TRACKS_WRAP_LIMIT => tracks
-                    .iter()
-                    .map(|t| {
-                        format!(
-                            "[`{}`](<{}>)",
-                            t.info.corrected_title(),
-                            t.info.uri_unwrapped()
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .pretty_join_with_and(),
-                _ => format!("`{tracks_len} tracks`"),
-            };
-
-            let playlists_len = playlists.len();
-            let playlist_text = match playlists_len {
-                0 => String::new(),
-                1..=ADD_TRACKS_WRAP_LIMIT => playlists
-                    .iter()
-                    .map(|p| {
-                        format!(
-                            "`{} tracks` from playlist [`{}`](<{}>)",
-                            p.tracks.len(),
-                            p.info.corrected_name(),
-                            p.uri
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .pretty_join_with_and(),
-                _ => format!(
-                    "`{} tracks` in total from `{} playlists`",
-                    playlists.iter().fold(0, |l, p| l + p.tracks.len()),
-                    playlists_len
-                ),
-            };
-
-            let enqueued_text = [track_text, playlist_text]
-                .into_iter()
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .pretty_join_with_and();
-            let plus = match tracks_len + playlists_len {
-                0 => panic!("no tracks or playlists loaded"),
-                1 => "**`＋`**",
-                _ => "**`≡+`**",
-            };
-
-            util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
-
-            let total_tracks = Vec::from(results);
-            let first_track = total_tracks
-                .first()
-                .expect("at least one track must be loaded")
-                .clone();
-
-            let player = util::auto_new_player(ctx).await?;
-
-            player
-                .data_unwrapped()
-                .write()
-                .await
-                .queue_mut()
-                .enqueue(total_tracks, ctx.user_id());
-            player.play(&first_track).await?;
-
-            out_or_fol!(format!("{} Added {}.", plus, enqueued_text), ctx);
-        }
+        Ok(results) => Ok(handle_load_track_results(ctx, results).await?),
         Err(e) => match e {
             LoadTrackProcessManyError::Query(query) => match query {
                 QueryError::LoadFailed(LoadFailedError(query)) => {
-                    crit_or_fol!(
-                        format!("Failed to load tracks for query: `{}`.", query),
-                        ctx
-                    );
+                    ctx.unkn_f(format!("Failed to load tracks for query: `{query}`."))
+                        .await?;
+                    Ok(())
                 }
                 QueryError::SearchResult(query) | QueryError::NoMatches(query) => {
-                    bad_or_fol!(
+                    ctx.wrng_f(
                         format!(
-                            "**Given query is not a URL: `{}`**; Use the command's autocomplete to search for tracks instead. \n\
+                            "**Given query is not a URL: `{query}`**; Use the command's autocomplete to search for tracks instead. \n\
                             -# If the autocomplete results are empty, try using a different search query.",
-                            query
                         ),
-                        ctx
-                    );
+                    ).await?;
+                    Ok(())
                 }
             },
             LoadTrackProcessManyError::Lavalink(e) => Err(e.into()),
         },
     }
+}
+
+async fn handle_load_track_results(
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    results: LoadTrackResults,
+) -> Result<(), play::HandleLoadTrackResultsError> {
+    let (tracks, playlists) = results.split();
+    let tracks_len = tracks.len();
+    let track_text = match tracks_len {
+        0 => String::new(),
+        1..=ADD_TRACKS_WRAP_LIMIT => tracks
+            .iter()
+            .map(|t| {
+                format!(
+                    "[`{}`](<{}>)",
+                    t.info.corrected_title(),
+                    t.info.uri_unwrapped()
+                )
+            })
+            .collect::<Vec<_>>()
+            .pretty_join_with_and(),
+        _ => format!("`{tracks_len} tracks`"),
+    };
+    let playlists_len = playlists.len();
+    let playlist_text = match playlists_len {
+        0 => String::new(),
+        1..=ADD_TRACKS_WRAP_LIMIT => playlists
+            .iter()
+            .map(|p| {
+                format!(
+                    "`{} tracks` from playlist [`{}`](<{}>)",
+                    p.tracks.len(),
+                    p.metadata.corrected_name(),
+                    p.metadata.uri
+                )
+            })
+            .collect::<Vec<_>>()
+            .pretty_join_with_and(),
+        _ => format!(
+            "`{} tracks` in total from `{} playlists`",
+            playlists.iter().fold(0, |l, p| l + p.tracks.len()),
+            playlists_len
+        ),
+    };
+    let enqueued_text = [track_text, playlist_text]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .pretty_join_with_and();
+    util::auto_join_or_check_in_voice_with_user_and_check_not_suppressed(ctx).await?;
+    let total_tracks = Vec::from(results);
+    let total_tracks_len = total_tracks.len();
+    let plus = match total_tracks_len {
+        0 => panic!("no tracks or playlists loaded"),
+        1 => "**`＋`**",
+        _ => "**`≡+`**",
+    };
+    let first_track = total_tracks
+        .first()
+        .expect("at least one track must be loaded")
+        .clone();
+    let player = util::auto_new_player(ctx).await?;
+    let data = player.data_unwrapped();
+    let (now_playing_msg_exists, queue_len) = {
+        let data_r = data.read().await;
+        let queue = data_r.queue();
+        let pair = (require::current_track(queue).is_ok(), queue.len());
+        drop(data_r);
+        pair
+    };
+    if now_playing_msg_exists {
+        data.write()
+            .await
+            .update_and_apply_now_playing_queue_len(queue_len + total_tracks_len)
+            .await?;
+    }
+    data.write()
+        .await
+        .queue_mut()
+        .enqueue(total_tracks, ctx.user_id());
+    player.play(first_track.inner()).await?;
+    ctx.out_f(format!("{plus} Added {enqueued_text}.")).await?;
+    Ok(())
 }
 
 #[derive(CommandOption, CreateOption, Default)]
@@ -426,7 +451,7 @@ enum PlaySource {
     Spotify,
 }
 
-/// Adds track(s) to the queue
+/// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "play", dm_permission = false)]
 pub struct Play {
@@ -468,7 +493,7 @@ impl BotSlashCommand for Play {
     }
 }
 
-/// Adds track(s) from audio files to the queue
+/// Adds track(s) from audio files to the queue.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "play-file", dm_permission = false)]
 pub struct File {
@@ -503,7 +528,9 @@ impl BotSlashCommand for File {
                 .as_ref()
                 .is_some_and(|ty| !ty.starts_with("audio"))
         }) {
-            bad!(format!("`{}` is not an audio file.", file.filename), ctx);
+            ctx.wrng(format!("`{}` is not an audio file.", file.filename))
+                .await?;
+            return Ok(());
         }
 
         let urls = files.into_iter().map(|f| f.url.into());
@@ -554,7 +581,9 @@ impl BotMessageCommand for AddToQueue {
 
         let queries = extract_queries(message);
         if queries.is_empty() {
-            bad!("No audio files or URLs found in this message.", ctx);
+            ctx.wrng("No audio files or URLs found in this message.")
+                .await?;
+            return Ok(());
         }
         Ok(play(&mut ctx, queries).await?)
     }

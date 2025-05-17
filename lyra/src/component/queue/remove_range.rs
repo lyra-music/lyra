@@ -11,12 +11,19 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         AutocompleteCtx, SlashCtx, check,
-        macros::{bad, sus},
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
     component::queue::Remove,
-    core::model::{CacheAware, InteractionClient},
+    core::{
+        http::InteractionClient,
+        model::{
+            CacheAware,
+            response::initial::{
+                autocomplete::RespondAutocomplete, message::create::RespondWithMessage,
+            },
+        },
+    },
     error::{CommandResult, command::AutocompleteResult},
 };
 
@@ -134,11 +141,12 @@ impl BotAutocomplete for Autocomplete {
             kind,
         };
         let choices = generate_remove_range_autocomplete_choices(&options, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
-/// Removes a range of tracks from the queue
+/// Removes a range of tracks from the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "remove-range", dm_permission = false)]
 pub struct RemoveRange {
@@ -164,10 +172,11 @@ impl BotSlashCommand for RemoveRange {
         if queue_len == 1 {
             let remove = InteractionClient::mention_command::<Remove>();
 
-            sus!(
-                format!("The queue only has one track; Use {remove} instead."),
-                ctx
-            );
+            ctx.susp(format!(
+                "The queue only has one track; Use {remove} instead."
+            ))
+            .await?;
+            return Ok(());
         }
 
         super::validate_input_position(self.start, queue_len)?;
@@ -189,10 +198,11 @@ impl BotSlashCommand for RemoveRange {
                 )
             };
 
-            bad!(message, ctx);
+            ctx.wrng(message).await?;
+            return Ok(());
         }
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let positions =
             (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p.unsigned_abs() as usize));
         check::all_users_track(queue, positions, in_voice_with_user)?;

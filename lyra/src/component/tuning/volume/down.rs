@@ -4,14 +4,16 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
-    core::model::{BotStateAware, HttpAware},
+    core::model::{
+        BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
 };
 
-/// Decrease the playback volume
+/// Decreases the playback volume.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "down")]
 pub struct Down {
@@ -29,7 +31,7 @@ impl BotSlashCommand for Down {
         let data = player.data();
         let old_percent = data.read().await.volume();
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let maybe_new_percent = old_percent
             .get()
             .checked_sub(self.percent.unwrap_or(10).unsigned_abs() as u16)
@@ -54,9 +56,10 @@ impl BotSlashCommand for Down {
             (String::from("Muted"), "")
         };
 
-        out!(
-            format!("{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}."),
-            ctx
-        );
+        ctx.out(format!(
+            "{emoji}**`ー`** ~~{old_percent}%~~ ➜ **{new_percent_str}**{warning}."
+        ))
+        .await?;
+        Ok(())
     }
 }

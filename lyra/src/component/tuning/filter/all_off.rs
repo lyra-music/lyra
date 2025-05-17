@@ -2,8 +2,8 @@ use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{macros::out, require},
-    component::tuning::UpdateFilter,
+    command::require, component::tuning::UpdateFilter,
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 struct ResetAllExceptSpeed;
@@ -30,7 +30,7 @@ impl super::ApplyFilter for ResetAllExceptSpeed {
     }
 }
 
-/// Disable all filter
+/// Disables all filters.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "all-off")]
 pub struct AllOff;
@@ -43,6 +43,7 @@ impl crate::command::model::BotSlashCommand for AllOff {
         player.update_filter(ResetAllExceptSpeed).await?;
         player.data().write().await.pitch_mut().reset();
 
-        out!("🪄🔴 Disabled all filters.", ctx);
+        ctx.out("🪄🔴 Disabled all filters.").await?;
+        Ok(())
     }
 }

@@ -2,15 +2,11 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, filter::SetTremolo,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -23,7 +19,7 @@ pub enum Tremolo {
     Off(Off),
 }
 
-/// Enable Tremolo: Quickly oscillates the playback volume, giving a shuddering effect.
+/// Enables Tremolo: Quickly oscillates the playback volume, giving a shuddering effect.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {
@@ -41,12 +37,16 @@ impl BotSlashCommand for On {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetTremolo::new(self.frequency, self.depth) else {
-            bad!("Both frequency and depth must not be zero.", ctx);
+            ctx.wrng("Both frequency and depth must not be zero.")
+                .await?;
+            return Ok(());
         };
         let settings = update.settings();
 
         player.update_filter(Some(update)).await?;
-        out!(format!("🎸🟢 Enabled tremolo ({settings})."), ctx);
+        ctx.out(format!("🎸🟢 Enabled tremolo ({settings})."))
+            .await?;
+        Ok(())
     }
 }
 
@@ -61,6 +61,7 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetTremolo>).await?;
-        out!("🎸🔴 Disabled tremolo.", ctx);
+        ctx.out("🎸🔴 Disabled tremolo.").await?;
+        Ok(())
     }
 }

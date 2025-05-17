@@ -6,7 +6,15 @@ use twilight_model::{
 
 use crate::{
     command::model::PartialInteractionData,
-    core::{model::OwnedBotState, r#static::component::NowPlayingButtonType},
+    core::{
+        model::{
+            OwnedBotState,
+            response::initial::{
+                defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
+            },
+        },
+        r#static::component::NowPlayingButtonType,
+    },
 };
 
 use super::{ComponentMarker, Ctx, Location};
@@ -51,3 +59,6 @@ impl<U: Location> Ctx<ComponentMarker, U> {
         NowPlayingButtonType::try_from(id.as_str()).ok()
     }
 }
+
+impl<U: Location> RespondWithDeferUpdate for Ctx<ComponentMarker, U> {}
+impl<U: Location> RespondWithUpdate for Ctx<ComponentMarker, U> {}

@@ -3,13 +3,9 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
@@ -65,7 +61,7 @@ pub enum ChannelMix {
     Off(Off),
 }
 
-/// Enable Channel Mix: Mixes both channels (left and right).
+/// Enables Channel Mix: Mixes both channels (left and right).
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "on")]
 pub struct On {
@@ -94,18 +90,19 @@ impl BotSlashCommand for On {
             self.right_to_left,
             self.right_to_right,
         ) else {
-            bad!(
+            ctx.wrng(
                 format!(
                     "**At least one setting must be changed**: Same-channel settings must not all be `{}`, and cross-channel settings must not all be `{}`.",
                     SetChannelMix::DEFAULT_SAME_CHANNEL,
                     SetChannelMix::DEFAULT_CROSS_CHANNEL,
                 ),
-                ctx
-            );
+            ).await?;
+            return Ok(());
         };
 
         player.update_filter(Some(update)).await?;
-        out!("⚗️🟢 Enabled channel mix).", ctx);
+        ctx.out("⚗️🟢 Enabled channel mix).").await?;
+        Ok(())
     }
 }
 
@@ -120,6 +117,7 @@ impl BotSlashCommand for Off {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetChannelMix>).await?;
-        out!("⚗️🔴 Disabled channel mix.", ctx);
+        ctx.out("⚗️🔴 Disabled channel mix.").await?;
+        Ok(())
     }
 }

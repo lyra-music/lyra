@@ -45,6 +45,7 @@ pub enum UpdateNowPlayingMessageError {
     BuildNowPlayingEmbed(#[from] BuildNowPlayingEmbedError),
     DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     TwilightHttp(#[from] twilight_http::Error),
+    Respond(#[from] super::core::RespondError),
 }
 
 #[derive(Error, Debug)]

@@ -3,11 +3,9 @@ use std::time::Duration;
 use lyra_ext::pretty::duration_display::DurationDisplay;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use crate::command::{
-    check,
-    macros::{bad, out},
-    model::BotSlashCommand,
-    require,
+use crate::{
+    command::{check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
 };
 
 /// Seeks the current track forward to a new position some time later.
@@ -33,7 +31,8 @@ impl BotSlashCommand for Forward {
 
         let secs = self.seconds.unwrap_or(10.);
         if secs == 0. {
-            bad!("Seconds must not be zero.", ctx);
+            ctx.wrng("Seconds must not be zero.").await?;
+            return Ok(());
         }
 
         let old_timestamp = data_r.timestamp();
@@ -44,25 +43,23 @@ impl BotSlashCommand for Forward {
 
         if timestamp.as_millis() > current_track_length {
             let remaining = timestamp.as_millis() - current_track_length;
-            bad!(
-                format!(
-                    "**Cannot seek past the end of the track**; Maximum forward seek is `{} seconds`.",
-                    remaining.div_ceil(1_000),
-                ),
-                ctx
-            );
+            ctx.wrng(format!(
+                "**Cannot seek past the end of the track**; Maximum forward seek is `{} seconds`.",
+                remaining.div_ceil(1_000),
+            ))
+            .await?;
+            return Ok(());
         }
         player
             .seek_to_with(timestamp, &mut data.write().await)
             .await?;
 
-        out!(
-            format!(
-                "⏩ ~~`{}`~~ ➜ **`{}`**.",
-                old_timestamp.pretty_display(),
-                timestamp.pretty_display(),
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "⏩ ~~`{}`~~ ➜ **`{}`**.",
+            old_timestamp.pretty_display(),
+            timestamp.pretty_display(),
+        ))
+        .await?;
+        Ok(())
     }
 }

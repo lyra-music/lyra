@@ -18,13 +18,11 @@ use twilight_model::{
 
 use super::AccessCategoryFlag;
 use crate::{
-    command::{
-        SlashCtx, check,
-        macros::{out, sus},
-        model::BotSlashCommand,
-        require,
+    command::{SlashCtx, check, model::BotSlashCommand, require},
+    core::{
+        r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+        model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
     },
-    core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
     error::CommandResult,
     gateway::GuildIdAware,
 };
@@ -134,7 +132,7 @@ impl EditActionPrettify for EditAction {
     }
 }
 
-/// Edits the currently configured access controls for users or roles
+/// Edits the currently configured access controls for users or roles.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "edit-user-or-role")]
 pub struct MemberRole {
@@ -215,7 +213,8 @@ impl BotSlashCommand for MemberRole {
         }
 
         if rows_affected == 0 {
-            sus!(NO_ROWS_AFFECTED_MESSAGE, ctx);
+            ctx.susp(NO_ROWS_AFFECTED_MESSAGE).await?;
+            return Ok(());
         }
 
         let ignored_changes = input_mentionables_len as u64 - rows_affected;
@@ -230,17 +229,16 @@ impl BotSlashCommand for MemberRole {
             _ => String::new(),
         };
 
-        out!(
-            format!(
-                "🔐{} {} **`{}`** member(s) or role(s) {} to the guild's access controls{}.",
-                self.action.as_operator_icon(),
-                self.action.as_verb_past(),
-                rows_affected,
-                self.action.as_associated_preposition(),
-                ignored_changes_notice
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🔐{} {} **`{}`** member(s) or role(s) {} to the guild's access controls{}.",
+            self.action.as_operator_icon(),
+            self.action.as_verb_past(),
+            rows_affected,
+            self.action.as_associated_preposition(),
+            ignored_changes_notice
+        ))
+        .await?;
+        Ok(())
     }
 }
 
@@ -319,7 +317,8 @@ impl BotSlashCommand for Channel {
         }
 
         if rows_affected == 0 {
-            sus!(NO_ROWS_AFFECTED_MESSAGE, ctx);
+            ctx.susp(NO_ROWS_AFFECTED_MESSAGE).await?;
+            return Ok(());
         }
 
         let ignored_changes = input_channels_len as u64 - rows_affected;
@@ -334,16 +333,15 @@ impl BotSlashCommand for Channel {
             _ => String::new(),
         };
 
-        out!(
-            format!(
-                "🔐{} {} **`{}`** channel(s) {} to the guild's access controls{}",
-                self.action.as_operator_icon(),
-                self.action.as_verb_past(),
-                rows_affected,
-                self.action.as_associated_preposition(),
-                ignored_changes_notice
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🔐{} {} **`{}`** channel(s) {} to the guild's access controls{}",
+            self.action.as_operator_icon(),
+            self.action.as_verb_past(),
+            rows_affected,
+            self.action.as_associated_preposition(),
+            ignored_changes_notice
+        ))
+        .await?;
+        Ok(())
     }
 }

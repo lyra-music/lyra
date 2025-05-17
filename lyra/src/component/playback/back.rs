@@ -3,16 +3,16 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         check,
-        macros::out,
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::component::playback::PlayPauseError,
     lavalink::OwnedPlayerData,
 };
 
-/// Jumps to the track before the current one in the queue. Will wrap around if queue repeat is enabled.
+/// Jumps to the track before the current one in the queue, wrapping around if queue repeat is enabled.
 #[derive(CreateCommand, CommandModel)]
 #[command(name = "back")]
 pub struct Back;
@@ -50,7 +50,7 @@ pub async fn back(
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
-    queue.acquire_advance_lock();
+    queue.disable_advancing();
     queue.recede();
     let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;
@@ -61,5 +61,6 @@ pub async fn back(
     drop(data_w);
 
     let content = controller_fmt(ctx, via_controller, &message);
-    out!(content, ctx);
+    ctx.out(content).await?;
+    Ok(())
 }

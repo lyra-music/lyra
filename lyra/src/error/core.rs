@@ -7,9 +7,6 @@ pub enum FollowupError {
     MessageValidation(#[from] twilight_validate::message::MessageValidationError),
 }
 
-pub type RespondResult<T> = Result<T, twilight_http::Error>;
-pub type FollowupResult<T> = Result<T, FollowupError>;
-
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum DeserialiseBodyFromHttpError {
@@ -19,7 +16,22 @@ pub enum DeserialiseBodyFromHttpError {
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub enum RegisterGlobalCommandsError {
+pub enum SetGlobalCommandsError {
     TwilightHttp(#[from] twilight_http::Error),
     DeserializeBody(#[from] twilight_http::response::DeserializeBodyError),
+}
+
+#[derive(Error, Debug)]
+pub enum RespondError {
+    #[error(transparent)]
+    TwilightHttp(#[from] twilight_http::Error),
+    #[error(transparent)]
+    Builder(#[from] super::BuildError),
+}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum RespondOrFollowupError {
+    Respond(#[from] RespondError),
+    Followup(#[from] twilight_http::Error),
 }

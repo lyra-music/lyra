@@ -73,13 +73,10 @@ pub mod connection {
     use std::time::Duration;
 
     pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
-    pub const INACTIVITY_TIMEOUT_POLL_N: u8 = 10;
 
     pub const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64);
     pub const CHANGED_TIMEOUT: Duration = Duration::from_millis(250);
     pub const GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
-    pub const INACTIVITY_TIMEOUT_POLL_INTERVAL: Duration =
-        Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64 / INACTIVITY_TIMEOUT_POLL_N as u64);
 }
 
 pub mod misc {
@@ -90,7 +87,7 @@ pub mod misc {
     pub const WAIT_FOR_NOT_SUPPRESSED_TIMEOUT: Duration = Duration::from_secs(30);
     pub const WAIT_FOR_BOT_EVENTS_TIMEOUT: Duration = Duration::from_millis(1_000);
     pub const DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(60);
-    pub const QUEUE_ADVANCE_LOCKED_TIMEOUT: Duration = Duration::from_millis(250);
+    pub const QUEUE_ADVANCE_DISABLED_TIMEOUT: Duration = Duration::from_millis(250);
 }
 
 pub mod text {

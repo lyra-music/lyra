@@ -1,17 +1,13 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{
-        SlashCtx, check,
-        macros::{bad, out},
-        model::BotSlashCommand,
-        require,
-    },
+    command::{SlashCtx, check, model::BotSlashCommand, require},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
     lavalink::IndexerType,
 };
 
-/// Toggles fair queuing
+/// Toggles fair queuing.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "fair-queue", dm_permission = false)]
 pub struct FairQueue;
@@ -35,14 +31,13 @@ impl BotSlashCommand for FairQueue {
                     .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Standard)
                     .await?;
 
-                out!("**` ⮆ `** Disabled fair queue.", ?ctx);
+                ctx.out("**` ⮆ `** Disabled fair queue.").await?;
                 Ok(())
             }
             IndexerType::Shuffled => {
-                bad!(
-                    "Cannot enable fair queue as shuffle is currently enabled.",
-                    ctx
-                );
+                ctx.wrng("Cannot enable fair queue as shuffle is currently enabled.")
+                    .await?;
+                Ok(())
             }
             IndexerType::Standard => {
                 data.write()
@@ -50,7 +45,7 @@ impl BotSlashCommand for FairQueue {
                     .set_indexer_then_update_and_apply_to_now_playing(IndexerType::Fair)
                     .await?;
 
-                out!("⚖️ Enabled fair queue.", ?ctx);
+                ctx.out("⚖️ Enabled fair queue.").await?;
                 Ok(())
             }
         }

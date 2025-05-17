@@ -4,20 +4,17 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use super::AccessCategory;
 use crate::{
-    command::{
-        SlashCtx, check,
-        macros::{note, out, sus},
-        model::BotSlashCommand,
-        require,
-        util::prompt_for_confirmation,
-    },
+    command::{SlashCtx, check, model::BotSlashCommand, require, util::prompt_for_confirmation},
     component::config::access::AccessCategoryFlags,
-    core::{r#const::text::NO_ROWS_AFFECTED_MESSAGE, model::DatabaseAware},
+    core::{
+        r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+        model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
+    },
     error::CommandResult,
     gateway::GuildIdAware,
 };
 
-/// Clears all currently configured access controls for channels, roles or members
+/// Clears all currently configured access controls for channels, roles or members.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "clear")]
 pub struct Clear {
@@ -47,7 +44,8 @@ impl BotSlashCommand for Clear {
 
         let (mut ctx, confirmed) = prompt_for_confirmation(ctx).await?;
         if !confirmed {
-            note!("Cancelled executing this command.", ctx);
+            ctx.note("Cancelled executing this command.").await?;
+            return Ok(());
         }
 
         let mut rows_affected = 0;
@@ -57,15 +55,15 @@ impl BotSlashCommand for Clear {
         }
 
         if rows_affected == 0 {
-            sus!(NO_ROWS_AFFECTED_MESSAGE, ctx);
+            ctx.susp(NO_ROWS_AFFECTED_MESSAGE).await?;
+            return Ok(());
         }
 
-        out!(
-            format!(
-                "🔐🧹 Cleared all access controls for **{}**.",
-                category_flags.pretty_display_code()
-            ),
-            ctx
-        );
+        ctx.out(format!(
+            "🔐🧹 Cleared all access controls for **{}**.",
+            category_flags.pretty_display_code()
+        ))
+        .await?;
+        Ok(())
     }
 }

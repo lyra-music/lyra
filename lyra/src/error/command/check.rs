@@ -181,14 +181,6 @@ pub enum HandlePollError {
 }
 
 #[derive(Error, Debug)]
-#[error(transparent)]
-pub enum SendSupersededWinNoticeError {
-    DeserialiseBodyFromHttp(#[from] crate::error::core::DeserialiseBodyFromHttpError),
-    Http(#[from] twilight_http::Error),
-    MessageValidation(#[from] twilight_validate::message::MessageValidationError),
-}
-
-#[derive(Error, Debug)]
 #[error("poll timed out: {}", .source)]
 pub struct PollLossError {
     pub source: PollResolvableError,

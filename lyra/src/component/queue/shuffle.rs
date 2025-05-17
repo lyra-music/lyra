@@ -3,16 +3,16 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         SlashCtx, check,
-        macros::{bad, out},
         model::{BotSlashCommand, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
-    error::CommandResult,
+    core::model::response::initial::message::create::RespondWithMessage,
+    error::{CommandResult, lavalink::UpdateNowPlayingMessageError},
     lavalink::{IndexerType, OwnedPlayerData},
 };
 
-/// Toggles queue shuffling
+/// Toggles queue shuffling.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "shuffle", dm_permission = false)]
 pub struct Shuffle;
@@ -36,7 +36,7 @@ pub async fn shuffle(
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
-) -> Result<(), crate::error::component::queue::ShuffleError> {
+) -> Result<(), UpdateNowPlayingMessageError> {
     let indexer_type = data.read().await.queue().indexer_type();
     match indexer_type {
         IndexerType::Shuffled => {
@@ -46,15 +46,16 @@ pub async fn shuffle(
                 .await?;
 
             let content = controller_fmt(ctx, via_controller, "**` ⮆ `** Disabled shuffle.");
-            out!(content, ?ctx);
+            ctx.out(content).await?;
             Ok(())
         }
         IndexerType::Fair => {
-            bad!(
+            ctx.wrng(
                 // The shuffle button on the playback controller will be disabled, so no need to use `controller_fmt` here
                 "Cannot enable shuffle as fair queue is currently enabled.",
-                ctx
-            );
+            )
+            .await?;
+            Ok(())
         }
         IndexerType::Standard => {
             data.write()
@@ -63,7 +64,7 @@ pub async fn shuffle(
                 .await?;
 
             let content = controller_fmt(ctx, via_controller, "🔀 Enabled shuffle.");
-            out!(content, ?ctx);
+            ctx.out(content).await?;
             Ok(())
         }
     }

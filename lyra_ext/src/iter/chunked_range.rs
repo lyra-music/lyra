@@ -1,4 +1,4 @@
-/* FIXME: make this generic over `T: std::ops::Add<Output = T> + std::ops::AddAssign + std::iter::Step + Copy` once `std::iter::Step` is stablised:
+/* TODO: make this generic over `T: std::ops::Add<Output = T> + std::ops::AddAssign + std::iter::Step + Copy` once `std::iter::Step` is stablised:
     https://github.com/rust-lang/rust/issues/42168
 */
 pub fn chunked_range(

@@ -29,13 +29,16 @@ use twilight_util::builder::embed::{
 
 use crate::{
     LavalinkAware,
-    command::macros::{caut, hid, nope},
     core::{
         r#const::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },
-        model::{BotStateAware, CacheAware, HttpAware, UserIdAware},
+        model::{
+            BotStateAware, CacheAware, HttpAware, UserIdAware,
+            ctx_head::CtxHead,
+            response::initial::message::{create::RespondWithMessage, update::RespondWithUpdate},
+        },
     },
     error::{
         Cache as CacheError,
@@ -53,6 +56,7 @@ use super::{
 
 #[derive(Hash)]
 pub enum Topic {
+    #[expect(unused)] // TODO: #44
     Repeat(crate::lavalink::RepeatMode),
 }
 
@@ -328,7 +332,7 @@ async fn wait_for_poll_actions(
 }
 
 enum EmbedUpdate<'a> {
-    InteractionResponse(crate::core::model::InteractionInterface<'a>),
+    InteractionResponse(CtxHead),
     Http {
         client: &'a twilight_http::Client,
         channel_id: Id<ChannelMarker>,
@@ -339,7 +343,13 @@ enum EmbedUpdate<'a> {
 impl EmbedUpdate<'_> {
     async fn update_embed(self, embed: Embed) -> Result<(), UpdateEmbedError> {
         match self {
-            EmbedUpdate::InteractionResponse(i) => i.update_message_embeds_only([embed]).await?,
+            EmbedUpdate::InteractionResponse(mut i) => {
+                i.update()
+                    .embeds([embed])
+                    .await?
+                    .retrieve_response()
+                    .await?
+            }
             EmbedUpdate::Http {
                 client,
                 channel_id,
@@ -368,7 +378,7 @@ fn calculate_votes_and_ratios(
     let downvotes = total_votes - upvotes;
     let votes_left = threshold - total_votes;
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let (threshold_f64, upvotes_f64, downvotes_f64, votes_left_f64) = (
         threshold as f64,
         upvotes as f64,
@@ -410,7 +420,7 @@ fn generate_embed_colour(
         );
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     mixbox::latent_to_rgb(&z_mix.map(|f| f as f32))
 }
 
@@ -443,10 +453,10 @@ pub async fn start(
     let users_in_voice = get_users_in_voice(ctx, in_voice).await?;
     let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let threshold = ((users_in_voice_plus_1 / 2.).round() as isize).unsigned_abs();
 
     let embed = generate_embed(
@@ -458,9 +468,11 @@ pub async fn start(
         &embed_latent,
     )?;
     let message = super::util::MessageLinkComponent::from(
-        ctx.respond_embeds_and_components([embed.clone()], [row])
+        ctx.respond()
+            .embeds([embed.clone()])
+            .components([row])
             .await?
-            .model()
+            .retrieve_message()
             .await?,
     );
 
@@ -517,10 +529,10 @@ fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: u
     let ((upvotes, downvotes), (upvote_ratio, downvote_ratio, _)) =
         calculate_votes_and_ratios(votes, threshold);
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let ratio_bar_size = RATIO_BAR_SIZE as f64;
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let (upvote_char_n, downvote_char_n) = (
         ((upvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
         ((downvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
@@ -560,9 +572,10 @@ async fn wait_for_votes(
                     vote,
                     interaction,
                 } => {
-                    let i = ctx.bot().interaction().await?.interfaces(&interaction);
+                    let mut i = ctx.bot().interaction().ctx(&interaction);
                     if !users_in_voice.contains(&user_id) {
-                        nope!("You are not eligible to cast a vote to this poll.", ?i);
+                        i.nope("You are not eligible to cast a vote to this poll.")
+                            .await?;
                         continue;
                     }
 
@@ -571,10 +584,8 @@ async fn wait_for_votes(
                             e.insert(vote);
                         }
                         Entry::Occupied(e) => {
-                            caut!(
-                                format!("You've already casted a vote: **{}**.", e.get()),
-                                ?i
-                            );
+                            i.warn(format!("You've already casted a vote: **{}**.", e.get()))
+                                .await?;
                             continue;
                         }
                     }
@@ -624,13 +635,13 @@ async fn wait_for_votes(
                     .await?;
                 }
                 PollAction::DjUpvote(inter) => {
-                    let i = ctx.bot().interaction().await?.interfaces(&inter);
-                    hid!(format!("🪄 Superseded this poll to win."), ?i);
+                    let mut i = ctx.bot().interaction().ctx(&inter);
+                    i.hid("🪄 Superseded this poll to win.").await?;
                     return Ok(Resolution::SupersededWinViaDj);
                 }
                 PollAction::DjDownvote(inter) => {
-                    let i = ctx.bot().interaction().await?.interfaces(&inter);
-                    hid!(format!("🪄 Superseded this poll to lose."), ?i);
+                    let mut i = ctx.bot().interaction().ctx(&inter);
+                    i.hid("🪄 Superseded this poll to lose.").await?;
                     return Ok(Resolution::SupersededLossViaDj);
                 }
                 PollAction::AlternateDjCast => return Ok(Resolution::SupersededWinViaDj),

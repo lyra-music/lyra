@@ -6,36 +6,33 @@ pub trait PrettyTruncator: AsGrapheme + ToOwned + 'static
 where
     for<'a> Cow<'a, Self>: Add<&'a Self, Output = Cow<'a, Self>>,
 {
-    fn empty() -> &'static Self;
-    fn trail() -> &'static Self;
+    const EMPTY: &Self;
+    const TRAIL: &Self;
     fn pretty_truncate(&self, new_len: usize) -> Cow<Self>
     where
         for<'a> <Self as ToOwned>::Owned: FromIterator<&'a str>,
     {
-        let trail = Self::trail();
+        let trail = Self::TRAIL;
 
-        (self.grapheme_len() <= new_len)
-            .then_some(Cow::Borrowed(self))
-            .unwrap_or_else(|| {
+        if self.grapheme_len() <= new_len {
+            Cow::Borrowed(self)
+        } else {
+            {
                 let Some(len) = new_len.checked_sub(trail.grapheme_len()) else {
-                    return Cow::Borrowed(Self::empty());
+                    return Cow::Borrowed(Self::EMPTY);
                 };
                 if len == 0 {
                     return Cow::Borrowed(trail);
                 }
                 self.grapheme_truncate(len) + trail
-            })
+            }
+        }
     }
 }
 
 impl PrettyTruncator for str {
-    fn empty() -> &'static Self {
-        ""
-    }
-
-    fn trail() -> &'static Self {
-        "…"
-    }
+    const EMPTY: &Self = "";
+    const TRAIL: &Self = "…";
 }
 
 #[cfg(test)]

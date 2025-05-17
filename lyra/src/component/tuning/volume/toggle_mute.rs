@@ -2,14 +2,16 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::unmuting_checks,
-    core::model::{BotStateAware, HttpAware},
+    core::model::{
+        BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
+    },
     error::CommandResult,
     gateway::GuildIdAware,
 };
 
-/// Toggles server muting the bot
+/// Toggles server muting the bot.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "toggle-mute")]
 pub struct ToggleMute;
@@ -27,6 +29,7 @@ impl BotSlashCommand for ToggleMute {
             .await?;
 
         let message = if mute { "🔇 Muted." } else { "🔊 Unmuted." };
-        out!(message, ctx);
+        ctx.out(message).await?;
+        Ok(())
     }
 }

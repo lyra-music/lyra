@@ -5,11 +5,14 @@ use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::{
     command::{SlashCtx, model::BotSlashCommand, require},
-    core::{r#const::colours::EMBED_DEFAULT, model::DatabaseAware},
+    core::{
+        r#const::colours::EMBED_DEFAULT,
+        model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
+    },
     error::CommandResult,
 };
 
-/// Views the currently configured access controls for channels, roles and members
+/// Views the currently configured access controls for channels, roles and members.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "view")]
 pub struct View;
@@ -31,7 +34,7 @@ impl BotSlashCommand for View {
         );
         let embed = embed.validate()?.build();
 
-        ctx.respond_embeds([embed]).await?;
+        ctx.respond().embeds([embed]).await?;
         Ok(())
     }
 }

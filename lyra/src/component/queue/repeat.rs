@@ -3,15 +3,13 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        SlashCtx,
-        check::{self, ResolveWithPoll, StartPoll},
-        macros::out_or_upd,
+        SlashCtx, check,
         model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
-        poll::Topic,
         require,
         util::controller_fmt,
     },
-    error::{CommandResult, component::queue::RepeatError},
+    core::model::response::initial::message::create::RespondWithMessage,
+    error::CommandResult,
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
 
@@ -35,7 +33,7 @@ impl From<RepeatMode> for LavalinkRepeatMode {
     }
 }
 
-/// Sets a repeat mode of the queue
+/// Sets a repeat mode of the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "repeat", dm_permission = false)]
 pub struct Repeat {
@@ -60,11 +58,13 @@ impl BotSlashCommand for Repeat {
 
         require::queue_not_empty(&data.read().await)?;
 
-        check::user_in(in_voice)?
-            .only()
-            .or_else_try_resolve_with(Topic::Repeat(mode))?
-            .and_then_start(&mut ctx)
-            .await?;
+        // TODO: #44
+        //
+        // check::user_in(in_voice)?.only()
+        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
+        //    .and_then_start(&mut ctx)
+        //    .await?;
+        check::user_in(in_voice)?.only()?;
 
         Ok(repeat(&mut ctx, data, mode, false).await?)
     }
@@ -83,7 +83,7 @@ pub async fn repeat(
     data: OwnedPlayerData,
     mode: LavalinkRepeatMode,
     via_controller: bool,
-) -> Result<(), RepeatError> {
+) -> Result<(), crate::error::component::queue::repeat::Error> {
     ctx.get_conn().dispatch(Event::QueueRepeat);
     data.write()
         .await
@@ -92,6 +92,7 @@ pub async fn repeat(
 
     let message = format!("{} {}.", mode.emoji(), mode);
     let content = controller_fmt(ctx, via_controller, &message);
-    out_or_upd!(content, ?ctx);
+    //out_or_upd!(content, ?ctx); TODO: #44
+    ctx.out(content).await?;
     Ok(())
 }

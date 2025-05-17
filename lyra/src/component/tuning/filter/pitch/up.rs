@@ -3,14 +3,15 @@ use std::num::NonZeroI64;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, macros::out, model::BotSlashCommand, require},
+    command::{SlashCtx, model::BotSlashCommand, require},
     component::tuning::{
         check_user_is_dj_and_require_unsuppressed_player, filter::pitch::shift_pitch,
     },
+    core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
 
-/// Shifts the playback pitch up
+/// Shifts the playback pitch up.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "up")]
 pub struct Up {
@@ -29,6 +30,8 @@ impl BotSlashCommand for Up {
         let (old, new) = shift_pitch(&player, half_tones).await?;
 
         let emoji = new.tier().emoji();
-        out!(format!("{emoji}**`＋`** ~~`{old}`~~ ➜ **`{new}`**."), ctx);
+        ctx.out(format!("{emoji}**`＋`** ~~`{old}`~~ ➜ **`{new}`**."))
+            .await?;
+        Ok(())
     }
 }

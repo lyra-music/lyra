@@ -14,7 +14,7 @@ use crate::{
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
-    core::model::CacheAware,
+    core::model::{CacheAware, response::initial::autocomplete::RespondAutocomplete},
     error::{CommandResult, command::AutocompleteResult},
 };
 
@@ -92,11 +92,12 @@ impl BotAutocomplete for Autocomplete {
             .expect("exactly one autocomplete option should be focused");
 
         let choices = generate_remove_choices(&focused, finished, &ctx).await;
-        Ok(ctx.autocomplete(choices).await?)
+        ctx.autocomplete(choices).await?;
+        Ok(())
     }
 }
 
-/// Removes track(s) from the queue
+/// Removes track(s) from the queue.
 #[derive(CommandModel, CreateCommand)]
 #[command(name = "remove", dm_permission = false)]
 pub struct Remove {
@@ -141,7 +142,7 @@ impl BotSlashCommand for Remove {
 
         super::validate_input_positions(&inputs, queue.len())?;
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let mut positions = inputs
             .iter()
             .filter_map(|&p| NonZeroUsize::new(p.unsigned_abs() as usize))

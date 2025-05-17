@@ -47,14 +47,13 @@
 
               # https://devenv.sh/packages/
               packages = with pkgs; [
-                git
-                clang
-                mold
                 codespell
-                act
-                sqlx-cli
-                # pgcli
                 cargo-edit
+                #sqlx-cli
+                #clang
+                #mold
+                #act
+                #pgcli
               ];
 
               # https://devenv.sh/scripts/
