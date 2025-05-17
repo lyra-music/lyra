@@ -12,7 +12,7 @@ use twilight_model::{
     application::interaction::{InteractionData, InteractionType},
     channel::{
         ChannelType,
-        message::component::{TextInput, TextInputStyle},
+        message::component::{ActionRow, TextInput, TextInputStyle},
     },
     guild::PartialMember,
     id::{
@@ -335,7 +335,10 @@ pub async fn prompt_for_confirmation(
     ctx.modal(
         modal_custom_id.clone(),
         ctx.command_name_full(),
-        [text_input.into()],
+        [ActionRow {
+            components: vec![text_input.into()],
+        }
+        .into()],
     )
     .await?;
 

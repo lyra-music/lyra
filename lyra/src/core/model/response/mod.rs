@@ -1,10 +1,8 @@
 use twilight_http::{Response, client::InteractionClient, response::marker::EmptyBody};
 use twilight_model::{
-    channel::message::AllowedMentions,
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{Id, marker::InteractionMarker},
 };
-use twilight_util::builder::InteractionResponseDataBuilder;
 
 pub mod either;
 pub mod followup;
@@ -19,10 +17,6 @@ pub trait Respond {
     fn interaction_id(&self) -> Id<InteractionMarker>;
     fn interaction_token(&self) -> &str;
     fn interaction_client(&self) -> InteractionClient<'_>;
-
-    fn base_response_data_builder() -> InteractionResponseDataBuilder {
-        InteractionResponseDataBuilder::new().allowed_mentions(AllowedMentions::default())
-    }
 
     #[expect(async_fn_in_trait)]
     async fn raw_respond_and_acknowledge(

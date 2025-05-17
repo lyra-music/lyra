@@ -1,10 +1,11 @@
 use twilight_model::{channel::message::MessageFlags, http::interaction::InteractionResponseType};
+use twilight_util::builder::InteractionResponseDataBuilder;
 
 use crate::core::model::response::{EmptyResponseResult, Respond};
 
 pub trait RespondWithDefer: Respond {
     async fn raw_defer(&mut self, ephemeral: bool) -> EmptyResponseResult {
-        let mut data = Self::base_response_data_builder();
+        let mut data = InteractionResponseDataBuilder::new();
         if ephemeral {
             data = data.flags(MessageFlags::EPHEMERAL);
         }

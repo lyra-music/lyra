@@ -1,4 +1,4 @@
-use twilight_model::channel::message::MessageFlags;
+use twilight_model::channel::message::{AllowedMentions, MessageFlags};
 
 use crate::core::model::response::Respond;
 
@@ -26,6 +26,7 @@ pub trait RespondWithMessage: Respond {
         ResponseBuilder::default()
             .inner(self)
             .interaction_response_type(InteractionResponseType2::ChannelMessageWithSource)
+            .allowed_mentions(AllowedMentions::default())
     }
     #[inline]
     fn out(&mut self, content: impl Into<String>) -> ResponseBuilder<'_, Self>
