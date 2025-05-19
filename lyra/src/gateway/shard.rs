@@ -4,7 +4,7 @@ use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::{
-    command::declare,
+    command::declare::COMMANDS,
     core::{
         model::{BotState, BotStateRef, DatabaseAware},
         r#static::application,
@@ -37,11 +37,10 @@ impl BotState {
 impl Process for ReadyContext<'_> {
     async fn process(self) -> ProcessResult {
         application::set_id(self.inner.application.id);
-        let commands = declare::commands();
-        tracing::info!("registering {} global command(s)", commands.len());
+        tracing::info!("registering {} global command(s)", COMMANDS.len());
         self.bot
             .interaction()
-            .set_global_commands(&commands)
+            .set_global_commands(&*COMMANDS)
             .await?;
 
         let guild_count = self.inner.guilds.len();
