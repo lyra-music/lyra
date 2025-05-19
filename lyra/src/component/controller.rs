@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "now-playing", desc = ".")]
+#[command(name = "now-playing", desc = ".", dm_permission = false)]
 pub enum NowPlaying {
     #[command(name = "bump")]
     Bump(Bump),

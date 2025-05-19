@@ -14,7 +14,7 @@ use crate::{
 
 /// Skip playing the current track.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "skip")]
+#[command(name = "skip", dm_permission = false)]
 pub struct Skip;
 
 impl BotSlashCommand for Skip {

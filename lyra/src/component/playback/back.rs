@@ -14,7 +14,7 @@ use crate::{
 
 /// Jumps to the track before the current one in the queue, wrapping around if queue repeat is enabled.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "back")]
+#[command(name = "back", dm_permission = false)]
 pub struct Back;
 
 impl BotSlashCommand for Back {
