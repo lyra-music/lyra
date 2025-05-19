@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, OnceLock},
+};
 
 use twilight_model::application::command::Command;
 
@@ -278,8 +281,7 @@ pub static POPULATED_COMMAND_MAP: OnceLock<HashMap<&'static str, Command>> = Onc
 const COMMANDS_N: usize = SLASH_COMMANDS_N + MESSAGE_COMMANDS_N;
 type Commands = [Command; COMMANDS_N];
 
-#[inline]
-pub fn commands() -> Commands {
+pub static COMMANDS: LazyLock<Commands> = LazyLock::new(|| {
     let a = slash_commands();
     let b = message_commands();
 
@@ -288,4 +290,4 @@ pub fn commands() -> Commands {
         SLASH_COMMANDS_N..COMMANDS_N => b[i - SLASH_COMMANDS_N].clone(),
         _ => unreachable!(),
     })
-}
+});
