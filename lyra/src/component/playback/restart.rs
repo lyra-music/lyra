@@ -9,7 +9,7 @@ use crate::{
 
 /// Restarts the current track; Equivalent to seeking to 0:00.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "restart", dm_permission = false)]
+#[command(name = "restart", contexts = "guild")]
 pub struct Restart;
 
 impl BotSlashCommand for Restart {

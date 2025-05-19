@@ -453,7 +453,7 @@ enum PlaySource {
 
 /// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "play", dm_permission = false)]
+#[command(name = "play", contexts = "guild")]
 pub struct Play {
     /// What song? [search query / direct link]
     #[command(autocomplete = true)]
@@ -495,7 +495,7 @@ impl BotSlashCommand for Play {
 
 /// Adds track(s) from audio files to the queue.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "play-file", dm_permission = false)]
+#[command(name = "play-file", contexts = "guild")]
 pub struct File {
     /// What track?
     track: Attachment,

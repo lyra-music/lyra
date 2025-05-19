@@ -16,7 +16,7 @@ use crate::{
 
 /// Clears the queue.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "clear", dm_permission = false)]
+#[command(name = "clear", contexts = "guild")]
 pub struct Clear;
 
 impl BotSlashCommand for Clear {

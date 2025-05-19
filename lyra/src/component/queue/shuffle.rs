@@ -14,7 +14,7 @@ use crate::{
 
 /// Toggles queue shuffling.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "shuffle", dm_permission = false)]
+#[command(name = "shuffle", contexts = "guild")]
 pub struct Shuffle;
 
 impl BotSlashCommand for Shuffle {

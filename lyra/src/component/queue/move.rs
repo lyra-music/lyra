@@ -141,7 +141,7 @@ impl BotAutocomplete for Autocomplete {
 
 /// Moves a track to a new position in the queue.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "move", dm_permission = false)]
+#[command(name = "move", contexts = "guild")]
 pub struct Move {
     /// Move which track? [track title / position in queue]
     #[command(min_value = 1, autocomplete = true)]

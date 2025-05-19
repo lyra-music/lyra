@@ -28,7 +28,7 @@ pub fn clipping_warning(percent: NonZeroU16) -> &'static str {
 }
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "volume", desc = ".", dm_permission = false)]
+#[command(name = "volume", desc = ".", contexts = "guild")]
 pub enum Volume {
     #[command(name = "toggle-mute")]
     ToggleMute(toggle_mute::ToggleMute),

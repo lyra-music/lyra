@@ -8,7 +8,6 @@ mod repeat;
 mod shuffle;
 
 pub use clear::Clear;
-#[expect(clippy::module_name_repetitions)]
 pub use fair_queue::FairQueue;
 use lyra_ext::{
     num::usize_to_i64_truncating,
@@ -16,7 +15,6 @@ use lyra_ext::{
 };
 
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
-#[expect(clippy::module_name_repetitions)]
 pub use play::AddToQueue;
 pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};

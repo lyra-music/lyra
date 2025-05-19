@@ -7,7 +7,7 @@ mod forward;
 mod to;
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "jump", desc = ".", dm_permission = false)]
+#[command(name = "jump", desc = ".", contexts = "guild")]
 pub enum Jump {
     #[command(name = "to")]
     To(to::To),

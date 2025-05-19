@@ -8,7 +8,7 @@ use lyra_proc::BotCommandGroup;
 use self::{access::Access, now_playing::NowPlaying};
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "config", desc = ".", dm_permission = false)]
+#[command(name = "config", desc = ".", contexts = "guild")]
 pub enum Config {
     #[command(name = "access")]
     Access(Box<Access>),

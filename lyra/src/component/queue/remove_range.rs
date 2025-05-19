@@ -148,7 +148,7 @@ impl BotAutocomplete for Autocomplete {
 
 /// Removes a range of tracks from the queue.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "remove-range", dm_permission = false)]
+#[command(name = "remove-range", contexts = "guild")]
 pub struct RemoveRange {
     /// Which starting tracks? [track title / position in queue]
     #[command(min_value = 1, autocomplete = true)]

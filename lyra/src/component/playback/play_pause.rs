@@ -14,7 +14,7 @@ use crate::{
 
 /// Toggles the playback of the current track.
 #[derive(CreateCommand, CommandModel)]
-#[command(name = "play-pause", dm_permission = false)]
+#[command(name = "play-pause", contexts = "guild")]
 pub struct PlayPause;
 
 impl BotSlashCommand for PlayPause {
