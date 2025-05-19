@@ -108,7 +108,7 @@ impl ApplyFilter for Option<SetTremoloVibrato<VibratoMarker>> {
 }
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "filter", desc = ".", dm_permission = false)]
+#[command(name = "filter", desc = ".", contexts = "guild")]
 pub enum Filter {
     #[command(name = "tremolo")]
     Tremolo(tremolo::Tremolo),

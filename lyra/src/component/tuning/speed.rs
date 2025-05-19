@@ -108,7 +108,7 @@ impl PlayerInterface {
 
 /// Sets the playback speed.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "speed", dm_permission = false)]
+#[command(name = "speed", contexts = "guild")]
 pub struct Speed {
     /// Sets the speed with what multiplier? [Default: 1.0]
     #[command(min_value = 0)]

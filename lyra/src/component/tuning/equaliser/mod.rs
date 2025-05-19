@@ -38,7 +38,7 @@ impl super::ApplyFilter for Option<SetEqualiser> {
 }
 
 #[derive(CommandModel, CreateCommand, BotCommandGroup)]
-#[command(name = "equaliser", desc = ".", dm_permission = false)]
+#[command(name = "equaliser", desc = ".", contexts = "guild")]
 pub enum Equaliser {
     #[command(name = "preset")]
     Preset(preset::Preset),

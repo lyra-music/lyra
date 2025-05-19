@@ -9,7 +9,7 @@ use crate::{
 
 /// Toggles fair queuing.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "fair-queue", dm_permission = false)]
+#[command(name = "fair-queue", contexts = "guild")]
 pub struct FairQueue;
 
 impl BotSlashCommand for FairQueue {

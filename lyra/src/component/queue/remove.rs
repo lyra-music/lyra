@@ -99,7 +99,7 @@ impl BotAutocomplete for Autocomplete {
 
 /// Removes track(s) from the queue.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "remove", dm_permission = false)]
+#[command(name = "remove", contexts = "guild")]
 pub struct Remove {
     /// Which track? [track title / position in queue]
     #[command(min_value = 1, autocomplete = true)]
