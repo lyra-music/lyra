@@ -1,6 +1,6 @@
 [package]
 name = "lyra_proc"
-version = "0.9.0-rc.2"
+version = "0.9.0-rc.3"
 rust-version = "1.87"
 edition = "2024"
 
