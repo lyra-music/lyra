@@ -21,10 +21,9 @@ use twilight_model::{
 use crate::error::{CommandResult, command::AutocompleteResult};
 
 pub use self::ctx::{
-    AppCtxKind, AppCtxMarker, Autocomplete as AutocompleteCtx, Component as ComponentCtx, Ctx,
-    DeferCtxKind, FollowupCtxKind, Guild as GuildCtx, GuildModal as GuildModalCtx,
-    GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx, RespondViaMessage,
-    Slash as SlashCtx, User,
+    AutocompleteCtx, CmdInnerMarkerKind, CmdMarker, ComponentCtx, Ctx, CtxKind, FollowupKind,
+    GuildCtx, GuildModalCtx, GuildRef as GuildCtxRef, MessageCmdCtx, RespondWithDeferKind,
+    RespondWithMessageKind, SlashCmdCtx, UserCmdCtx,
 };
 
 pub trait NonPingInteraction {
@@ -99,16 +98,16 @@ pub trait CommandStructureAware: CreateCommand {
 }
 
 pub trait BotSlashCommand: CommandStructureAware {
-    async fn run(self, ctx: SlashCtx) -> CommandResult;
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult;
 }
 
 #[expect(unused)]
 pub trait BotUserCommand: CreateCommand {
-    async fn run(ctx: User) -> CommandResult;
+    async fn run(ctx: UserCmdCtx) -> CommandResult;
 }
 
 pub trait BotMessageCommand: CreateCommand {
-    async fn run(ctx: MessageCtx) -> CommandResult;
+    async fn run(ctx: MessageCmdCtx) -> CommandResult;
 }
 
 pub trait BotAutocomplete {

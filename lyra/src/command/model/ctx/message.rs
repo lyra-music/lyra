@@ -1,13 +1,13 @@
 use crate::core::model::response::initial::message::create::RespondWithMessage;
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, Kind, Location, ModalMarker,
-    modal::ModalSrcMarker,
+    CmdInnerMarkerKind, CmdMarker, ComponentMarker, Ctx, CtxContext, CtxKind, ModalMarker,
+    modal::ModalInnerMarkerKind,
 };
 
-pub trait RespondVia: Kind {}
-impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
-impl<M: ModalSrcMarker> RespondVia for ModalMarker<M> {}
-impl RespondVia for ComponentMarker {}
+pub trait RespondWithMessageKind: CtxKind {}
+impl<T: CmdInnerMarkerKind> RespondWithMessageKind for CmdMarker<T> {}
+impl<M: ModalInnerMarkerKind> RespondWithMessageKind for ModalMarker<M> {}
+impl RespondWithMessageKind for ComponentMarker {}
 
-impl<T: RespondVia, U: Location> RespondWithMessage for Ctx<T, U> {}
+impl<T: RespondWithMessageKind, C: CtxContext> RespondWithMessage for Ctx<T, C> {}

@@ -13,7 +13,7 @@ use crate::{
 pub struct Restart;
 
 impl BotSlashCommand for Restart {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
+    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;

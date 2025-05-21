@@ -12,7 +12,7 @@ use crate::{
 pub struct Off;
 
 impl crate::command::model::BotSlashCommand for Off {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
+    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 

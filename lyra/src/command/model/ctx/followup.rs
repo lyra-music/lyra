@@ -1,13 +1,13 @@
 use crate::core::model::response::followup::Followup;
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, Kind, Location,
-    modal::{Marker, ModalSrcMarker},
+    CmdInnerMarkerKind, CmdMarker, ComponentMarker, Ctx, CtxContext, CtxKind,
+    modal::{ModalInnerMarkerKind, ModalMarker},
 };
 
-pub trait FollowupCtxKind: Kind {}
-impl<T: AppCtxKind> FollowupCtxKind for AppCtxMarker<T> {}
-impl<M: ModalSrcMarker> FollowupCtxKind for Marker<M> {}
-impl FollowupCtxKind for ComponentMarker {}
+pub trait FollowupKind: CtxKind {}
+impl<T: CmdInnerMarkerKind> FollowupKind for CmdMarker<T> {}
+impl<M: ModalInnerMarkerKind> FollowupKind for ModalMarker<M> {}
+impl FollowupKind for ComponentMarker {}
 
-impl<T: FollowupCtxKind, U: Location> Followup for Ctx<T, U> {}
+impl<T: FollowupKind, C: CtxContext> Followup for Ctx<T, C> {}

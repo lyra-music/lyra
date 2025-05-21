@@ -10,23 +10,23 @@ use twilight_model::{
     user::User as TwilightUser,
 };
 
-use super::{AppCtxKind, AppCtxMarker, Ctx, Location};
+use super::{CmdInnerMarkerKind, CmdMarker, Ctx, CtxContext};
 
-pub struct UserAppMarker;
-impl AppCtxKind for UserAppMarker {}
-pub type UserMarker = AppCtxMarker<UserAppMarker>;
-pub type User = Ctx<UserMarker>;
+pub struct UserCmdInnerMarker;
+impl CmdInnerMarkerKind for UserCmdInnerMarker {}
+pub type UserCmdMarker = CmdMarker<UserCmdInnerMarker>;
+pub type UserCmdCtx = Ctx<UserCmdMarker>;
 
-pub struct MessageAppMarker;
-impl AppCtxKind for MessageAppMarker {}
-pub type MessageMarker = AppCtxMarker<MessageAppMarker>;
-pub type Message = Ctx<MessageMarker>;
+pub struct MessageCmdInnerMarker;
+impl CmdInnerMarkerKind for MessageCmdInnerMarker {}
+pub type MessageCmdMarker = CmdMarker<MessageCmdInnerMarker>;
+pub type MessageCmdCtx = Ctx<MessageCmdMarker>;
 
-pub trait TargetIdAware: AppCtxKind {}
-impl TargetIdAware for UserAppMarker {}
-impl TargetIdAware for MessageAppMarker {}
+pub trait TargetIdAwareKind: CmdInnerMarkerKind {}
+impl TargetIdAwareKind for UserCmdInnerMarker {}
+impl TargetIdAwareKind for MessageCmdInnerMarker {}
 
-impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
+impl<T: TargetIdAwareKind + CmdInnerMarkerKind, C: CtxContext> Ctx<CmdMarker<T>, C> {
     pub const fn target_id(&self) -> Id<GenericMarker> {
         self.command_data()
             .target_id
@@ -42,7 +42,7 @@ impl<T: TargetIdAware + AppCtxKind, U: Location> Ctx<AppCtxMarker<T>, U> {
 }
 
 #[expect(unused)]
-impl<U: Location> Ctx<UserMarker, U> {
+impl<C: CtxContext> Ctx<UserCmdMarker, C> {
     #[inline]
     pub const fn target_user_id(&self) -> Id<TwilightUserMarker> {
         self.target_id().cast()
@@ -56,7 +56,7 @@ impl<U: Location> Ctx<UserMarker, U> {
     }
 }
 
-impl<U: Location> Ctx<MessageMarker, U> {
+impl<C: CtxContext> Ctx<MessageCmdMarker, C> {
     #[inline]
     pub const fn target_message_id(&self) -> Id<TwilightMessageMarker> {
         self.target_id().cast()

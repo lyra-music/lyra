@@ -1,11 +1,11 @@
 use crate::core::model::response::initial::autocomplete::RespondAutocomplete;
 
-use super::{Ctx, GuildMarker, Kind, Location};
+use super::{Ctx, CtxContext, CtxKind, GuildMarker};
 
-pub struct Marker;
-impl Kind for Marker {}
-pub type Autocomplete = Ctx<Marker>;
+pub struct AutocompleteMarker;
+impl CtxKind for AutocompleteMarker {}
+pub type AutocompleteCtx = Ctx<AutocompleteMarker>;
 #[expect(unused)]
-pub type GuildAutocompleteCtx = Ctx<Marker, GuildMarker>;
+pub type GuildAutocompleteCtx = Ctx<AutocompleteMarker, GuildMarker>;
 
-impl<U: Location> RespondAutocomplete for Ctx<Marker, U> {}
+impl<C: CtxContext> RespondAutocomplete for Ctx<AutocompleteMarker, C> {}

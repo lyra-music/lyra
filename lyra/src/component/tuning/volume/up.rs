@@ -4,7 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, model::BotSlashCommand, require},
     component::tuning::check_user_is_dj_and_require_player,
     core::model::{
         BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
@@ -23,7 +23,7 @@ pub struct Up {
 }
 
 impl BotSlashCommand for Up {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         const MAX_PERCENT: NonZeroU16 = NonZeroU16::new(1_000).expect("`1_000 is non-zero");
 
         let mut ctx = require::guild(ctx)?;

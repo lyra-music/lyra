@@ -91,7 +91,7 @@ pub fn impl_bot_command_group(input: &DeriveInput) -> TokenStream {
     let bot_slash_command_path =
         syn::parse_str::<Path>("crate::command::model::BotSlashCommand").expect("path is valid");
     let slash_ctx_path =
-        syn::parse_str::<Path>("crate::command::model::SlashCtx").expect("path is valid");
+        syn::parse_str::<Path>("crate::command::model::SlashCmdCtx").expect("path is valid");
     let result_path =
         syn::parse_str::<Path>("crate::error::command::Result").expect("path is valid");
     quote! {

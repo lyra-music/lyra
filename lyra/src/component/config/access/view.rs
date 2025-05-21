@@ -4,7 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::{
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, model::BotSlashCommand, require},
     core::{
         r#const::colours::EMBED_DEFAULT,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
@@ -18,7 +18,7 @@ use crate::{
 pub struct View;
 
 impl BotSlashCommand for View {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
 
         let embed = EmbedBuilder::new()

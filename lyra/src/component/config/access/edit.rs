@@ -18,7 +18,7 @@ use twilight_model::{
 
 use super::AccessCategoryFlag;
 use crate::{
-    command::{SlashCtx, check, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, check, model::BotSlashCommand, require},
     core::{
         r#const::text::NO_ROWS_AFFECTED_MESSAGE,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
@@ -151,7 +151,7 @@ pub struct MemberRole {
 }
 
 impl BotSlashCommand for MemberRole {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 
@@ -261,7 +261,7 @@ pub struct Channel {
 }
 
 impl BotSlashCommand for Channel {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 

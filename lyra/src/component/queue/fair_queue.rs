@@ -1,7 +1,7 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, check, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, check, model::BotSlashCommand, require},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
     lavalink::IndexerType,
@@ -13,7 +13,7 @@ use crate::{
 pub struct FairQueue;
 
 impl BotSlashCommand for FairQueue {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         check::user_is_dj(&ctx)?;
         let _ = require::in_voice(&ctx)?.and_with_someone_else()?;

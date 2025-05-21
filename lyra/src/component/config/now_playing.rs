@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, model::BotSlashCommand, require},
     core::model::{
         DatabaseAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
     },
@@ -26,7 +26,7 @@ pub enum NowPlaying {
 pub struct Toggle;
 
 impl BotSlashCommand for Toggle {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let new_now_playing = sqlx::query!(
             "UPDATE guild_configs SET now_playing = NOT now_playing WHERE id = $1 RETURNING now_playing;",

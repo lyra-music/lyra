@@ -2,8 +2,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        SlashCtx, check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        SlashCmdCtx, check,
+        model::{BotSlashCommand, GuildCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -18,7 +18,7 @@ use crate::{
 pub struct Shuffle;
 
 impl BotSlashCommand for Shuffle {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         check::user_in(require::in_voice(&ctx)?)?.only()?;
         let player = require::player(&ctx)?;
@@ -34,7 +34,7 @@ impl BotSlashCommand for Shuffle {
 
 pub async fn shuffle(
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), UpdateNowPlayingMessageError> {
     let indexer_type = data.read().await.queue().indexer_type();

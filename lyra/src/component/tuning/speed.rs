@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        SlashCtx,
+        SlashCmdCtx,
         model::BotSlashCommand,
         require::{self, PlayerInterface},
     },
@@ -118,7 +118,7 @@ pub struct Speed {
 }
 
 impl BotSlashCommand for Speed {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 

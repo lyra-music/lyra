@@ -17,9 +17,9 @@ use crate::{
     },
 };
 
-use super::{ComponentMarker, Ctx, Location};
+use super::{ComponentMarker, Ctx, CtxContext};
 
-impl<U: Location> Ctx<ComponentMarker, U> {
+impl<C: CtxContext> Ctx<ComponentMarker, C> {
     pub const fn from_data(
         inner: Box<InteractionCreate>,
         data: Box<MessageComponentInteractionData>,
@@ -36,7 +36,7 @@ impl<U: Location> Ctx<ComponentMarker, U> {
             acknowledged: false,
             acknowledgement: None,
             kind: std::marker::PhantomData,
-            location: std::marker::PhantomData,
+            context: std::marker::PhantomData,
         }
     }
 
@@ -60,5 +60,5 @@ impl<U: Location> Ctx<ComponentMarker, U> {
     }
 }
 
-impl<U: Location> RespondWithDeferUpdate for Ctx<ComponentMarker, U> {}
-impl<U: Location> RespondWithUpdate for Ctx<ComponentMarker, U> {}
+impl<C: CtxContext> RespondWithDeferUpdate for Ctx<ComponentMarker, C> {}
+impl<C: CtxContext> RespondWithUpdate for Ctx<ComponentMarker, C> {}

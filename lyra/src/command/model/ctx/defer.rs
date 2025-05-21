@@ -1,13 +1,13 @@
 use crate::core::model::response::initial::defer::RespondWithDefer;
 
 use super::{
-    AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, Kind, Location,
-    modal::{Marker, ModalSrcMarker},
+    CmdInnerMarkerKind, CmdMarker, ComponentMarker, Ctx, CtxContext, CtxKind,
+    modal::{ModalInnerMarkerKind, ModalMarker},
 };
 
-pub trait DeferCtxKind: Kind {}
-impl<T: AppCtxKind> DeferCtxKind for AppCtxMarker<T> {}
-impl<M: ModalSrcMarker> DeferCtxKind for Marker<M> {}
-impl DeferCtxKind for ComponentMarker {}
+pub trait RespondWithDeferKind: CtxKind {}
+impl<T: CmdInnerMarkerKind> RespondWithDeferKind for CmdMarker<T> {}
+impl<M: ModalInnerMarkerKind> RespondWithDeferKind for ModalMarker<M> {}
+impl RespondWithDeferKind for ComponentMarker {}
 
-impl<T: DeferCtxKind, U: Location> RespondWithDefer for Ctx<T, U> {}
+impl<T: RespondWithDeferKind, C: CtxContext> RespondWithDefer for Ctx<T, C> {}

@@ -3,7 +3,7 @@ use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::{SlashCmdCtx, model::BotSlashCommand, require},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
@@ -80,7 +80,7 @@ pub struct On {
 }
 
 impl BotSlashCommand for On {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
@@ -112,7 +112,7 @@ impl BotSlashCommand for On {
 pub struct Off;
 
 impl BotSlashCommand for Off {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 

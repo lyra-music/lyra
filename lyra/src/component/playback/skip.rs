@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        model::{BotSlashCommand, GuildCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -18,7 +18,7 @@ use crate::{
 pub struct Skip;
 
 impl BotSlashCommand for Skip {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
+    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
@@ -38,7 +38,7 @@ pub async fn skip(
     current_track_title: &str,
     player: require::PlayerInterface,
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), PlayPauseError> {
     let mut data_w = data.write().await;

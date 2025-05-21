@@ -4,7 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use super::AccessCategory;
 use crate::{
-    command::{SlashCtx, check, model::BotSlashCommand, require, util::prompt_for_confirmation},
+    command::{SlashCmdCtx, check, model::BotSlashCommand, require, util::prompt_for_confirmation},
     component::config::access::AccessCategoryFlags,
     core::{
         r#const::text::NO_ROWS_AFFECTED_MESSAGE,
@@ -23,7 +23,7 @@ pub struct Clear {
 }
 
 impl BotSlashCommand for Clear {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let ctx = require::guild(ctx)?;
         check::user_is_access_manager(&ctx)?;
 

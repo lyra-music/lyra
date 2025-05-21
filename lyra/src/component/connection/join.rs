@@ -21,8 +21,8 @@ use twilight_model::{
 use crate::{
     LavalinkAware,
     command::{
-        SlashCtx, check,
-        model::{BotSlashCommand, CtxKind, FollowupCtxKind, GuildCtx, RespondViaMessage},
+        SlashCmdCtx, check,
+        model::{BotSlashCommand, CtxKind, FollowupKind, GuildCtx, RespondWithMessageKind},
         require::{self, InVoiceCachedVoiceState},
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
@@ -339,7 +339,7 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 
 async fn handle_response(
     response: Response,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
 ) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
@@ -391,13 +391,13 @@ async fn handle_response(
 }
 
 pub async fn auto(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
 ) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
     Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
 }
 
 pub async fn join(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<InVoiceCachedVoiceState, JoinError> {
     Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
@@ -413,7 +413,7 @@ pub struct Join {
 }
 
 impl BotSlashCommand for Join {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let Err(e) = join(&mut ctx, self.channel).await else {
             return Ok(());

@@ -28,7 +28,7 @@ pub enum NowPlaying {
 pub struct Bump;
 
 impl BotSlashCommand for Bump {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
+    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
         let mut ctx = require::guild(ctx)?;
         let player = require::player(&ctx)?;
         let data = player.data();

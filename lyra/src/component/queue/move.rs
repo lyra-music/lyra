@@ -6,7 +6,7 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        AutocompleteCtx, SlashCtx, check,
+        AutocompleteCtx, SlashCmdCtx, check,
         model::{BotAutocomplete, BotSlashCommand},
         require,
     },
@@ -152,7 +152,7 @@ pub struct Move {
 }
 
 impl BotSlashCommand for Move {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;

@@ -6,7 +6,7 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         check,
-        model::{BotSlashCommand, SlashCtx},
+        model::{BotSlashCommand, SlashCmdCtx},
         require,
     },
     core::model::response::initial::message::create::RespondWithMessage,
@@ -20,7 +20,7 @@ use crate::{
 pub struct Clear;
 
 impl BotSlashCommand for Clear {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let in_voice = require::in_voice(&ctx)?.and_unsuppressed()?;
         let in_voice_with_user = check::user_in(in_voice)?;

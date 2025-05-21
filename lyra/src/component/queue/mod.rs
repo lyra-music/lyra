@@ -30,7 +30,7 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 
 use crate::{
     command::{
-        model::{FollowupCtxKind, GuildCtx, RespondViaMessage},
+        model::{FollowupKind, GuildCtx, RespondWithMessageKind},
         require::PlayerInterface,
     },
     core::{
@@ -210,7 +210,7 @@ fn validate_input_positions(
 async fn remove_range(
     start: i64,
     end: i64,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     #[expect(clippy::cast_possible_truncation)]
@@ -240,7 +240,7 @@ async fn remove_range(
 
 async fn remove(
     positions: Box<[NonZeroUsize]>,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
@@ -264,7 +264,7 @@ async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
     queue_cleared: bool,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();

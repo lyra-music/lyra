@@ -9,7 +9,7 @@ mod modal;
 
 use std::{marker::PhantomData, sync::Arc};
 
-use modal::{ModalFromAppCmd, ModalFromComponent};
+use modal::{CmdModalMarker, ComponentModalMarker};
 use tokio::sync::oneshot;
 use twilight_cache_inmemory::{InMemoryCache, Reference, model::CachedMember};
 use twilight_gateway::{Latency, MessageSender};
@@ -45,51 +45,51 @@ use crate::{
 
 use super::PartialInteractionData;
 
-use self::modal::Marker as ModalMarker;
+use self::modal::ModalMarker;
 pub use self::{
-    autocomplete::Autocomplete,
-    defer::DeferCtxKind,
-    followup::FollowupCtxKind,
-    menu::{Message, User},
-    message::RespondVia as RespondViaMessage,
-    modal::Guild as GuildModal,
+    autocomplete::AutocompleteCtx,
+    defer::RespondWithDeferKind,
+    followup::FollowupKind,
+    menu::{MessageCmdCtx, UserCmdCtx},
+    message::RespondWithMessageKind,
+    modal::GuildModalCtx,
 };
 
 type CachedBotMember<'a> = Reference<'a, (Id<TwilightGuildMarker>, Id<UserMarker>), CachedMember>;
 
-pub trait Kind {}
+pub trait CtxKind {}
 
-pub trait AppCtxKind {}
+pub trait CmdInnerMarkerKind {}
 
-pub struct SlashAppMarker;
-impl AppCtxKind for SlashAppMarker {}
+pub struct SlashCmdInnerMarker;
+impl CmdInnerMarkerKind for SlashCmdInnerMarker {}
 
-pub struct AppCtxMarker<T: AppCtxKind>(PhantomData<fn(T) -> T>);
-impl<T: AppCtxKind> Kind for AppCtxMarker<T> {}
+pub struct CmdMarker<T: CmdInnerMarkerKind>(PhantomData<fn(T) -> T>);
+impl<T: CmdInnerMarkerKind> CtxKind for CmdMarker<T> {}
 
-pub type SlashMarker = AppCtxMarker<SlashAppMarker>;
-pub type Slash = Ctx<SlashMarker>;
+pub type SlashCmdMarker = CmdMarker<SlashCmdInnerMarker>;
+pub type SlashCmdCtx = Ctx<SlashCmdMarker>;
 #[expect(unused)]
-pub type GuildSlash = Ctx<SlashMarker, GuildMarker>;
+pub type GuildSlashCmdCtx = Ctx<SlashCmdMarker, GuildMarker>;
 
 pub struct ComponentMarker;
-impl Kind for ComponentMarker {}
+impl CtxKind for ComponentMarker {}
 
-pub type Component = Ctx<ComponentMarker>;
+pub type ComponentCtx = Ctx<ComponentMarker>;
 
-pub trait Location {}
+pub trait CtxContext {}
 
-pub struct Unknown;
-impl Location for Unknown {}
+pub struct NonGuildMarker;
+impl CtxContext for NonGuildMarker {}
 
 pub struct GuildMarker;
-impl Location for GuildMarker {}
-pub type Guild<T> = Ctx<T, GuildMarker>;
+impl CtxContext for GuildMarker {}
+pub type GuildCtx<T> = Ctx<T, GuildMarker>;
 
-pub struct Ctx<Of, In = Unknown>
+pub struct Ctx<T, C = NonGuildMarker>
 where
-    Of: Kind,
-    In: Location,
+    T: CtxKind,
+    C: CtxContext,
 {
     inner: Box<InteractionCreate>,
     bot: OwnedBotState,
@@ -98,11 +98,11 @@ where
     data: Option<PartialInteractionData>,
     acknowledged: bool,
     acknowledgement: Option<oneshot::Sender<()>>,
-    kind: PhantomData<fn(Of) -> Of>,
-    location: PhantomData<fn(In) -> In>,
+    kind: PhantomData<fn(T) -> T>,
+    context: PhantomData<fn(C) -> C>,
 }
 
-impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
+impl<T: CtxKind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
     type Error = NotInGuild;
 
     fn try_from(value: Ctx<T>) -> Result<Self, Self::Error> {
@@ -116,48 +116,48 @@ impl<T: Kind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
             acknowledged: value.acknowledged,
             acknowledgement: value.acknowledgement,
             kind: value.kind,
-            location: PhantomData::<fn(GuildMarker) -> GuildMarker>,
+            context: PhantomData::<fn(GuildMarker) -> GuildMarker>,
         })
     }
 }
 
-impl<U: Location> Ctx<ComponentMarker, U> {
+impl<C: CtxContext> Ctx<ComponentMarker, C> {
     #[expect(unused)]
     pub fn into_modal_interaction(
         self,
         inner: Box<InteractionCreate>,
-    ) -> Ctx<ModalFromComponent, U> {
+    ) -> Ctx<ComponentModalMarker, C> {
         Ctx {
             inner,
             bot: self.bot,
             latency: self.latency,
             sender: self.sender,
-            location: self.location,
+            context: self.context,
             data: None,
             acknowledged: false,
             acknowledgement: None,
-            kind: PhantomData::<fn(ModalFromComponent) -> ModalFromComponent>,
+            kind: PhantomData::<fn(ComponentModalMarker) -> ComponentModalMarker>,
         }
     }
 }
 
-impl<A: AppCtxKind, U: Location> Ctx<AppCtxMarker<A>, U> {
-    pub fn into_modal_interaction(self, inner: Box<InteractionCreate>) -> Ctx<ModalFromAppCmd, U> {
+impl<A: CmdInnerMarkerKind, C: CtxContext> Ctx<CmdMarker<A>, C> {
+    pub fn into_modal_interaction(self, inner: Box<InteractionCreate>) -> Ctx<CmdModalMarker, C> {
         Ctx {
             inner,
             bot: self.bot,
             latency: self.latency,
             sender: self.sender,
-            location: self.location,
+            context: self.context,
             data: None,
             acknowledged: false,
             acknowledgement: None,
-            kind: PhantomData::<fn(ModalFromAppCmd) -> ModalFromAppCmd>,
+            kind: PhantomData::<fn(CmdModalMarker) -> CmdModalMarker>,
         }
     }
 }
 
-impl<T: Kind, U: Location> Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> Ctx<T, C> {
     pub const fn latency(&self) -> &Latency {
         &self.latency
     }
@@ -194,7 +194,7 @@ impl<T: Kind, U: Location> Ctx<T, U> {
     }
 }
 
-impl<T: Kind> Ctx<T, GuildMarker> {
+impl<T: CtxKind> Ctx<T, GuildMarker> {
     pub fn bot_member(&self) -> CacheResult<CachedBotMember> {
         self.cache()
             .member(self.guild_id(), self.bot().user_id())
@@ -247,7 +247,7 @@ impl<T: Kind> Ctx<T, GuildMarker> {
     }
 }
 
-impl<T: Kind, U: Location> Respond for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> Respond for Ctx<T, C> {
     fn is_acknowledged(&self) -> bool {
         self.acknowledged
     }
@@ -272,90 +272,90 @@ impl<T: Kind, U: Location> Respond for Ctx<T, U> {
     }
 }
 
-impl<T: Kind, U: Location> BotStateAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> BotStateAware for Ctx<T, C> {
     fn bot(&self) -> &BotState {
         &self.bot
     }
 }
 
-impl<T: Kind, U: Location> OwnedBotStateAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> OwnedBotStateAware for Ctx<T, C> {
     fn bot_owned(&self) -> Arc<BotState> {
         self.bot.clone()
     }
 }
 
-impl<T: Kind, U: Location> SenderAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> SenderAware for Ctx<T, C> {
     fn sender(&self) -> &MessageSender {
         &self.sender
     }
 }
 
-impl<T: Kind, U: Location> CacheAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> CacheAware for Ctx<T, C> {
     fn cache(&self) -> &InMemoryCache {
         self.bot.cache()
     }
 }
 
-impl<T: Kind, U: Location> HttpAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> HttpAware for Ctx<T, C> {
     fn http(&self) -> &HttpClient {
         self.bot.http()
     }
 }
 
-impl<T: Kind, U: Location> OwnedHttpAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> OwnedHttpAware for Ctx<T, C> {
     fn http_owned(&self) -> Arc<HttpClient> {
         self.bot.http_owned()
     }
 }
 
-impl<T: Kind, U: Location> LavalinkAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> LavalinkAware for Ctx<T, C> {
     fn lavalink(&self) -> &Lavalink {
         self.bot.lavalink()
     }
 }
 
-impl<T: Kind, U: Location> DatabaseAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> DatabaseAware for Ctx<T, C> {
     fn db(&self) -> &sqlx::Pool<sqlx::Postgres> {
         self.bot.db()
     }
 }
 
-impl<T: Kind, U: Location> OptionallyGuildIdAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> OptionallyGuildIdAware for Ctx<T, C> {
     fn get_guild_id(&self) -> Option<Id<TwilightGuildMarker>> {
         self.inner.guild_id
     }
 }
 
-impl<T: Kind, U: Location> UserAware for Ctx<T, U> {
+impl<T: CtxKind, C: CtxContext> UserAware for Ctx<T, C> {
     #[inline]
     fn user(&self) -> &TwilightUser {
         self.inner.author_expected()
     }
 }
 
-impl<T: Kind> GuildIdAware for Ctx<T, GuildMarker> {
+impl<T: CtxKind> GuildIdAware for Ctx<T, GuildMarker> {
     #[inline]
     fn guild_id(&self) -> Id<TwilightGuildMarker> {
         self.guild_id_expected()
     }
 }
 
-impl<T: Kind> PartialMemberAware for Ctx<T, GuildMarker> {
+impl<T: CtxKind> PartialMemberAware for Ctx<T, GuildMarker> {
     #[inline]
     fn member(&self) -> &PartialMember {
         self.member_expected()
     }
 }
 
-impl<T: Kind> UserPermissionsAware for Ctx<T, GuildMarker> {
+impl<T: CtxKind> UserPermissionsAware for Ctx<T, GuildMarker> {
     fn user_permissions(&self) -> Permissions {
         self.author_permissions_expected()
     }
 }
 
-pub struct GuildRef<'a, T: Kind>(&'a Ctx<T>);
+pub struct GuildRef<'a, T: CtxKind>(&'a Ctx<T>);
 
-impl<'a, T: Kind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
+impl<'a, T: CtxKind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
     type Error = NotInGuild;
 
     fn try_from(value: &'a Ctx<T>) -> Result<Self, Self::Error> {
@@ -364,19 +364,19 @@ impl<'a, T: Kind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
     }
 }
 
-impl<T: Kind> GuildIdAware for GuildRef<'_, T> {
+impl<T: CtxKind> GuildIdAware for GuildRef<'_, T> {
     fn guild_id(&self) -> Id<TwilightGuildMarker> {
         self.0.guild_id_expected()
     }
 }
 
-impl<T: Kind> GuildRef<'_, T> {
+impl<T: CtxKind> GuildRef<'_, T> {
     pub fn member(&self) -> &PartialMember {
         self.0.member_expected()
     }
 }
 
-impl<T: Kind> UserPermissionsAware for GuildRef<'_, T> {
+impl<T: CtxKind> UserPermissionsAware for GuildRef<'_, T> {
     fn user_permissions(&self) -> Permissions {
         self.0.author_permissions_expected()
     }

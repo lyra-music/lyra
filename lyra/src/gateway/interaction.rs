@@ -17,7 +17,7 @@ use super::model::Process;
 use crate::{
     CommandError, LavalinkAware,
     command::{
-        AutocompleteCtx, MessageCtx, SlashCtx,
+        AutocompleteCtx, MessageCmdCtx, SlashCmdCtx,
         model::{ComponentCtx, NonPingInteraction},
         require,
         util::MessageLinkAware,
@@ -105,7 +105,7 @@ impl Context {
 
         let result = match data.kind {
             CommandType::ChatInput => {
-                SlashCtx::from_partial_data(
+                SlashCmdCtx::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),
@@ -117,7 +117,7 @@ impl Context {
                 .await
             }
             CommandType::Message => {
-                MessageCtx::from_partial_data(
+                MessageCmdCtx::from_partial_data(
                     self.inner,
                     &data,
                     bot.clone(),

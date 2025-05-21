@@ -73,7 +73,7 @@ macro_rules! declare_slash_commands {
 
         type Callback = &'static (
             dyn ::std::ops::Fn(
-                $crate::command::SlashCtx,
+                $crate::command::SlashCmdCtx,
                 ::twilight_model::application::interaction::application_command::CommandData,
             ) -> ::std::pin::Pin<::std::boxed::Box<
                     dyn ::std::future::Future<
@@ -96,7 +96,7 @@ macro_rules! declare_slash_commands {
                                 {
                                     #[::lavalink_rs::hook]
                                     async fn callback(
-                                        ctx: $crate::command::SlashCtx,
+                                        ctx: $crate::command::SlashCmdCtx,
                                         data: ::twilight_model::application::interaction::application_command::CommandData,
                                     ) -> ::std::result::Result<
                                         (),
@@ -122,7 +122,7 @@ macro_rules! declare_slash_commands {
                 )
             });
 
-        impl $crate::command::SlashCtx {
+        impl $crate::command::SlashCmdCtx {
             pub async fn execute(
                 self,
                 data: ::twilight_model::application::interaction::application_command::CommandData,
@@ -182,7 +182,7 @@ macro_rules! declare_message_commands {
             }
         }
 
-        impl $crate::command::MessageCtx {
+        impl $crate::command::MessageCmdCtx {
             pub async fn execute(
                 self,
                 data: ::twilight_model::application::interaction::application_command::CommandData,

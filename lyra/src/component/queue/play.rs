@@ -27,10 +27,10 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::{
     LavalinkAware,
     command::{
-        AutocompleteCtx, MessageCtx, SlashCtx,
+        AutocompleteCtx, MessageCmdCtx, SlashCmdCtx,
         model::{
-            BotAutocomplete, BotMessageCommand, BotSlashCommand, DeferCtxKind, FollowupCtxKind,
-            GuildCtx, RespondViaMessage,
+            BotAutocomplete, BotMessageCommand, BotSlashCommand, RespondWithDeferKind, FollowupKind,
+            GuildCtx, RespondWithMessageKind,
         },
         require, util,
     },
@@ -322,7 +322,7 @@ impl BotAutocomplete for Autocomplete {
 }
 
 async fn play(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind + DeferCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind + RespondWithDeferKind>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
     ctx.defer().await?;
@@ -352,7 +352,7 @@ async fn play(
 }
 
 async fn handle_load_track_results(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     results: LoadTrackResults,
 ) -> Result<(), play::HandleLoadTrackResultsError> {
     let (tracks, playlists) = results.split();
@@ -476,7 +476,7 @@ pub struct Play {
 }
 
 impl BotSlashCommand for Play {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let queries = [
             Some(self.query),
@@ -510,7 +510,7 @@ pub struct File {
 }
 
 impl BotSlashCommand for File {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
+    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let files = [
             Some(self.track),
@@ -575,7 +575,7 @@ impl CreateCommand for AddToQueue {
 }
 
 impl BotMessageCommand for AddToQueue {
-    async fn run(ctx: MessageCtx) -> CommandResult {
+    async fn run(ctx: MessageCmdCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
         let message = ctx.target_message();
 

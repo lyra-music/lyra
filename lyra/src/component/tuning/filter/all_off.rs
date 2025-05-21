@@ -36,7 +36,7 @@ impl super::ApplyFilter for ResetAllExceptSpeed {
 pub struct AllOff;
 
 impl crate::command::model::BotSlashCommand for AllOff {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::command::Result {
+    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::command::Result {
         let mut ctx = require::guild(ctx)?;
         let player = require::player(&ctx)?;
 
