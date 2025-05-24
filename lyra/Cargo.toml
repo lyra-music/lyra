@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.9.0-rc.3"
+version = "0.9.0"
 edition = "2024"
 # When bumping, bump in other Cargo.toml files, Dockerfile too
 rust-version = "1.87"
@@ -59,7 +59,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 rand = "0.9.1"
 itertools = "0.14.0"
 rayon = "1.10.0"
-sqlx = { version = "0.8.5", features = [
+sqlx = { version = "0.8.6", features = [
     "postgres",
     "runtime-tokio",
     "tls-rustls-aws-lc-rs",
