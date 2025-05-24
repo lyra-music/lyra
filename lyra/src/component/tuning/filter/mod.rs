@@ -10,7 +10,7 @@ mod vibrato;
 use std::marker::PhantomData;
 
 use lavalink_rs::model::player::{Filters, TremoloVibrato};
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use super::ApplyFilter;
@@ -107,7 +107,7 @@ impl ApplyFilter for Option<SetTremoloVibrato<VibratoMarker>> {
     }
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "filter", desc = ".", contexts = "guild")]
 pub enum Filter {
     #[command(name = "tremolo")]

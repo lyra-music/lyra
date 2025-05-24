@@ -28,7 +28,6 @@ pub enum Error {
     PositionOutOfRange(#[from] super::PositionOutOfRange),
     Leave(#[from] super::component::connection::leave::ResidualError),
     NoPlayer(#[from] super::lavalink::NoPlayerError),
-    NotInGuild(#[from] super::NotInGuild),
     CheckUserOnlyIn(#[from] check::UserOnlyInError),
     Cache(#[from] super::Cache),
     NotPlaying(#[from] super::NotPlaying),
@@ -111,7 +110,6 @@ pub enum FlattenedError<'a> {
     GatewaySend,
     Lavalink(&'a lavalink_rs::error::LavalinkError),
     NoPlayer,
-    NotInGuild,
     UnrecognisedConnection,
     TimestampParse,
     GetDominantPaletteFromUrl,
@@ -549,7 +547,6 @@ impl Error {
             Self::TwilightHttp(_) => Fe::TwilightHttp,
             Self::Lavalink(e) => Fe::Lavalink(e),
             Self::NoPlayer(_) => Fe::NoPlayer,
-            Self::NotInGuild(_) => Fe::NotInGuild,
             Self::Cache(_) => Fe::Cache,
             Self::NotPlaying(_) => Fe::NotPlaying,
             Self::Paused(_) => Fe::Paused,
@@ -586,7 +583,8 @@ pub enum AutocompleteError {
     LoadFailed(#[from] super::LoadFailed),
     TwilightHttp(#[from] twilight_http::Error),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
-    NotInGuild(#[from] super::NotInGuild),
 }
 
 pub type AutocompleteResult = core::result::Result<(), AutocompleteError>;
+
+pub type GuildAutocompleteResult = AutocompleteResult; // FIXME

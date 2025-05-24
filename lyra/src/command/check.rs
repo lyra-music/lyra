@@ -15,12 +15,12 @@ use twilight_model::{
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::model::{Ctx, CtxKind},
+    command::model::CtxKind,
     component::config::access::CalculatorBuilder,
     core::{
         model::{
-            BotState, DatabaseAware, HttpAware, OwnedBotStateAware, UserIdAware,
-            UserPermissionsAware,
+            BotState, DatabaseAware, HttpAware, OwnedBotStateAware, PartialMemberAware,
+            UserIdAware, UserPermissionsAware,
         },
         r#static::application,
         traced,
@@ -46,7 +46,7 @@ use crate::{
 use super::{
     model::{GuildCtx, RespondWithMessageKind},
     poll::{self, Resolution as PollResolution, Topic as PollTopic},
-    require::{self, CurrentTrack, InVoice, PartialInVoice, someone_else_in},
+    require::{CurrentTrack, InVoice, PartialInVoice, someone_else_in},
 };
 
 pub const DJ_PERMISSIONS: Permissions = Permissions::MOVE_MEMBERS.union(Permissions::MUTE_MEMBERS);
@@ -95,19 +95,15 @@ pub fn user_is_stage_moderator(
     Ok(())
 }
 
-pub async fn user_allowed_in(ctx: &Ctx<impl CtxKind>) -> Result<(), check::UserAllowedError> {
-    let Some(weak) = require::guild_ref(ctx).ok() else {
-        return Ok(());
-    };
-
-    if user_is_access_manager(&weak).is_ok() {
+pub async fn user_allowed_in(ctx: &GuildCtx<impl CtxKind>) -> Result<(), check::UserAllowedError> {
+    if user_is_access_manager(ctx).is_ok() {
         return Ok(());
     }
 
     let channel = ctx.channel();
-    let mut access_calculator_builder = CalculatorBuilder::new(weak.guild_id(), ctx.db().clone())
+    let mut access_calculator_builder = CalculatorBuilder::new(ctx.guild_id(), ctx.db().clone())
         .user(ctx.user_id())
-        .roles(weak.member().roles.iter());
+        .roles(ctx.member().roles.iter());
     match channel.kind {
         ChannelType::PublicThread
         | ChannelType::PrivateThread

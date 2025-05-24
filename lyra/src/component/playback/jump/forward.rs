@@ -3,7 +3,11 @@ use std::num::NonZeroUsize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{check, model::BotSlashCommand, require},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+    },
     core::model::response::initial::message::create::RespondWithMessage,
 };
 
@@ -16,9 +20,8 @@ pub struct Forward {
     tracks: i64,
 }
 
-impl BotSlashCommand for Forward {
-    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Forward {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();

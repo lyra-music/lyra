@@ -11,8 +11,8 @@ use twilight_model::{
 use crate::{
     LavalinkAndGuildIdAware, LavalinkAware,
     command::{
-        SlashCmdCtx, check,
-        model::{BotSlashCommand, CtxKind, GuildCtx},
+        check,
+        model::{BotGuildSlashCommand, CtxKind, GuildCtx, GuildSlashCmdCtx},
         require,
     },
     core::model::{HttpAware, response::initial::message::create::RespondWithMessage},
@@ -82,9 +82,8 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
 #[command(name = "leave", contexts = "guild")]
 pub struct Leave;
 
-impl BotSlashCommand for Leave {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Leave {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         match leave(&ctx).await {
             Ok(LeaveResponse(voice)) => {
                 ctx.out(format!("📎 ~~{}~~.", voice.mention())).await?;

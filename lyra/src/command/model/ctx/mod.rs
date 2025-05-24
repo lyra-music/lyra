@@ -38,7 +38,7 @@ use crate::{
         },
         r#static::application,
     },
-    error::{Cache, CacheResult, NotInGuild},
+    error::{Cache, CacheResult},
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},
     lavalink::Lavalink,
 };
@@ -47,10 +47,10 @@ use super::PartialInteractionData;
 
 use self::modal::ModalMarker;
 pub use self::{
-    autocomplete::AutocompleteCtx,
+    autocomplete::{AutocompleteCtx, GuildAutocompleteCtx},
     defer::RespondWithDeferKind,
     followup::FollowupKind,
-    menu::{MessageCmdCtx, UserCmdCtx},
+    menu::{GuildMessageCmdCtx, MessageCmdCtx, UserCmdCtx},
     message::RespondWithMessageKind,
     modal::GuildModalCtx,
 };
@@ -69,13 +69,14 @@ impl<T: CmdInnerMarkerKind> CtxKind for CmdMarker<T> {}
 
 pub type SlashCmdMarker = CmdMarker<SlashCmdInnerMarker>;
 pub type SlashCmdCtx = Ctx<SlashCmdMarker>;
-#[expect(unused)]
 pub type GuildSlashCmdCtx = Ctx<SlashCmdMarker, GuildMarker>;
 
 pub struct ComponentMarker;
 impl CtxKind for ComponentMarker {}
 
+#[expect(unused)]
 pub type ComponentCtx = Ctx<ComponentMarker>;
+pub type GuildComponentCtx = GuildCtx<ComponentMarker>;
 
 pub trait CtxContext {}
 
@@ -100,25 +101,6 @@ where
     acknowledgement: Option<oneshot::Sender<()>>,
     kind: PhantomData<fn(T) -> T>,
     context: PhantomData<fn(C) -> C>,
-}
-
-impl<T: CtxKind> TryFrom<Ctx<T>> for Ctx<T, GuildMarker> {
-    type Error = NotInGuild;
-
-    fn try_from(value: Ctx<T>) -> Result<Self, Self::Error> {
-        value.get_guild_id().ok_or(NotInGuild)?;
-        Ok(Self {
-            inner: value.inner,
-            bot: value.bot,
-            latency: value.latency,
-            sender: value.sender,
-            data: value.data,
-            acknowledged: value.acknowledged,
-            acknowledgement: value.acknowledgement,
-            kind: value.kind,
-            context: PhantomData::<fn(GuildMarker) -> GuildMarker>,
-        })
-    }
 }
 
 impl<C: CtxContext> Ctx<ComponentMarker, C> {
@@ -195,6 +177,21 @@ impl<T: CtxKind, C: CtxContext> Ctx<T, C> {
 }
 
 impl<T: CtxKind> Ctx<T, GuildMarker> {
+    #[inline]
+    pub fn cast_as_non_guild(self) -> Ctx<T, NonGuildMarker> {
+        Ctx {
+            inner: self.inner,
+            bot: self.bot,
+            latency: self.latency,
+            sender: self.sender,
+            data: self.data,
+            acknowledged: self.acknowledged,
+            acknowledgement: self.acknowledgement,
+            kind: self.kind,
+            context: PhantomData::<fn(NonGuildMarker) -> NonGuildMarker>,
+        }
+    }
+
     pub fn bot_member(&self) -> CacheResult<CachedBotMember> {
         self.cache()
             .member(self.guild_id(), self.bot().user_id())
@@ -350,34 +347,5 @@ impl<T: CtxKind> PartialMemberAware for Ctx<T, GuildMarker> {
 impl<T: CtxKind> UserPermissionsAware for Ctx<T, GuildMarker> {
     fn user_permissions(&self) -> Permissions {
         self.author_permissions_expected()
-    }
-}
-
-pub struct GuildRef<'a, T: CtxKind>(&'a Ctx<T>);
-
-impl<'a, T: CtxKind> TryFrom<&'a Ctx<T>> for GuildRef<'a, T> {
-    type Error = NotInGuild;
-
-    fn try_from(value: &'a Ctx<T>) -> Result<Self, Self::Error> {
-        value.get_guild_id().ok_or(NotInGuild)?;
-        Ok(Self(value))
-    }
-}
-
-impl<T: CtxKind> GuildIdAware for GuildRef<'_, T> {
-    fn guild_id(&self) -> Id<TwilightGuildMarker> {
-        self.0.guild_id_expected()
-    }
-}
-
-impl<T: CtxKind> GuildRef<'_, T> {
-    pub fn member(&self) -> &PartialMember {
-        self.0.member_expected()
-    }
-}
-
-impl<T: CtxKind> UserPermissionsAware for GuildRef<'_, T> {
-    fn user_permissions(&self) -> Permissions {
-        self.0.author_permissions_expected()
     }
 }

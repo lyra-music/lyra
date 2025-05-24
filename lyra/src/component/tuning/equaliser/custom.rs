@@ -1,7 +1,7 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::require,
+    command::model::GuildSlashCmdCtx,
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, equaliser::SetEqualiser,
     },
@@ -60,9 +60,8 @@ pub struct Custom {
     band_15: Option<f64>,
 }
 
-impl crate::command::model::BotSlashCommand for Custom {
-    async fn run(self, ctx: crate::command::SlashCmdCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl crate::command::model::BotGuildSlashCommand for Custom {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let equaliser = [

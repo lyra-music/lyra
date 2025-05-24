@@ -2,6 +2,8 @@ use proc_macro::TokenStream;
 use quote::{__private::TokenStream as QuoteTokenStream, quote};
 use syn::{Data, DeriveInput, Fields, FieldsUnnamed, Ident, Path, Type, TypePath, Variant};
 
+const GUILD_STR: &str = "Guild";
+
 fn unwrap(type_path: &TypePath, from: impl Into<String>) -> Option<&Path> {
     match type_path.path.segments.last() {
         Some(segment) if segment.ident == from.into() => match &segment.arguments {
@@ -67,7 +69,7 @@ fn declare_commands(
     }
 }
 
-pub fn impl_bot_command_group(input: &DeriveInput) -> TokenStream {
+pub fn impl_bot_command_group(input: &DeriveInput, guild: bool) -> TokenStream {
     let name = &input.ident;
     let data = &input.data;
 
@@ -88,10 +90,14 @@ pub fn impl_bot_command_group(input: &DeriveInput) -> TokenStream {
         _ => panic!("this can only be derived from an enum"),
     };
 
-    let bot_slash_command_path =
-        syn::parse_str::<Path>("crate::command::model::BotSlashCommand").expect("path is valid");
+    let guild_str = guild.then_some(GUILD_STR).unwrap_or_default();
+    let bot_slash_command_path = syn::parse_str::<Path>(&format!(
+        "crate::command::model::Bot{guild_str}SlashCommand"
+    ))
+    .expect("path is valid");
     let slash_ctx_path =
-        syn::parse_str::<Path>("crate::command::model::SlashCmdCtx").expect("path is valid");
+        syn::parse_str::<Path>(&format!("crate::command::model::{guild_str}SlashCmdCtx"))
+            .expect("path is valid");
     let result_path =
         syn::parse_str::<Path>("crate::error::command::Result").expect("path is valid");
     quote! {
@@ -129,7 +135,7 @@ fn declare_autocompletes(
     }
 }
 
-pub fn impl_bot_autocomplete_group(input: &DeriveInput) -> TokenStream {
+pub fn impl_bot_autocomplete_group(input: &DeriveInput, guild: bool) -> TokenStream {
     let name = &input.ident;
     let data = &input.data;
 
@@ -141,12 +147,19 @@ pub fn impl_bot_autocomplete_group(input: &DeriveInput) -> TokenStream {
         _ => panic!("this can only be derived from an enum"),
     };
 
-    let bot_autocomplete_path =
-        syn::parse_str::<Path>("crate::command::model::BotAutocomplete").expect("path is valid");
-    let autocomplete_ctx_path =
-        syn::parse_str::<Path>("crate::command::model::AutocompleteCtx").expect("path is valid");
-    let result_path =
-        syn::parse_str::<Path>("crate::error::command::AutocompleteResult").expect("path is valid");
+    let guild_str = guild.then_some(GUILD_STR).unwrap_or_default();
+    let bot_autocomplete_path = syn::parse_str::<Path>(&format!(
+        "crate::command::model::Bot{guild_str}Autocomplete"
+    ))
+    .expect("path is valid");
+    let autocomplete_ctx_path = syn::parse_str::<Path>(&format!(
+        "crate::command::model::{guild_str}AutocompleteCtx"
+    ))
+    .expect("path is valid");
+    let result_path = syn::parse_str::<Path>(&format!(
+        "crate::error::command::{guild_str}AutocompleteResult"
+    ))
+    .expect("path is valid");
     quote! {
         impl #bot_autocomplete_path for #name {
             async fn execute(self, ctx: #autocomplete_ctx_path) -> #result_path {

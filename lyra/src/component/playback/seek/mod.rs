@@ -1,11 +1,11 @@
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 mod backward;
 mod forward;
 mod to;
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "seek", desc = ".", contexts = "guild")]
 pub enum Seek {
     #[command(name = "to")]

@@ -22,7 +22,7 @@ pub trait CommandDataAwareKind: CtxKind {}
 impl<T: CmdInnerMarkerKind> CommandDataAwareKind for CmdMarker<T> {}
 impl CommandDataAwareKind for AutocompleteMarker {}
 
-impl<T: CommandDataAwareKind> Ctx<T> {
+impl<T: CommandDataAwareKind, C: CtxContext> Ctx<T, C> {
     pub fn from_partial_data(
         inner: Box<InteractionCreate>,
         data: &CommandData,

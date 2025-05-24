@@ -1,7 +1,7 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand},
+    command::model::{BotGuildSlashCommand, BotSlashCommand, GuildSlashCmdCtx, SlashCmdCtx},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
@@ -24,5 +24,11 @@ impl BotSlashCommand for Ping {
             .await?;
         }
         Ok(())
+    }
+}
+
+impl BotGuildSlashCommand for Ping {
+    async fn run(self, ctx: GuildSlashCmdCtx) -> CommandResult {
+        <Self as BotSlashCommand>::run(self, ctx.cast_as_non_guild()).await
     }
 }

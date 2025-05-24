@@ -10,7 +10,7 @@ use twilight_model::{
     user::User as TwilightUser,
 };
 
-use super::{CmdInnerMarkerKind, CmdMarker, Ctx, CtxContext};
+use super::{CmdInnerMarkerKind, CmdMarker, Ctx, CtxContext, GuildMarker};
 
 pub struct UserCmdInnerMarker;
 impl CmdInnerMarkerKind for UserCmdInnerMarker {}
@@ -21,6 +21,7 @@ pub struct MessageCmdInnerMarker;
 impl CmdInnerMarkerKind for MessageCmdInnerMarker {}
 pub type MessageCmdMarker = CmdMarker<MessageCmdInnerMarker>;
 pub type MessageCmdCtx = Ctx<MessageCmdMarker>;
+pub type GuildMessageCmdCtx = Ctx<MessageCmdMarker, GuildMarker>;
 
 pub trait TargetIdAwareKind: CmdInnerMarkerKind {}
 impl TargetIdAwareKind for UserCmdInnerMarker {}

@@ -8,17 +8,23 @@ use twilight_mention::Mention;
 use twilight_model::{
     application::{
         command::CommandType,
-        interaction::{InteractionData, InteractionType},
+        interaction::{InteractionData, InteractionType, application_command::CommandData},
     },
     gateway::payload::incoming::InteractionCreate,
+    id::{
+        Id,
+        marker::{ChannelMarker, GuildMarker},
+    },
 };
 
 use super::model::Process;
 use crate::{
     CommandError, LavalinkAware,
     command::{
-        AutocompleteCtx, MessageCmdCtx, SlashCmdCtx,
-        model::{ComponentCtx, NonPingInteraction},
+        model::{
+            AutocompleteCtx, GuildAutocompleteCtx, GuildComponentCtx, GuildMessageCmdCtx,
+            GuildSlashCmdCtx, MessageCmdCtx, NonPingInteraction, SlashCmdCtx,
+        },
         require,
         util::MessageLinkAware,
     },
@@ -91,18 +97,32 @@ impl Process for Context {
 
 impl Context {
     async fn process_as_app_command(mut self) -> ProcessResult {
-        let bot = self.bot;
-        let mut i = bot.interaction().ctx(&self.inner);
+        let i = self.bot.interaction().ctx(&self.inner);
 
         let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
             unreachable!()
         };
 
         let name = data.name.clone().into();
-        let inner_guild_id = self.inner.guild_id;
         let channel_id = self.inner.channel_id_expected();
-        let (tx, mut rx) = oneshot::channel::<()>();
+        let txrx = oneshot::channel::<()>();
+        match self.inner.guild_id {
+            None => self.handle_app_command(i, data, name, txrx).await,
+            Some(guild_id) => {
+                self.handle_guild_app_command(i, data, name, guild_id, channel_id, txrx)
+                    .await
+            }
+        }
+    }
 
+    async fn handle_app_command(
+        self,
+        mut i: CtxHead,
+        data: Box<CommandData>,
+        name: Box<str>,
+        (tx, mut rx): (oneshot::Sender<()>, oneshot::Receiver<()>),
+    ) -> Result<(), ProcessError> {
+        let bot = self.bot;
         let result = match data.kind {
             CommandType::ChatInput => {
                 SlashCmdCtx::from_partial_data(
@@ -132,12 +152,79 @@ impl Context {
             _ => unimplemented!(),
         };
 
-        if let Some(guild_id) = inner_guild_id {
-            let lavalink = bot.lavalink();
-            lavalink.handle_for(guild_id).set_text_channel(channel_id);
-            if let Ok(player) = require::player(&(lavalink, guild_id)) {
-                player.data().write().await.set_text_channel_id(channel_id);
+        let Err(source) = result else {
+            return Ok(());
+        };
+
+        if rx.try_recv().is_ok() {
+            i.acknowledge();
+        }
+        match source.flatten_until_user_not_allowed_as() {
+            Fuunacee::UserNotAllowed => {
+                i.nope("You are not allowed to use commands in this context.")
+                    .await?;
+                Ok(())
             }
+            Fuunacee::Command => {
+                let CommandExecuteError::Command(error) = source else {
+                    unreachable!()
+                };
+                match_error(error, name, i).await
+            }
+            _ => {
+                i.unkn(format!(
+                    "Something unexpectedly went wrong: ```rs\n{source:#?}```
+                    Please report this to the bot developers."
+                ))
+                .await?;
+                Err(ProcessError::CommandExecute { name, source })
+            }
+        }
+    }
+
+    async fn handle_guild_app_command(
+        self,
+        mut i: CtxHead,
+        data: Box<CommandData>,
+        name: Box<str>,
+        guild_id: Id<GuildMarker>,
+        channel_id: Id<ChannelMarker>,
+        (tx, mut rx): (oneshot::Sender<()>, oneshot::Receiver<()>),
+    ) -> Result<(), ProcessError> {
+        let bot = self.bot;
+        let result = match data.kind {
+            CommandType::ChatInput => {
+                GuildSlashCmdCtx::from_partial_data(
+                    self.inner,
+                    &data,
+                    bot.clone(),
+                    self.latency,
+                    self.sender,
+                    tx,
+                )
+                .execute(*data)
+                .await
+            }
+            CommandType::Message => {
+                GuildMessageCmdCtx::from_partial_data(
+                    self.inner,
+                    &data,
+                    bot.clone(),
+                    self.latency,
+                    self.sender,
+                    tx,
+                )
+                .execute(*data)
+                .await
+            }
+            CommandType::User => todo!(),
+            _ => unimplemented!(),
+        };
+
+        let lavalink = bot.lavalink();
+        lavalink.handle_for(guild_id).set_text_channel(channel_id);
+        if let Ok(player) = require::player(&(lavalink, guild_id)) {
+            player.data().write().await.set_text_channel_id(channel_id);
         }
 
         let Err(source) = result else {
@@ -177,7 +264,42 @@ impl Context {
 
         let name = data.name.clone().into();
         let (tx, _) = oneshot::channel::<()>();
+        match self.inner.guild_id {
+            Some(_) => self.handle_guild_autocomplete(data, name, tx).await,
+            None => self.handle_autocomplete(data, name, tx).await,
+        }
+    }
+
+    async fn handle_autocomplete(
+        self,
+        data: Box<CommandData>,
+        name: Box<str>,
+        tx: oneshot::Sender<()>,
+    ) -> Result<(), ProcessError> {
         let Err(source) = AutocompleteCtx::from_partial_data(
+            self.inner,
+            &data,
+            self.bot,
+            self.latency,
+            self.sender,
+            tx,
+        )
+        .execute(*data)
+        .await
+        else {
+            return Ok(());
+        };
+
+        Err(ProcessError::AutocompleteExecute { name, source })
+    }
+
+    async fn handle_guild_autocomplete(
+        self,
+        data: Box<CommandData>,
+        name: Box<str>,
+        tx: oneshot::Sender<()>,
+    ) -> Result<(), ProcessError> {
+        let Err(source) = GuildAutocompleteCtx::from_partial_data(
             self.inner,
             &data,
             self.bot,
@@ -200,10 +322,11 @@ impl Context {
         };
         tracing::trace!(?data);
 
-        let ctx = ComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender);
-        let Ok(mut ctx) = require::guild(ctx) else {
+        if self.inner.guild_id.is_none() {
             return Ok(());
-        };
+        }
+        let mut ctx =
+            GuildComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender);
         let Ok(player) = require::player(&ctx) else {
             return Ok(());
         };

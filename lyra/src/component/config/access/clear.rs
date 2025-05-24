@@ -4,7 +4,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use super::AccessCategory;
 use crate::{
-    command::{SlashCmdCtx, check, model::BotSlashCommand, require, util::prompt_for_confirmation},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        util::prompt_for_confirmation,
+    },
     component::config::access::AccessCategoryFlags,
     core::{
         r#const::text::NO_ROWS_AFFECTED_MESSAGE,
@@ -22,9 +26,8 @@ pub struct Clear {
     category: AccessCategory,
 }
 
-impl BotSlashCommand for Clear {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Clear {
+    async fn run(self, ctx: GuildSlashCmdCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let category_flags = AccessCategoryFlags::from(self.category);

@@ -1,9 +1,9 @@
 use lavalink_rs::model::player::{Filters, LowPass as LavalinkLowPass};
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
@@ -54,7 +54,7 @@ impl crate::component::tuning::ApplyFilter for Option<SetLowPass> {
     }
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "low-pass", desc = ".")]
 pub enum LowPass {
     #[command(name = "on")]
@@ -72,9 +72,8 @@ pub struct On {
     smoothing: Option<f64>, // default: 20 [https://github.com/lavalink-devs/Lavalink/blob/master/protocol/src/commonMain/kotlin/dev/arbjerg/lavalink/protocol/v4/filters.kt#L120]
 }
 
-impl BotSlashCommand for On {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for On {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetLowPass::new(self.smoothing) else {
@@ -99,9 +98,8 @@ impl BotSlashCommand for On {
 #[command(name = "off")]
 pub struct Off;
 
-impl BotSlashCommand for Off {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Off {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetLowPass>).await?;

@@ -22,7 +22,7 @@ pub use self::{
     view::View,
 };
 use crate::error::command::check::AccessCalculatorBuildError;
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 
 struct AccessState {
     in_access_controls: bool,
@@ -248,7 +248,7 @@ impl AccessCategoryFlags {
     }
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "access", desc = ".")]
 pub enum Access {
     #[command(name = "view")]

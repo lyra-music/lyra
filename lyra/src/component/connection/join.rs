@@ -21,8 +21,11 @@ use twilight_model::{
 use crate::{
     LavalinkAware,
     command::{
-        SlashCmdCtx, check,
-        model::{BotSlashCommand, CtxKind, FollowupKind, GuildCtx, RespondWithMessageKind},
+        check,
+        model::{
+            BotGuildSlashCommand, CtxKind, FollowupKind, GuildCtx, GuildSlashCmdCtx,
+            RespondWithMessageKind,
+        },
         require::{self, InVoiceCachedVoiceState},
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
@@ -412,9 +415,8 @@ pub struct Join {
     channel: Option<InteractionChannel>,
 }
 
-impl BotSlashCommand for Join {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Join {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let Err(e) = join(&mut ctx, self.channel).await else {
             return Ok(());
         };

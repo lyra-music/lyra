@@ -3,7 +3,7 @@ use std::num::NonZeroU16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
@@ -18,9 +18,8 @@ pub struct Set {
     percent: i64,
 }
 
-impl BotSlashCommand for Set {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Set {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         #[expect(clippy::cast_possible_truncation)]

@@ -10,8 +10,10 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        AutocompleteCtx, SlashCmdCtx, check,
-        model::{BotAutocomplete, BotSlashCommand},
+        check,
+        model::{
+            BotGuildAutocomplete, BotGuildSlashCommand, GuildAutocompleteCtx, GuildSlashCmdCtx,
+        },
         require,
     },
     component::queue::Remove,
@@ -115,9 +117,8 @@ pub struct Autocomplete {
     end: AutocompleteValue<i64>,
 }
 
-impl BotAutocomplete for Autocomplete {
-    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildAutocomplete for Autocomplete {
+    async fn execute(self, mut ctx: GuildAutocompleteCtx) -> AutocompleteResult {
         let (focused, kind) = match (self.start, self.end) {
             (AutocompleteValue::Focused(focused), AutocompleteValue::None) => {
                 (focused, RemoveRangeAutocompleteOptionsType::StartFocused)
@@ -158,9 +159,8 @@ pub struct RemoveRange {
     end: i64,
 }
 
-impl BotSlashCommand for RemoveRange {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for RemoveRange {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
 

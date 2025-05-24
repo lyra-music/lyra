@@ -5,7 +5,7 @@ mod up;
 
 use std::num::NonZeroU16;
 
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 pub(super) const fn volume_emoji(percent: Option<NonZeroU16>) -> &'static str {
@@ -27,7 +27,7 @@ pub fn clipping_warning(percent: NonZeroU16) -> &'static str {
         .unwrap_or_default()
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "volume", desc = ".", contexts = "guild")]
 pub enum Volume {
     #[command(name = "toggle-mute")]

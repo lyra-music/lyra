@@ -3,8 +3,10 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        SlashCmdCtx, check,
-        model::{BotSlashCommand, CtxKind, GuildCtx, RespondWithMessageKind},
+        check,
+        model::{
+            BotGuildSlashCommand, CtxKind, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind,
+        },
         require,
         util::controller_fmt,
     },
@@ -41,9 +43,8 @@ pub struct Repeat {
     mode: Option<RepeatMode>,
 }
 
-impl BotSlashCommand for Repeat {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Repeat {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let mode = {
             if let Some(mode) = self.mode {
                 mode.into()

@@ -3,7 +3,7 @@ use std::num::NonZeroI64;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::{
         check_user_is_dj_and_require_unsuppressed_player, filter::pitch::shift_pitch,
     },
@@ -20,9 +20,8 @@ pub struct Down {
     half_tones: Option<i64>,
 }
 
-impl BotSlashCommand for Down {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Down {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let half_tones = NonZeroI64::new(self.half_tones.unwrap_or(2))

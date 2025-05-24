@@ -2,7 +2,7 @@ use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::{
         ApplyFilter, UpdateFilter, check_user_is_dj_and_require_unsuppressed_player,
     },
@@ -66,9 +66,8 @@ pub struct Set {
     multiplier: f64,
 }
 
-impl BotSlashCommand for Set {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Set {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetPitch::new(self.multiplier) else {

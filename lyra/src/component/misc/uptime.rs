@@ -5,7 +5,7 @@ use twilight_mention::{
 };
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand},
+    command::model::{BotGuildSlashCommand, BotSlashCommand, GuildSlashCmdCtx, SlashCmdCtx},
     core::model::{BotStateAware, response::initial::message::create::RespondWithMessage},
     error::CommandResult,
 };
@@ -21,5 +21,11 @@ impl BotSlashCommand for Uptime {
         let stamp = Timestamp::new(started.as_secs(), Some(TimestampStyle::RelativeTime));
         ctx.out(format!("⏱️ {}.", stamp.mention())).await?;
         Ok(())
+    }
+}
+
+impl BotGuildSlashCommand for Uptime {
+    async fn run(self, ctx: GuildSlashCmdCtx) -> CommandResult {
+        <Self as BotSlashCommand>::run(self, ctx.cast_as_non_guild()).await
     }
 }

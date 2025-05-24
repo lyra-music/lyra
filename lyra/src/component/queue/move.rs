@@ -6,8 +6,10 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        AutocompleteCtx, SlashCmdCtx, check,
-        model::{BotAutocomplete, BotSlashCommand},
+        check,
+        model::{
+            BotGuildAutocomplete, BotGuildSlashCommand, GuildAutocompleteCtx, GuildSlashCmdCtx,
+        },
         require,
     },
     component::queue::normalize_queue_position,
@@ -108,9 +110,8 @@ pub struct Autocomplete {
     position: AutocompleteValue<i64>,
 }
 
-impl BotAutocomplete for Autocomplete {
-    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildAutocomplete for Autocomplete {
+    async fn execute(self, mut ctx: GuildAutocompleteCtx) -> AutocompleteResult {
         let (focused, kind) = match (self.track, self.position) {
             (AutocompleteValue::Focused(focused), AutocompleteValue::None) => {
                 (focused, MoveAutocompleteOptionType::TrackFocused)
@@ -151,9 +152,8 @@ pub struct Move {
     position: i64,
 }
 
-impl BotSlashCommand for Move {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Move {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
 

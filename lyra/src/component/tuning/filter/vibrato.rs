@@ -1,8 +1,8 @@
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCmdCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::{
         UpdateFilter, check_user_is_dj_and_require_unsuppressed_player, filter::SetVibrato,
     },
@@ -10,7 +10,7 @@ use crate::{
     error::CommandResult,
 };
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "vibrato", desc = ".")]
 pub enum Vibrato {
     #[command(name = "on")]
@@ -31,9 +31,8 @@ pub struct On {
     depth: Option<f64>, // default: 0.5 [https://github.com/lavalink-devs/Lavalink/blob/master/protocol/src/commonMain/kotlin/dev/arbjerg/lavalink/protocol/v4/filters.kt#L89]
 }
 
-impl BotSlashCommand for On {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for On {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SetVibrato::new(self.frequency, self.depth) else {
@@ -55,9 +54,8 @@ impl BotSlashCommand for On {
 #[command(name = "off")]
 pub struct Off;
 
-impl BotSlashCommand for Off {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Off {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         player.update_filter(None::<SetVibrato>).await?;

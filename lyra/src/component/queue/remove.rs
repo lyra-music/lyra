@@ -10,8 +10,10 @@ use twilight_model::application::command::CommandOptionChoice;
 use crate::{
     LavalinkAndGuildIdAware,
     command::{
-        AutocompleteCtx, SlashCmdCtx, check,
-        model::{BotAutocomplete, BotSlashCommand},
+        check,
+        model::{
+            BotGuildAutocomplete, BotGuildSlashCommand, GuildAutocompleteCtx, GuildSlashCmdCtx,
+        },
         require,
     },
     core::model::{CacheAware, response::initial::autocomplete::RespondAutocomplete},
@@ -64,9 +66,8 @@ pub struct Autocomplete {
     track_5: AutocompleteValue<i64>,
 }
 
-impl BotAutocomplete for Autocomplete {
-    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildAutocomplete for Autocomplete {
+    async fn execute(self, mut ctx: GuildAutocompleteCtx) -> AutocompleteResult {
         let tracks = [
             self.track,
             self.track_2,
@@ -118,9 +119,8 @@ pub struct Remove {
     track_5: Option<i64>,
 }
 
-impl BotSlashCommand for Remove {
-    async fn run(self, ctx: SlashCmdCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Remove {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
 
         let player = require::player(&ctx)?;

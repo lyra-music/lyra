@@ -3,11 +3,11 @@ pub mod now_playing;
 
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 
 use self::{access::Access, now_playing::NowPlaying};
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "config", desc = ".", contexts = "guild")]
 pub enum Config {
     #[command(name = "access")]
