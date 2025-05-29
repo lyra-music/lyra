@@ -29,7 +29,7 @@ The easiest way to set up Λύρα is to use Docker. Start by creating a copy of
 cp compose.example.yaml compose.yaml
 ```
 
-In addition, you need to set `DOCKER_POSTGRES_PATH` and `DOCKER_PLUGINS_PATH` environment variables in `.env` to point to two empty directories you want to use for the database and plugins respectively. You can create them with:
+In addition, you need to set `DOCKER_POSTGRES_PATH` and `DOCKER_LAVALINK_PLUGINS_PATH` environment variables in `.env` to point to two empty directories you want to use for the database and plugins respectively. You can create them with:
 
 ```bash
 mkdir -p /path/to/your/database
@@ -40,7 +40,7 @@ chown -R 322:322 /path/to/your/plugins
 ```bash
 # File: .env
 DOCKER_POSTGRES_PATH=/path/to/your/database
-DOCKER_PLUGINS_PATH=/path/to/your/plugins
+DOCKER_LAVALINK_PLUGINS_PATH=/path/to/your/plugins
 ```
 
 Then, run the following command to start the bot and the database:
