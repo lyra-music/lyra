@@ -37,7 +37,7 @@ $ mkdir -p /path/to/your/plugins
 # chown -R 322:322 /path/to/your/plugins
 ```
 
-```bash
+```dotenv
 # File: .env
 DOCKER_POSTGRES_PATH=/path/to/your/database
 DOCKER_LAVALINK_PLUGINS_PATH=/path/to/your/plugins
