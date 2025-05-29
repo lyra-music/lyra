@@ -30,6 +30,7 @@ services:
       PLUGINS_LAVASRC_SPOTIFY_CLIENT_SECRET: ${PLUGINS_LAVASRC_SPOTIFY_CLIENT_SECRET}
       PLUGINS_LAVASRC_SOURCES_DEEZER: ${PLUGINS_LAVASRC_SOURCES_DEEZER:-false}
       PLUGINS_LAVASRC_DEEZER_MASTER_DECRYPTION_KEY: ${PLUGINS_LAVASRC_DEEZER_MASTER_DECRYPTION_KEY}
+      PLUGINS_LAVASRC_DEEZER_ARL: ${PLUGINS_LAVASRC_DEEZER_ARL}
     volumes:
       # mount application.yml from the same directory or use environment variables
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
