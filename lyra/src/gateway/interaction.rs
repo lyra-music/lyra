@@ -431,10 +431,12 @@ async fn match_error(
     }
 }
 
+const SUPPRESSED_MESSAGE: &str = "Currently server muted.";
+
 async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitRespondOrFollowupResult {
     match error {
         SuppressedError::Muted => {
-            i.wrng_f("Currently server muted.").await?;
+            i.wrng_f(SUPPRESSED_MESSAGE).await?;
         }
         SuppressedError::NotSpeaker => {
             i.wrng_f("Not currently a speaker in this stage channel.")
@@ -450,8 +452,7 @@ async fn match_autojoin_suppressed(
 ) -> UnitRespondResult {
     match error {
         AutoJoinSuppressedError::Muted => {
-            i.suspf("Can't use this command as is currently server muted.")
-                .await?;
+            i.wrngf(SUPPRESSED_MESSAGE).await?;
         }
         AutoJoinSuppressedError::StillNotSpeaker { last_followup_id } => {
             i.update_followup(*last_followup_id)

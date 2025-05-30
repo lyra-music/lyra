@@ -340,6 +340,7 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 async fn handle_response(
     response: Response,
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    send_muted_notice: bool,
 ) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
     let (joined, empty) = match response {
         Response::Joined { voice, empty } => {
@@ -382,8 +383,7 @@ async fn handle_response(
     }
 
     let state = ctx.current_voice_state().ok_or(CacheError)?;
-    let muted = state.mute();
-    if muted {
+    if send_muted_notice && state.mute() {
         ctx.suspf("**Currently server muted**; Some features will be limited.")
             .await?;
     }
@@ -393,14 +393,14 @@ async fn handle_response(
 pub async fn auto(
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
 ) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
-    Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
+    Ok(handle_response(impl_auto_join(ctx).await?, ctx, false).await?)
 }
 
 pub async fn join(
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<InVoiceCachedVoiceState, JoinError> {
-    Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
+    Ok(handle_response(impl_join(ctx, channel).await?, ctx, true).await?)
 }
 
 /// Joins a voice/stage channel.
