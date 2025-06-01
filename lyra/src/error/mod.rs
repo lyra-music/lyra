@@ -207,7 +207,6 @@ pub struct PrettifiedTimestampParse;
 #[error("error running the bot starter: {}", .0)]
 pub enum Run {
     ColorEyre(#[from] color_eyre::Report),
-    Dotenvy(#[from] dotenvy::Error),
     Start(#[from] runner::StartError),
     InstallDefaultCryptoProvider(#[from] InstallDefaultCryptoProvider),
 }
