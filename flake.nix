@@ -33,10 +33,7 @@
     devShells =
       forEachSystem
       (system: let
-        pkgs = import nixpkgs {
-          inherit systems;
-          config.allowUnfree = true;
-        };
+        pkgs = nixpkgs.legacyPackages.${system};
       in {
         default = devenv.lib.mkShell {
           inherit inputs pkgs;
@@ -69,14 +66,15 @@
               # https://devenv.sh/services/
               services.postgres = {
                 enable = true;
-                package = pkgs.postgresql_15;
-                initialDatabases = [{name = "mydb";}];
-                extensions = extensions: [
-                  extensions.postgis
-                  extensions.timescaledb
+                package = pkgs.postgresql_17;
+                initialDatabases = [
+                  {
+                    name = "lyra";
+                    user = "lyra";
+                    pass = "correcthorsebatterystaple"; # only serve as an initial password;
+                    # don't forget to change the actual user password to `POSTGRES_PASSWORD`: `ALTER USER lyra WITH PASSWORD 'new_password';`
+                  }
                 ];
-                settings.shared_preload_libraries = "timescaledb";
-                initialScript = "CREATE EXTENSION IF NOT EXISTS timescaledb;";
                 listen_addresses = "localhost";
               };
 

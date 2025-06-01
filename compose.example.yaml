@@ -45,7 +45,15 @@ services:
     expose:
       - ${SERVER_PORT:-2333}
     healthcheck:
-      test: ["CMD", "curl", "-f", "-H", "Authorization: ${LAVALINK_SERVER_PASSWORD}", "http://localhost:2333/version"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "-H",
+          "Authorization: ${LAVALINK_SERVER_PASSWORD}",
+          "http://localhost:2333/version",
+        ]
       interval: 60s
       start_period: 10s
       timeout: 10s

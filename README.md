@@ -48,7 +48,7 @@ Then, run the following command to start the bot and the database:
 ```console
 # docker compose up -d
 ```
-This will start the bot and it's associated services in detached mode and run them in the background. To check the logs, run:
+This will start the bot and its associated services in detached mode and run them in the background. To check the logs, run:
 
 ```console
 # docker compose logs -f
@@ -60,20 +60,35 @@ To stop the bot, run:
 # docker compose down
 ```
 
-### Nix
+### Nix (For Development)
 
-From the project root, run:
+Start by entering the development shell:
 
 ```console
-$ nix develop --impure -c devenv up
+$ nix develop --impure
 ```
 
-This will download all the dependencies and set up the environment, as well as starting the services required for the bot to function.
-
-Then, run the bot:
+This will also download all the dependencies and set up the environment. To start the services required for the bot to function, run:
 
 ```console
-$ nix develop --impure -c cargo run --release
+$ devenv up -D
+```
+
+To check the logs, run:
+```console
+$ process-compose attach
+```
+
+To stop these services, run:
+
+```console
+$ process-compose down
+```
+
+To start the bot, run:
+
+```console
+$ cargo run --release
 ```
 
 ### Manual (Not recommended)
