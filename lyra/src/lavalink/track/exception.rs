@@ -39,13 +39,23 @@ pub(super) async fn impl_exception(
         }
     }
 
+    let oauth_enabled = std::env::var("PLUGINS_YOUTUBE_OAUTH_ENABLED")
+        .is_ok_and(|x| x.parse::<bool>().is_ok_and(|y| y));
+    let note = if oauth_enabled {
+        "contact the bot developers to report the issue."
+    } else {
+        "contact the bot host to **enable YouTube OAuth**."
+    };
+
     lavalink
         .data_unwrapped()
         .http()
         .create_message(data.read().await.text_channel_id())
         .content(&format!(
-            "💔**`ー`** ~~`{}`~~ `(Error playing this track)`",
-            event.track.info.title
+            "💔**`ー`** ~~`{}`~~ (Unable to play track)\n\
+            -# Please ensure this track is available. \
+            If you believe it should be playable, {}",
+            event.track.info.title, note
         ))
         .await?;
 

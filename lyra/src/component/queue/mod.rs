@@ -16,7 +16,7 @@ use lyra_ext::{
 
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use play::AddToQueue;
-pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
+pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play, PlaySource};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
 pub use repeat::{Repeat, get_next_repeat_mode, repeat};
