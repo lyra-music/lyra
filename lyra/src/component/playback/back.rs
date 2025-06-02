@@ -49,9 +49,15 @@ pub async fn back(
 ) -> Result<(), PlayPauseError> {
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
+
     queue.downgrade_repeat_mode();
-    queue.disable_advancing();
+    if current_track_title.is_some() {
+        // CORRECTNESS: the current track is present and will be ending via the
+        // `play_now` call later, so this is correct.
+        queue.disable_advancing();
+    }
     queue.recede();
+
     let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;
     let message = current_track_title.map_or_else(

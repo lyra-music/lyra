@@ -258,6 +258,12 @@ impl Queue {
         self.advancing_enabler.send_replace(state);
     }
 
+    /// Disables the queue advancing
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the current track is ending.
+    /// Otherwise, this will lead to incorrect queue advancing behaviour.
     pub fn disable_advancing(&self) {
         tracing::debug!("disabling queue advancing");
         self.set_advancing_state(false);

@@ -59,12 +59,6 @@ impl PlayerInterface {
         self.context.data_unwrapped()
     }
 
-    pub async fn disable_advancing_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
-        queue.disable_advancing();
-        self.context.stop_now().await?;
-        Ok(())
-    }
-
     pub async fn update_voice_channel(&self, voice_is_empty: bool) -> LavalinkResult<()> {
         let mut update_player = lavalink_rs::model::http::UpdatePlayer {
             voice: Some(
