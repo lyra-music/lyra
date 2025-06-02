@@ -29,11 +29,15 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+    pub fn new(
+        channel_id: Id<ChannelMarker>,
+        text_channel_id: Id<ChannelMarker>,
+        mute: bool,
+    ) -> Self {
         Self {
             channel_id,
             text_channel_id,
-            mute: false,
+            mute,
             poll: None,
             event_sender: broadcast::channel(0xFF).0,
             vsu_handler_enabler: watch::channel(true).0,

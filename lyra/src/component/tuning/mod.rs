@@ -78,6 +78,8 @@ pub async fn handle_voice_state_update(
     ctx: &voice::Context,
     head: ConnectionHead,
 ) -> Result<(), twilight_http::Error> {
+    tracing::debug!("handling voice state update");
+
     let bot = ctx.bot();
     let guild_id = ctx.guild_id();
     let conn = ctx.get_conn();
