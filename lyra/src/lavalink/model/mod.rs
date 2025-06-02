@@ -76,6 +76,11 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
     }
 
     /// Disables the voice state update handler for the current guild.
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the bot received a VSU event.
+    /// Otherwise, this will lead to incorrect voice state update handling.
     fn disable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
         self.lavalink()
             .handle_for(self.guild_id())

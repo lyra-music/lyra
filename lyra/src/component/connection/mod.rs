@@ -144,6 +144,8 @@ async fn start_inactivity_timeout(
         return Ok(());
     }
 
+    // CORRECTNESS: as the bot later leaves the voice channel, it invokes a
+    // voice state update event, so this is correct.
     if ctx.disable_vsu_handler().await.is_err() {
         tracing::debug!(
             "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
@@ -152,6 +154,7 @@ async fn start_inactivity_timeout(
         );
         return Ok(());
     }
+
     let text_channel_id = ctx
         .lavalink()
         .handle_for(guild_id)
