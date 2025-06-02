@@ -94,9 +94,11 @@ impl BotSlashCommand for To {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        if let Ok(current_track) = require::current_track(queue) {
-            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        let current_track = require::current_track(queue);
+        if let Ok(ref curr) = current_track {
+            check::current_track_is_users(curr, in_voice_with_user)?;
         }
+        let current_track_exist = current_track.is_ok();
 
         let queue_len = queue.len();
         if queue_len == 1 {
@@ -115,7 +117,11 @@ impl BotSlashCommand for To {
         }
 
         queue.downgrade_repeat_mode();
-        queue.disable_advancing();
+        if current_track_exist {
+            // CORRECTNESS: the current track is present and will be ending via the
+            // `play_now` call later, so this is correct
+            queue.disable_advancing();
+        }
 
         let index = position - 1;
         let track = queue[index].data();

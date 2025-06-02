@@ -44,7 +44,14 @@ pub async fn skip(
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
+
+    // CORRECTNESS: the current track is present in both scenarios:
+    // - when called from `/skip`: verified via `queue_not_empty` and `current_track` checks
+    // - when called from the skip button on the controller: if the controller exists, then
+    //   it must only mean the current track also exists.
+    // and will be ending via the `play_now` call later, so this is correct.
     queue.disable_advancing();
+
     queue.advance();
     if let Some(item) = queue.current() {
         player.context.play_now(item.data()).await?;

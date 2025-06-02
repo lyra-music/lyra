@@ -51,6 +51,13 @@ impl BotSlashCommand for Forward {
         check::all_users_track(queue, skipped, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
+
+        // CORRECTNESS: the current track will always exist as this command cannot be used when the
+        // current track doesn't exist, which is possible in two scenarios:
+        // - queue is empty (which is impossible because of the `queue_not_empty_mut` check)
+        // - the current queue index is past the end of the queue (which will early returned as
+        //   "no where else to jump to"`)
+        // the current track will be ending via the `play_now` call later, so this is correct.
         queue.disable_advancing();
 
         let track = queue[new_position].data();

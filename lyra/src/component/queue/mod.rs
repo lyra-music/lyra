@@ -293,11 +293,14 @@ async fn impl_remove(
         queue.downgrade_repeat_mode();
         let next = queue.current().map(QueueItem::data);
 
+        // CORRECTNESS: the current track is present (and will be removed from the queue) and
+        // will be ending via the `play_now` or `stop_now` call later, so this is correct.
+        queue.disable_advancing();
+
         if let Some(next) = next {
-            queue.disable_advancing();
             player.context.play_now(next).await?;
         } else {
-            player.disable_advancing_and_stop_with(queue).await?;
+            player.context.stop_now().await?;
         }
     }
     let (queue_len, queue_position) = (queue.len(), queue.position());
