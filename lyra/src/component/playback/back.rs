@@ -49,8 +49,6 @@ pub async fn back(
 ) -> Result<(), PlayPauseError> {
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
-    dbg!("before");
-    queue.print();
 
     queue.downgrade_repeat_mode();
     if current_track_title.is_some() {
@@ -60,8 +58,6 @@ pub async fn back(
     }
     queue.recede();
 
-    queue.print();
-    dbg!("after");
     let item = queue.current().expect("queue must be non-empty");
     player.context.play_now(item.data()).await?;
     let message = current_track_title.map_or_else(

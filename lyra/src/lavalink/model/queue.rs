@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, num::NonZeroUsize, time::Duration};
 
-use itertools::Itertools;
 use lavalink_rs::model::track::TrackData;
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use tokio::sync::watch;
@@ -322,14 +321,6 @@ impl Queue {
     #[inline]
     pub fn insert(&mut self, index: usize, value: Item) {
         self.inner.insert(index, value);
-    }
-
-    pub fn print(&self) {
-        println!(
-            "index={} inner:[{}]",
-            self.index,
-            self.inner.iter().map(|x| &x.data().info.title).join(", ")
-        );
     }
 }
 
