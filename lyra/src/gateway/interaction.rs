@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lavalink_rs::error::LavalinkError;
-use lyra_ext::pretty::flags_display::FlagsDisplay;
+use lyra_ext::pretty::{flags_display::FlagsDisplay, join::PrettyJoiner};
 use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
@@ -22,7 +22,10 @@ use crate::{
         require,
         util::MessageLinkAware,
     },
-    component::{connection::Join, queue::Play},
+    component::{
+        connection::Join,
+        queue::{Play, PlaySource},
+    },
     core::{
         r#const::exit_code::DUBIOUS,
         http::InteractionClient,
@@ -306,9 +309,19 @@ async fn match_error(
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
         Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
         Fe::Lavalink(e) => {
-            if let LavalinkError::TrackError(e) = e {
-                i.hid_f(format!("💔 Error loading this track: {}", e.message))
-                    .await?;
+            if let LavalinkError::TrackError(_error) = e {
+                i.hid_f(format!(
+                    // As of Lavalink v4 API, the `severity` doesn't mean much to the user,
+                    // and `message` is almost always "Something went wrong while looking up the track.",
+                    // with `cause` repeating the same message, so the information from the error object
+                    // is entirely ignored.
+                    "💔 **Unable to load track**: \
+                    Please ensure the URL is from a supported audio streaming service and \
+                    the content is publicly accessible.  \n\
+                    -# **Supported streaming services**: {}.",
+                    PlaySource::values().pretty_join_with_and()
+                ))
+                .await?;
                 Ok(())
             } else {
                 i.erro_f(format!(
