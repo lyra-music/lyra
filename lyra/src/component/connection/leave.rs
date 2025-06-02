@@ -68,7 +68,11 @@ async fn leave(ctx: &GuildCtx<impl CtxKind>) -> Result<LeaveResponse, leave::Err
     let conn = ctx.get_conn();
     conn.set_channel(channel_id);
     check::user_in(in_voice)?.only()?;
+
+    // CORRECTNESS: as the bot later leaves the voice channel, it invokes a
+    // voice state update event, so this is correct.
     conn.disable_vsu_handler().await?;
+
     disconnect_cleanup(ctx).await?;
     disconnect(ctx)?;
 

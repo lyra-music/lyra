@@ -240,14 +240,22 @@ async fn impl_connect_to(
     let response = old_channel_id.map_or_else(
         || {
             let connection = Connection::new(channel_id, ctx.channel_id(), mute);
+
+            // CORRECTNESS: as the bot later joins a new voice channel, it invokes a
+            // voice state update event, so this is correct.
             connection.disable_vsu_handler();
+
             lavalink.new_connection_with(guild_id, connection);
             Response::new(None, joined, voice_is_empty, mute)
         },
         |from| {
             let conn = lavalink.handle_for(guild_id);
             conn.set_channel(channel_id);
+
+            // CORRECTNESS: as the bot later joins a new voice channel, it invokes a
+            // voice state update event, so this is correct.
             conn.disable_vsu_handler();
+
             Response::new(Some(from), joined, voice_is_empty, mute)
         },
     );
