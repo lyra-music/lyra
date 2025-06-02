@@ -229,8 +229,15 @@ pub async fn handle_voice_state_update(
                 .await?;
         }
         Some(old_state) => {
-            match_state_channel_id(state.channel_id, old_state, guild_id, text_channel_id, ctx)
-                .await?;
+            match_state_channel_id(
+                state.channel_id,
+                old_state,
+                guild_id,
+                text_channel_id,
+                state.mute,
+                ctx,
+            )
+            .await?;
         }
         None => {}
     }
@@ -243,6 +250,7 @@ async fn match_state_channel_id(
     old_state: &CachedVoiceState,
     guild_id: Id<GuildMarker>,
     text_channel_id: Id<ChannelMarker>,
+    mute: bool,
     ctx: &voice::Context,
 ) -> Result<(), MatchStateChannelIdError> {
     match channel_id {
@@ -255,11 +263,7 @@ async fn match_state_channel_id(
 
             let voice_is_empty = users_in_voice(ctx, channel_id).is_some_and(|n| n == 0);
 
-            let response = join::Response::Moved {
-                from: old_channel_id,
-                to: joined,
-                empty: voice_is_empty,
-            };
+            let response = join::Response::new(Some(old_channel_id), joined, voice_is_empty, mute);
 
             if let Ok(player) = require::player(ctx) {
                 player.update_voice_channel(voice_is_empty).await?;
