@@ -3,6 +3,7 @@ mod off;
 mod preset;
 
 use lavalink_rs::model::player::{Equalizer, Filters};
+use lyra_ext::num::usize_as_u8;
 use lyra_proc::BotCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
@@ -20,8 +21,7 @@ impl SetEqualiser {
             equaliser.map(|o| o.filter(|o| (o - Self::DEFAULT_GAIN).abs() > ERR_MARGIN));
         equaliser.iter().any(Option::is_some).then(|| {
             Self(core::array::from_fn(|i| Equalizer {
-                #[expect(clippy::cast_possible_truncation)]
-                band: i as u8,
+                band: usize_as_u8(i),
                 gain: equaliser[i].unwrap_or(Self::DEFAULT_GAIN),
             }))
         })

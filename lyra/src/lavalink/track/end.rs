@@ -27,7 +27,7 @@ pub(super) async fn impl_end(
 
     data.write()
         .await
-        .delete_now_playing_message(lavalink.data_unwrapped().as_ref())
+        .delete_now_playing_message(&*lavalink.data_unwrapped())
         .await;
 
     let data_r = data.read().await;

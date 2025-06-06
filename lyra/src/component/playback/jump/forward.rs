@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -27,8 +28,7 @@ impl BotSlashCommand for Forward {
         let queue = require::queue_not_empty_mut(&mut data_w)?;
         let current_track = require::current_track(queue)?;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let jump = self.tracks.unsigned_abs() as usize;
+        let jump = i64_as_usize(self.tracks);
         let queue_len = queue.len();
 
         let queue_position = queue.position();

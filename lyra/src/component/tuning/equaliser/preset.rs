@@ -1,3 +1,4 @@
+use lyra_ext::num::usize_as_u8;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -15,8 +16,7 @@ impl From<EqualiserPreset> for SetEqualiser {
         let gains = value.gains();
         Self(core::array::from_fn(|i| {
             lavalink_rs::model::player::Equalizer {
-                #[expect(clippy::cast_possible_truncation)]
-                band: i as u8,
+                band: usize_as_u8(i),
                 gain: gains[i],
             }
         }))

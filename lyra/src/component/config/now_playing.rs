@@ -1,4 +1,3 @@
-use lyra_ext::num::u64_to_i64_truncating;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -30,7 +29,7 @@ impl BotSlashCommand for Toggle {
         let mut ctx = require::guild(ctx)?;
         let new_now_playing = sqlx::query!(
             "UPDATE guild_configs SET now_playing = NOT now_playing WHERE id = $1 RETURNING now_playing;",
-            u64_to_i64_truncating(ctx.guild_id().get()),
+            ctx.guild_id().get().cast_signed(),
         )
         .fetch_one(ctx.db())
         .await?

@@ -3,13 +3,11 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{model::BotSlashCommand, require},
+    command::{model::BotSlashCommand, require, util::is_message_at_bottom},
     component::config::now_playing::Toggle as ConfigNowPlayingToggle,
     core::{
         http::InteractionClient,
-        model::{
-            CacheAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
-        },
+        model::{OwnedHttpAware, response::initial::message::create::RespondWithMessage},
     },
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
@@ -45,11 +43,7 @@ impl BotSlashCommand for Bump {
             return Ok(());
         };
         let channel_id = ctx.channel_id();
-        if ctx
-            .cache()
-            .channel_messages(channel_id)
-            .is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id))
-        {
+        if is_message_at_bottom(&ctx, channel_id, msg_id) {
             ctx.note(
                 "The now-playing track message is already at the bottom of the current text channel.",
             ).await?;

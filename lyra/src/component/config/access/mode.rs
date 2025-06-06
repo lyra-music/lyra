@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools;
-use lyra_ext::{num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay};
+use lyra_ext::pretty::flags_display::FlagsDisplay;
 use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand, CreateOption};
 
 use super::AccessCategory;
@@ -118,7 +118,7 @@ impl BotSlashCommand for Mode {
         let res = sqlx::query(&format!(
             "UPDATE guild_configs SET {set_statements} WHERE id = $1 AND ({where_clause});"
         ))
-        .bind(u64_to_i64_truncating(ctx.guild_id().get()))
+        .bind(ctx.guild_id().get().cast_signed())
         .bind(access_mode)
         .execute(ctx.db())
         .await?;

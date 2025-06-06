@@ -1,4 +1,3 @@
-use lyra_ext::num::u64_to_i64_truncating;
 use tokio::task::JoinSet;
 use twilight_gateway::ShardId;
 use twilight_model::gateway::payload::incoming::Ready;
@@ -53,7 +52,7 @@ impl Process for ReadyContext<'_> {
 
         self.inner.guilds.iter().for_each(|g| {
             let db = self.bot.db().clone();
-            let guild_id = u64_to_i64_truncating(g.id.get());
+            let guild_id = g.id.get().cast_signed();
             set.spawn(async move {
                 sqlx::query!(
                     "INSERT INTO guild_configs

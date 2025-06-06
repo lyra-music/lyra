@@ -1,3 +1,4 @@
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -29,8 +30,7 @@ impl BotSlashCommand for Backward {
         }
         let current_track_exists = current_track.is_ok();
 
-        #[expect(clippy::cast_possible_truncation)]
-        let tracks = self.tracks.unsigned_abs() as usize;
+        let tracks = i64_as_usize(self.tracks);
         let queue_index = queue.index();
         let Some(index) = queue_index.checked_sub(tracks) else {
             if queue_index == 0 {

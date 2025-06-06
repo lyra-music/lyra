@@ -1,4 +1,4 @@
-use lyra_ext::{num::u64_to_i64_truncating, pretty::flags_display::FlagsDisplay};
+use lyra_ext::pretty::flags_display::FlagsDisplay;
 use tokio::task::JoinSet;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
@@ -32,7 +32,7 @@ impl BotSlashCommand for Clear {
         let mut set = JoinSet::new();
         category_flags.iter_as_columns().for_each(|c| {
             let db = ctx.db().clone();
-            let g = u64_to_i64_truncating(ctx.guild_id().get());
+            let g = ctx.guild_id().get().cast_signed();
 
             set.spawn(async move {
                 sqlx::query(&format!("DELETE FROM {c} WHERE guild = $1;"))

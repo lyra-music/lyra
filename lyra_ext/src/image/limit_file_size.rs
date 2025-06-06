@@ -2,11 +2,12 @@ use std::borrow::Cow;
 
 use image::{DynamicImage, GenericImageView, imageops::FilterType};
 
+use crate::num::f64_as_u32;
+
 pub trait LimitFileSize {
     fn limit_file_size(&self, limit: u32) -> Cow<DynamicImage>;
 }
 
-#[expect(clippy::similar_names)]
 impl LimitFileSize for DynamicImage {
     fn limit_file_size(&self, limit: u32) -> Cow<DynamicImage> {
         let (x, y) = self.dimensions();
@@ -22,10 +23,7 @@ impl LimitFileSize for DynamicImage {
         let new_y = (f64::from(limit) / (f64::from(bytes_per_pixel) * x_to_y)).sqrt();
         let new_x = new_y * x_to_y;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let (new_x_u32, new_y_u32) = ((new_x as i32).unsigned_abs(), (new_y as i32).unsigned_abs());
-
-        let image = self.resize(new_x_u32, new_y_u32, FilterType::Lanczos3);
+        let image = self.resize(f64_as_u32(new_x), f64_as_u32(new_y), FilterType::Lanczos3);
         Cow::Owned(image)
     }
 }

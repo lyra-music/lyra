@@ -9,7 +9,10 @@ use std::{
 
 use futures::StreamExt;
 use itertools::Itertools;
-use lyra_ext::rgb_hex::{hex_to_rgb, rgb_to_hex};
+use lyra_ext::{
+    num::{f64_as_isize, usize_as_f64},
+    rgb_hex::{hex_to_rgb, rgb_to_hex},
+};
 use rand::{Rng, distr::Alphanumeric};
 use twilight_model::{
     application::interaction::{Interaction, InteractionData},
@@ -378,12 +381,11 @@ fn calculate_votes_and_ratios(
     let downvotes = total_votes - upvotes;
     let votes_left = threshold - total_votes;
 
-    #[expect(clippy::cast_precision_loss)]
     let (threshold_f64, upvotes_f64, downvotes_f64, votes_left_f64) = (
-        threshold as f64,
-        upvotes as f64,
-        downvotes as f64,
-        votes_left as f64,
+        usize_as_f64(threshold),
+        usize_as_f64(upvotes),
+        usize_as_f64(downvotes),
+        usize_as_f64(votes_left),
     );
 
     let upvote_ratio = upvotes_f64 / threshold_f64;
@@ -453,11 +455,9 @@ pub async fn start(
     let users_in_voice = get_users_in_voice(ctx, in_voice).await?;
     let votes = HashMap::from([(ctx.user_id(), Vote(true))]);
 
-    #[expect(clippy::cast_precision_loss)]
-    let users_in_voice_plus_1 = (users_in_voice.len() + 1) as f64;
+    let users_in_voice_plus_1 = usize_as_f64(users_in_voice.len() + 1);
 
-    #[expect(clippy::cast_possible_truncation)]
-    let threshold = ((users_in_voice_plus_1 / 2.).round() as isize).unsigned_abs();
+    let threshold = f64_as_isize((users_in_voice_plus_1 / 2.).round()).unsigned_abs();
 
     let embed = generate_embed(
         topic,
@@ -529,13 +529,11 @@ fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: u
     let ((upvotes, downvotes), (upvote_ratio, downvote_ratio, _)) =
         calculate_votes_and_ratios(votes, threshold);
 
-    #[expect(clippy::cast_precision_loss)]
-    let ratio_bar_size = RATIO_BAR_SIZE as f64;
+    let ratio_bar_size = usize_as_f64(RATIO_BAR_SIZE);
 
-    #[expect(clippy::cast_possible_truncation)]
     let (upvote_char_n, downvote_char_n) = (
-        ((upvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
-        ((downvote_ratio * ratio_bar_size) as isize).unsigned_abs(),
+        f64_as_isize(upvote_ratio * ratio_bar_size).unsigned_abs(),
+        f64_as_isize(downvote_ratio * ratio_bar_size).unsigned_abs(),
     );
     let votes_left_char_n = RATIO_BAR_SIZE - upvote_char_n - downvote_char_n;
 
