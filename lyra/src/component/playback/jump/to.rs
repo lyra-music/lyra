@@ -3,6 +3,7 @@ use std::{
     num::{IntErrorKind, NonZeroUsize},
 };
 
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -109,8 +110,7 @@ impl BotSlashCommand for To {
         let input = self.track;
         validate_input_position(input, queue_len)?;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let position = input.unsigned_abs() as usize;
+        let position = i64_as_usize(input);
         if position == queue.position().get() {
             ctx.wrng("Cannot jump to the current track.").await?;
             return Ok(());

@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use lyra_ext::num::u64_to_i64_truncating;
 use sqlx::{Pool, Postgres, postgres::PgQueryResult};
 use tokio::task::JoinSet;
 use twilight_interactions::command::{
@@ -179,7 +178,7 @@ impl BotSlashCommand for MemberRole {
         let input_mentionables_len = input_mentionables.values().fold(0, |acc, v| acc + v.len());
 
         let database = ctx.db();
-        let guild_id = u64_to_i64_truncating(ctx.guild_id().get());
+        let guild_id = ctx.guild_id().get().cast_signed();
         let mut set = JoinSet::new();
         match self.action {
             EditAction::Add => {
@@ -295,7 +294,7 @@ impl BotSlashCommand for Channel {
         let input_channels_len = input_channels.values().fold(0, |acc, v| acc + v.len());
 
         let database = ctx.db();
-        let guild_id = u64_to_i64_truncating(ctx.guild_id().get());
+        let guild_id = ctx.guild_id().get().cast_signed();
         let mut set = JoinSet::new();
         match self.action {
             EditAction::Add => {

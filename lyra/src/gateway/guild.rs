@@ -1,4 +1,3 @@
-use lyra_ext::num::u64_to_i64_truncating;
 use twilight_gateway::ShardId;
 use twilight_model::{
     gateway::payload::incoming::{GuildCreate, GuildDelete},
@@ -27,7 +26,7 @@ impl CreateContext<'_> {
                 NOT EXISTS (
                     SELECT 1 FROM guild_configs WHERE id = $1
                 );",
-            u64_to_i64_truncating(self.inner.id().get())
+            self.inner.id().get().cast_signed()
         )
         .execute(self.bot.db())
         .await?;

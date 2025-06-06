@@ -1,5 +1,6 @@
 use std::{collections::HashSet, num::NonZeroUsize};
 
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -181,11 +182,7 @@ impl BotSlashCommand for Move {
             return Ok(());
         }
 
-        #[expect(clippy::cast_possible_truncation)]
-        let (track_usize, position_usize) = (
-            self.track.unsigned_abs() as usize,
-            self.position.unsigned_abs() as usize,
-        );
+        let (track_usize, position_usize) = (i64_as_usize(self.track), i64_as_usize(self.position));
 
         let position =
             NonZeroUsize::new(position_usize).expect("new track position must be non-zero");

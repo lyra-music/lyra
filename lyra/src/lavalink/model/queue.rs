@@ -121,16 +121,34 @@ impl Queue {
         &mut self.index
     }
 
-    pub fn current_index(&self) -> Option<usize> {
+    pub fn mapped_index_from(&self, index: usize) -> Option<usize> {
         match self.indexer {
-            Indexer::Standard => Some(self.index),
-            Indexer::Fair(ref indexer) => indexer.current(self.index),
-            Indexer::Shuffled(ref indexer) => indexer.current(self.index),
+            Indexer::Standard => Some(index),
+            Indexer::Fair(ref indexer) => indexer.current(index),
+            Indexer::Shuffled(ref indexer) => indexer.current(index),
         }
     }
 
+    #[inline]
+    pub fn mapped_index(&self) -> Option<usize> {
+        self.mapped_index_from(self.index)
+    }
+
+    #[inline]
+    pub fn mapped_index_rel(&self, offset: isize) -> Option<usize> {
+        let Some(index) = self.index.checked_add_signed(offset) else {
+            panic!(
+                "index out of range: queue len is {}, index is {}, got offset {}",
+                self.len(),
+                self.index,
+                offset
+            );
+        };
+        self.mapped_index_from(index)
+    }
+
     pub fn current(&self) -> Option<&Item> {
-        self.inner.get(self.current_index()?)
+        self.inner.get(self.mapped_index()?)
     }
 
     pub fn current_and_position(&self) -> (Option<&Item>, NonZeroUsize) {

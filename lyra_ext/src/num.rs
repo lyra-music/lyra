@@ -1,205 +1,501 @@
 #[inline]
 #[must_use]
-#[expect(clippy::cast_possible_truncation)]
-pub const fn u64_to_i64_truncating(n: u64) -> i64 {
-    (n as i128) as i64
+#[allow(clippy::cast_possible_wrap)]
+pub const fn usize_as_i64(n: usize) -> i64 {
+    n as i64
 }
 
 #[inline]
 #[must_use]
 #[expect(clippy::cast_possible_truncation)]
-pub const fn usize_to_i64_truncating(n: usize) -> i64 {
-    (n as i128) as i64
+pub const fn usize_as_u8(n: usize) -> u8 {
+    n as u8
+}
+
+#[inline]
+#[must_use]
+#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub const fn i64_as_usize(n: i64) -> usize {
+    n as usize
+}
+
+#[inline]
+#[must_use]
+#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub const fn i64_as_u16(n: i64) -> u16 {
+    n as u16
+}
+
+#[inline]
+#[must_use]
+#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub const fn f64_as_u32(n: f64) -> u32 {
+    n as u32
+}
+
+#[inline]
+#[must_use]
+#[expect(clippy::cast_precision_loss)]
+pub const fn usize_as_f64(n: usize) -> f64 {
+    n as f64
+}
+
+#[inline]
+#[must_use]
+#[expect(clippy::cast_possible_truncation)]
+pub const fn f64_as_isize(n: f64) -> isize {
+    n as isize
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{u64_to_i64_truncating, usize_to_i64_truncating};
+mod test {
+    use hexf::hexf64;
     use rstest::rstest;
 
-    // Tests for u64_to_i64_truncating
+    use crate::num::{
+        f64_as_isize, f64_as_u32, i64_as_u16, i64_as_usize, usize_as_f64, usize_as_i64, usize_as_u8,
+    };
+
     #[rstest]
-    #[case::small_values(0u64, 0i64)]
-    #[case::small_values(1u64, 1i64)]
-    #[case::small_values(100u64, 100i64)]
-    #[case::small_values(1000u64, 1000i64)]
-    #[case::max_i64_fits(i64::MAX as u64, i64::MAX)]
-    #[case::overflow_truncation(u64::MAX, -1i64)] // u64::MAX wraps to -1
-    #[case::just_over_i64_max((i64::MAX as u64) + 1, i64::MIN)] // Wraps around
-    #[case::mid_range_overflow(0x8000_0000_0000_0000u64, i64::MIN)]
-    #[case::large_overflow(0xFFFF_FFFF_FFFF_FFFEu64, -2i64)]
-    fn test_u64_to_i64_truncating(#[case] input: u64, #[case] expected: i64) {
-        let result = u64_to_i64_truncating(input);
-        assert_eq!(
-            result, expected,
-            "u64_to_i64_truncating({input}) should equal {expected}, got {result}"
-        );
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    #[case(0xFFFF, 0xFFFF)]
+    #[case(0xFFFF_FFFF, 0xFFFF_FFFF)]
+    fn usize_as_i64_trivial(#[case] input: usize, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(input), expected);
     }
 
-    // Test boundary conditions for u64_to_i64_truncating
-    #[test]
-    fn test_u64_to_i64_truncating_boundaries() {
-        // Test powers of 2 near the boundary
-        let boundary = i64::MAX as u64;
-
-        assert_eq!(u64_to_i64_truncating(boundary), i64::MAX);
-        assert_eq!(u64_to_i64_truncating(boundary + 1), i64::MIN);
-        assert_eq!(u64_to_i64_truncating(boundary + 2), i64::MIN + 1);
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x1_0000_0000)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0x7FFF_FFFF_FFFF_FFFF)]
+    fn usize_as_i64_trivial_x64(#[case] input: usize, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(input), expected);
     }
 
-    // Tests for usize_to_i64_truncating
+    // tests `clippy::cast_possible_wrap`
+    #[cfg(target_pointer_width = "64")]
     #[rstest]
-    #[case::small_values(0usize, 0i64)]
-    #[case::small_values(1usize, 1i64)]
-    #[case::small_values(100usize, 100i64)]
-    #[case::small_values(1000usize, 1000i64)]
-    #[case::typical_size(
-        usize::MAX.min(
-            #[allow(clippy::cast_possible_truncation)]
-            { i64::MAX as usize }
-        ),
-        {
-            #[allow(clippy::cast_possible_wrap)]
-            {
-                (usize::MAX.min(
-                    #[allow(clippy::cast_possible_truncation)]
-                    { i64::MAX as usize }
-                )) as i64
-            }
-        }
+    #[case(0x8000_0000_0000_0000, -0x8000_0000_0000_0000)]
+    #[case(0x8000_0000_0000_0001, -0x7FFF_FFFF_FFFF_FFFF)]
+    #[case(0x8000_0000_0000_0003, -0x7FFF_FFFF_FFFF_FFFD)]
+    #[case(0x8000_0000_0000_000F, -0x7FFF_FFFF_FFFF_FFF1)]
+    #[case(0x8000_0000_0000_00FF, -0x7FFF_FFFF_FFFF_FF01)]
+    #[case(0x8000_0000_0000_FFFF, -0x7FFF_FFFF_FFFF_0001)]
+    #[case(0x8000_0000_FFFF_FFFF, -0x7FFF_FFFF_0000_0001)]
+    #[case(0x8FFF_FFFF_FFFF_FFFF, -0x7000_0000_0000_0001)]
+    #[case(0xF000_0000_0000_0000, -0x1000_0000_0000_0000)]
+    #[case(0xFFFF_FFFF_0000_0000, -0x1_0000_0000)]
+    #[case(0xFFFF_FFFF_FFFF_0000, -0x1_0000)]
+    #[case(0xFFFF_FFFF_FFFF_FFFF, -0x1)]
+    fn usize_as_i64_wrapping_x64(#[case] input: usize, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(input), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    #[case(0xFFFF, 0xFFFF)]
+    #[case(0xFFFF_FFFF, 0xFFFF_FFFF)]
+    fn i64_as_usize_trivial(#[case] input: i64, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(input), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x1_0000_0000)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0x7FFF_FFFF_FFFF_FFFF)]
+    fn i64_as_usize_trivial_x64(#[case] input: i64, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(input), expected);
+    }
+
+    // tests `clippy::cast_sign_loss`
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case(-0x8000_0000_0000_0000, 0x0000_0000)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFF, 0x0000_0001)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFD, 0x0000_0003)]
+    #[case(-0x7FFF_FFFF_FFFF_FFF1, 0x0000_000F)]
+    #[case(-0x7FFF_FFFF_FFFF_FF01, 0x0000_00FF)]
+    #[case(-0x7FFF_FFFF_FFFF_0001, 0x0000_FFFF)]
+    #[case(-0x7FFF_FFFF_0000_0001, 0xFFFF_FFFF)]
+    #[case(-0x1, 0xFFFF_FFFF)]
+    fn i64_as_usize_sign_losing_x86(#[case] input: i64, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(input), expected);
+    }
+
+    // tests `clippy::cast_sign_loss`
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(-0x8000_0000_0000_0000, 0x8000_0000_0000_0000)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFF, 0x8000_0000_0000_0001)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFD, 0x8000_0000_0000_0003)]
+    #[case(-0x7FFF_FFFF_FFFF_FFF1, 0x8000_0000_0000_000F)]
+    #[case(-0x7FFF_FFFF_FFFF_FF01, 0x8000_0000_0000_00FF)]
+    #[case(-0x7FFF_FFFF_FFFF_0001, 0x8000_0000_0000_FFFF)]
+    #[case(-0x7FFF_FFFF_0000_0001, 0x8000_0000_FFFF_FFFF)]
+    #[case(-0x7000_0000_0000_0001, 0x8FFF_FFFF_FFFF_FFFF)]
+    #[case(-0x1000_0000_0000_0000, 0xF000_0000_0000_0000)]
+    #[case(-0x1_0000_0000, 0xFFFF_FFFF_0000_0000)]
+    #[case(-0x1_0000, 0xFFFF_FFFF_FFFF_0000)]
+    #[case(-0x1, 0xFFFF_FFFF_FFFF_FFFF)]
+    fn i64_as_usize_sign_losing_x64(#[case] input: i64, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(input), expected);
+    }
+
+    // tests `clippy::cast_possible_truncation`
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x0)]
+    #[case(0x1_0000_0001, 0x1)]
+    #[case(0x1_0000_000C, 0xC)]
+    #[case(0x1_0000_000F, 0xF)]
+    #[case(0x1_0000_00FF, 0xFF)]
+    #[case(0x1_0000_FFFF, 0xFFFF)]
+    #[case(0x1_FFFF_FFFF, 0xFFFF_FFFF)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0xFFFF_FFFF)]
+    fn i64_as_usize_truncating_x86(#[case] input: i64, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(input), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    #[case(0xFFFF, 0xFFFF)]
+    #[case(0xFFFF_FFFF, 0xFFFF_FFFF)]
+    fn usize_as_i64_as_usize_trivial(#[case] input: usize, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(usize_as_i64(input)), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    #[case(0xFFFF, 0xFFFF)]
+    #[case(0xFFFF_FFFF, 0xFFFF_FFFF)]
+    fn i64_as_usize_as_i64_trivial(#[case] input: i64, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(i64_as_usize(input)), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x1_0000_0000)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0x7FFF_FFFF_FFFF_FFFF)]
+    fn usize_as_i64_as_usize_trivial_x64(#[case] input: usize, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(usize_as_i64(input)), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x1_0000_0000)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0x7FFF_FFFF_FFFF_FFFF)]
+    fn i64_as_usize_as_i64_trivial_x64(#[case] input: i64, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(i64_as_usize(input)), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x8000_0000_0000_0000, 0x8000_0000_0000_0000)]
+    #[case(0x8000_0000_0000_0001, 0x8000_0000_0000_0001)]
+    #[case(0x8000_0000_0000_0003, 0x8000_0000_0000_0003)]
+    #[case(0x8000_0000_0000_000F, 0x8000_0000_0000_000F)]
+    #[case(0x8000_0000_0000_00FF, 0x8000_0000_0000_00FF)]
+    #[case(0x8000_0000_0000_FFFF, 0x8000_0000_0000_FFFF)]
+    #[case(0x8000_0000_FFFF_FFFF, 0x8000_0000_FFFF_FFFF)]
+    #[case(0x8FFF_FFFF_FFFF_FFFF, 0x8FFF_FFFF_FFFF_FFFF)]
+    #[case(0xF000_0000_0000_0000, 0xF000_0000_0000_0000)]
+    #[case(0xFFFF_FFFF_0000_0000, 0xFFFF_FFFF_0000_0000)]
+    #[case(0xFFFF_FFFF_FFFF_0000, 0xFFFF_FFFF_FFFF_0000)]
+    #[case(0xFFFF_FFFF_FFFF_FFFF, 0xFFFF_FFFF_FFFF_FFFF)]
+    fn usize_as_i64_as_usize_nontrivial_x64(#[case] input: usize, #[case] expected: usize) {
+        assert_eq!(i64_as_usize(usize_as_i64(input)), expected);
+    }
+
+    // tests `clippy::cast_possible_truncation`
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case(0x1_0000_0000, 0x0)]
+    #[case(0x1_0000_0001, 0x1)]
+    #[case(0x1_0000_000C, 0xC)]
+    #[case(0x1_0000_000F, 0xF)]
+    #[case(0x1_0000_00FF, 0xFF)]
+    #[case(0x1_0000_FFFF, 0xFFFF)]
+    #[case(0x1_FFFF_FFFF, 0xFFFF_FFFF)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0xFFFF_FFFF)]
+    fn i64_as_usize_as_i64_truncating_x86(#[case] input: i64, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(i64_as_usize(input)), expected);
+    }
+
+    // tests `clippy::cast_sign_loss`
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case(-0x8000_0000_0000_0000, 0x0000_0000)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFF, 0x0000_0001)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFD, 0x0000_0003)]
+    #[case(-0x7FFF_FFFF_FFFF_FFF1, 0x0000_000F)]
+    #[case(-0x7FFF_FFFF_FFFF_FF01, 0x0000_00FF)]
+    #[case(-0x7FFF_FFFF_FFFF_0001, 0x0000_FFFF)]
+    #[case(-0x7FFF_FFFF_0000_0001, 0xFFFF_FFFF)]
+    #[case(-0x1, 0xFFFF_FFFF)]
+    fn i64_as_usize_as_i64_sign_losing_x86(#[case] input: i64, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(i64_as_usize(input)), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(-0x8000_0000_0000_0000, -0x8000_0000_0000_0000)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFF, -0x7FFF_FFFF_FFFF_FFFF)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFD, -0x7FFF_FFFF_FFFF_FFFD)]
+    #[case(-0x7FFF_FFFF_FFFF_FFF1, -0x7FFF_FFFF_FFFF_FFF1)]
+    #[case(-0x7FFF_FFFF_FFFF_FF01, -0x7FFF_FFFF_FFFF_FF01)]
+    #[case(-0x7FFF_FFFF_FFFF_0001, -0x7FFF_FFFF_FFFF_0001)]
+    #[case(-0x7FFF_FFFF_0000_0001, -0x7FFF_FFFF_0000_0001)]
+    #[case(-0x7000_0000_0000_0001, -0x7000_0000_0000_0001)]
+    #[case(-0x1000_0000_0000_0000, -0x1000_0000_0000_0000)]
+    #[case(-0x1_0000_0000, -0x1_0000_0000)]
+    #[case(-0x1_0000, -0x1_0000)]
+    #[case(-0x1, -0x1)]
+    fn i64_as_usize_as_i64_nontrivial_x64(#[case] input: i64, #[case] expected: i64) {
+        assert_eq!(usize_as_i64(i64_as_usize(input)), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    fn usize_as_u8_trivial(#[case] input: usize, #[case] expected: u8) {
+        assert_eq!(usize_as_u8(input), expected);
+    }
+
+    // tests `clippy::cast_possible_truncation`
+    #[rstest]
+    #[case(0x100, 0x0)]
+    #[case(0x101, 0x1)]
+    #[case(0x103, 0x3)]
+    #[case(0x10F, 0xF)]
+    #[case(0x1FF, 0xFF)]
+    fn usize_as_u8_truncating(#[case] input: usize, #[case] expected: u8) {
+        assert_eq!(usize_as_u8(input), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, hexf64!("0x0.p0"))]
+    #[case(0x1, hexf64!("0x1.p0"))]
+    #[case(0x3, hexf64!("0x3.p0"))]
+    #[case(0xF, hexf64!("0xF.p0"))]
+    #[case(0xFF, hexf64!("0xFF.p0"))]
+    #[case(0xFFFF, hexf64!("0xFFFF.p0"))]
+    #[case(0xFFFF_FFFF, hexf64!("0xFFFF_FFFF.p0"))]
+    fn usize_as_f64_trivial(#[case] input: usize, #[case] expected: f64) {
+        let l = usize_as_f64(input);
+        assert!((l - expected).abs() < f64::EPSILON, "l={l}\nr={expected}",);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x1_0000_0000, hexf64!("0x1_0000_0000.p0"))]
+    #[case(0x20_0000_0000_0000, hexf64!("0x20_0000_0000_0000.p0"))]
+    fn usize_as_f64_trivial_x64(#[case] input: usize, #[case] expected: f64) {
+        let l = usize_as_f64(input);
+        assert!((l - expected).abs() < f64::EPSILON, "l={l}\nr={expected}",);
+    }
+
+    // tests `clippy::cast_precision_loss`
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(0x20_0000_0000_0001, hexf64!("0x20_0000_0000_0000.p0"))]
+    #[case(0x20_0000_0000_0003, hexf64!("0x20_0000_0000_0004.p0"))]
+    #[case(0x20_0000_0000_000C, hexf64!("0x20_0000_0000_000C.p0"))]
+    #[case(0x20_0000_0000_000F, hexf64!("0x20_0000_0000_0010.p0"))]
+    #[case(0x20_0000_0000_00FF, hexf64!("0x20_0000_0000_0100.p0"))]
+    #[case(0x20_0000_0000_FFFF, hexf64!("0x20_0000_0001_0000.p0"))]
+    #[case(0x20_0000_FFFF_FFFF, hexf64!("0x20_0001_0000_0000.p0"))]
+    #[case(0x2F_FFFF_FFFF_FFFF, hexf64!("0x30_0000_0000_0000.p0"))]
+    #[case(0xFFFF_FFFF_FFFF_FFFF, hexf64!("0x8000_0000_0000_0000.p1"))]
+    fn usize_as_f64_precision_losing_x64(#[case] input: usize, #[case] expected: f64) {
+        let l = usize_as_f64(input);
+        assert!((l - expected).abs() < f64::EPSILON, "l={l}\nr={expected}",);
+    }
+
+    #[rstest]
+    #[case(hexf64!("0x0.p0"), 0x0)]
+    #[case(hexf64!("-0x0.p0"), -0x0)]
+    #[case(hexf64!("0x1.p0"), 0x1)]
+    #[case(hexf64!("-0x1.p0"), -0x1)]
+    #[case(hexf64!("0x3.p0"), 0x3)]
+    #[case(hexf64!("-0x3.p0"), -0x3)]
+    #[case(hexf64!("0xF.p0"), 0xF)]
+    #[case(hexf64!("-0xF.p0"), -0xF)]
+    #[case(hexf64!("0xFF.p0"), 0xFF)]
+    #[case(hexf64!("-0xFF.p0"), -0xFF)]
+    #[case(hexf64!("0xFFFF.p0"), 0xFFFF)]
+    #[case(hexf64!("-0xFFFF.p0"), -0xFFFF)]
+    #[case(hexf64!("0x7FFF_FFFF.p0"), 0x7FFF_FFFF)]
+    #[case(hexf64!("-0x8000_0000.p0"), -0x8000_0000)]
+    fn f64_as_isize_trivial(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(hexf64!("0x8000_0000.p0"), 0x8000_0000)]
+    #[case(hexf64!("-0x8000_0001.p0"), -0x8000_0001)]
+    #[case(
+        // 0x7FFF_FFFF_FFFF_FFFF.p0 cannot be exactly represented in f64, so rounding up
+        hexf64!("0x8000_0000_0000_0000.p0"),
+        0x7FFF_FFFF_FFFF_FFFF
     )]
-    fn test_usize_to_i64_truncating_safe_range(#[case] input: usize, #[case] expected: i64) {
-        let result = usize_to_i64_truncating(input);
-        assert_eq!(
-            result, expected,
-            "usize_to_i64_truncating({input}) should equal {expected}, got {result}"
-        );
+    #[case(hexf64!("-0x8000_0000_0000_0000.p0"), -0x8000_0000_0000_0000)]
+    fn f64_as_isize_trivial_x64(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
     }
 
-    // Test usize edge cases (depends on platform)
-    #[test]
-    fn test_usize_to_i64_truncating_max() {
-        let result = usize_to_i64_truncating(usize::MAX);
-
-        // On 64-bit systems, this will truncate; on 32-bit systems, it should fit
-        if std::mem::size_of::<usize>() == 8 {
-            // 64-bit system: usize::MAX might overflow i64
-            #[allow(clippy::cast_possible_truncation)]
-            if usize::MAX > i64::MAX as usize {
-                assert!(
-                    result < 0,
-                    "usize::MAX on 64-bit should truncate to negative i64"
-                );
-            } else {
-                #[allow(clippy::cast_possible_wrap)]
-                {
-                    assert_eq!(result, usize::MAX as i64);
-                }
-            }
-        } else {
-            // 32-bit system: usize::MAX should always fit in i64
-            #[allow(clippy::cast_possible_wrap)]
-            {
-                assert_eq!(result, usize::MAX as i64);
-            }
-            assert!(result >= 0, "usize::MAX on 32-bit should be positive i64");
-        }
-    }
-
-    // Test const evaluation
-    #[test]
-    fn test_truncating_functions_const() {
-        // These should be evaluable at compile time
-        const U64_RESULT: i64 = u64_to_i64_truncating(12345u64);
-        const USIZE_RESULT: i64 = usize_to_i64_truncating(67890usize);
-
-        assert_eq!(U64_RESULT, 12345i64);
-        assert_eq!(USIZE_RESULT, 67890i64);
-    }
-
-    // Test mathematical properties
-    #[test]
-    fn test_truncating_functions_properties() {
-        // Test that small values are preserved
-        for i in 0..1000u64 {
-            #[allow(clippy::cast_possible_wrap)]
-            {
-                assert_eq!(
-                    u64_to_i64_truncating(i),
-                    i as i64,
-                    "Small u64 value {i} should be preserved"
-                );
-            }
-        }
-
-        for i in 0..1000usize {
-            #[allow(clippy::cast_possible_wrap)]
-            {
-                assert_eq!(
-                    usize_to_i64_truncating(i),
-                    i as i64,
-                    "Small usize value {i} should be preserved"
-                );
-            }
-        }
-    }
-
-    // Test performance (should be no-op at runtime due to const)
+    // tests `clippy::cast_possible_truncation`
     #[rstest]
-    #[case::performance_u64(1000)]
-    #[case::performance_usize(1000)]
-    fn test_truncating_functions_performance(#[case] iterations: usize) {
-        let start = std::time::Instant::now();
-
-        for i in 0..iterations {
-            let _ = u64_to_i64_truncating(i as u64);
-            let _ = usize_to_i64_truncating(i);
-        }
-
-        let duration = start.elapsed();
-
-        // These should be extremely fast (essentially no-ops)
-        assert!(
-            duration < std::time::Duration::from_millis(10),
-            "Truncating functions took too long: {duration:?} for {iterations} iterations"
-        );
+    #[case(hexf64!("0x0.FFFF_FFFF_FFFF_F8p0"), 0x0)]
+    #[case(hexf64!("-0x0.FFFF_FFFF_FFFF_F8p0"), 0x0)]
+    #[case(hexf64!("0x1.0000_0000_0000_1p0"), 0x1)]
+    #[case(hexf64!("-0x1.0000_0000_0000_1p0"), -0x1)]
+    #[case(hexf64!("0x0.0000_0000_0000_1p-1022"), 0x0)] // {min,max} x {pos,neg} subnormal numbers
+    #[case(hexf64!("-0x0.0000_0000_0000_1p-1022"), 0x0)]
+    #[case(hexf64!("0x0.FFFF_FFFF_FFFF_Fp-1022"), 0x0)]
+    #[case(hexf64!("-0x0.FFFF_FFFF_FFFF_Fp-1022"), 0x0)]
+    fn f64_as_isize_truncating(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
     }
 
-    // Test specific overflow patterns
+    // tests `clippy::cast_possible_truncation`
+    #[cfg(target_pointer_width = "32")]
     #[rstest]
-    #[case::overflow_patterns(0x8000_0000_0000_0000u64, i64::MIN)]
-    #[case::overflow_patterns(0x8000_0000_0000_0001u64, i64::MIN + 1)]
-    #[case::overflow_patterns(0xFFFF_FFFF_FFFF_FFFFu64, -1i64)]
-    #[case::overflow_patterns(0xFFFF_FFFF_FFFF_FFFEu64, -2i64)]
-    #[case::overflow_patterns(0xFFFF_FFFF_FFFF_FFFDu64, -3i64)]
-    fn test_u64_to_i64_overflow_patterns(#[case] input: u64, #[case] expected: i64) {
-        let result = u64_to_i64_truncating(input);
-        assert_eq!(
-            result, expected,
-            "Overflow pattern: u64_to_i64_truncating(0x{input:016X}) should equal {expected}"
-        );
+    #[case(hexf64!("0x8000_0000.p0"), 0x7FFF_FFFF)]
+    #[case(hexf64!("-0x8000_0000.p0"), -0x8000_0000)]
+    #[case(hexf64!("0x1.FFFF_FFFF_FFFF_Fp+1_023"), 0x7FFF_FFFF)]
+    #[case(hexf64!("-0x1.FFFF_FFFF_FFFF_Fp+1_023"), -0x8000_0000)]
+    fn f64_as_isize_truncating_x86(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
     }
 
-    // Test bit patterns are preserved in truncation
+    // tests `clippy::cast_possible_truncation`
+    #[cfg(target_pointer_width = "64")]
     #[rstest]
-    fn test_truncating_bit_patterns() {
-        // Test that the lower 64 bits are preserved exactly
-        let test_values = [
-            0x0123_4567_89AB_CDEFu64,
-            0xFEDC_BA98_7654_3210u64,
-            0xAAAA_AAAA_AAAA_AAAAu64,
-            0x5555_5555_5555_5555u64,
-        ];
+    #[case(hexf64!("0x8000_0000_0000_0800.p0"), 0x7FFF_FFFF_FFFF_FFFF)]
+    #[case(hexf64!("-0x8000_0000_0000_0800.p0"), -0x8000_0000_0000_0000)]
+    #[case(hexf64!("0x1.FFFF_FFFF_FFFF_Fp+1_023"), 0x7FFF_FFFF_FFFF_FFFF)]
+    #[case(hexf64!("-0x1.FFFF_FFFF_FFFF_Fp+1_023"), -0x8000_0000_0000_0000)]
+    fn f64_as_isize_truncating_x64(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
+    }
 
-        for &value in &test_values {
-            let result = u64_to_i64_truncating(value);
-            #[allow(clippy::cast_sign_loss)]
-            let result_bits = result as u64;
+    #[rstest]
+    #[case(f64::NAN, 0x0)]
+    #[case(-f64::NAN, 0x0)]
+    fn f64_as_isize_nontrivial(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
+    }
 
-            assert_eq!(
-                result_bits, value,
-                "Bit pattern should be preserved: 0x{value:016X} -> 0x{result_bits:016X}"
-            );
-        }
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case(f64::INFINITY, 0x7FFF_FFFF)]
+    #[case(f64::NEG_INFINITY, -0x8000_0000)]
+    fn f64_as_isize_nontrivial_x86(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case(f64::INFINITY, 0x7FFF_FFFF_FFFF_FFFF)]
+    #[case(f64::NEG_INFINITY, -0x8000_0000_0000_0000)]
+    fn f64_as_isize_nontrivial_x64(#[case] input: f64, #[case] expected: isize) {
+        assert_eq!(f64_as_isize(input), expected);
+    }
+
+    #[rstest]
+    #[case(0x0, 0x0)]
+    #[case(0x1, 0x1)]
+    #[case(0x3, 0x3)]
+    #[case(0xF, 0xF)]
+    #[case(0xFF, 0xFF)]
+    #[case(0xFFFF, 0xFFFF)]
+    fn i64_as_u16_trivial(#[case] input: i64, #[case] expected: u16) {
+        assert_eq!(i64_as_u16(input), expected);
+    }
+
+    // tests `clippy::cast_sign_loss`
+    #[rstest]
+    #[case(-0x8000_0000_0000_0000, 0x0000)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFF, 0x0001)]
+    #[case(-0x7FFF_FFFF_FFFF_FFFD, 0x0003)]
+    #[case(-0x7FFF_FFFF_FFFF_FFF1, 0x000F)]
+    #[case(-0x7FFF_FFFF_FFFF_FF01, 0x00FF)]
+    #[case(-0x7FFF_FFFF_FFFF_0001, 0xFFFF)]
+    #[case(-0x1, 0xFFFF)]
+    fn i64_as_u16_sign_losing(#[case] input: i64, #[case] expected: u16) {
+        assert_eq!(i64_as_u16(input), expected);
+    }
+
+    // tests `clippy::cast_possible_truncation`
+    #[rstest]
+    #[case(0x1_0000, 0x0)]
+    #[case(0x1_0001, 0x1)]
+    #[case(0x1_000C, 0xC)]
+    #[case(0x1_000F, 0xF)]
+    #[case(0x1_00FF, 0xFF)]
+    #[case(0x1_FFFF, 0xFFFF)]
+    #[case(0x7FFF_FFFF_FFFF_FFFF, 0xFFFF)]
+    fn i64_as_u16_truncating(#[case] input: i64, #[case] expected: u16) {
+        assert_eq!(i64_as_u16(input), expected);
+    }
+
+    #[rstest]
+    #[case(hexf64!("0x0.p0"), 0x0)]
+    #[case(hexf64!("-0x0.p0"), 0x0)]
+    #[case(hexf64!("0x1.p0"), 0x1)]
+    #[case(hexf64!("0x3.p0"), 0x3)]
+    #[case(hexf64!("0xF.p0"), 0xF)]
+    #[case(hexf64!("0xFF.p0"), 0xFF)]
+    #[case(hexf64!("0xFFFF.p0"), 0xFFFF)]
+    #[case(hexf64!("0xFFFF_FFFF.p0"), 0xFFFF_FFFF)]
+    fn f64_as_u32_trivial(#[case] input: f64, #[case] expected: u32) {
+        assert_eq!(f64_as_u32(input), expected);
+    }
+
+    #[rstest]
+    #[case(f64::NAN, 0x0)]
+    #[case(-f64::NAN, 0x0)]
+    #[case(f64::INFINITY, 0xFFFF_FFFF)]
+    #[case(f64::NEG_INFINITY, 0x0)]
+    fn f64_as_u32_nontrivial(#[case] input: f64, #[case] expected: u32) {
+        assert_eq!(f64_as_u32(input), expected);
+    }
+
+    #[rstest]
+    #[case(hexf64!("0x0.FFFF_FFFF_FFFF_F8p0"), 0x0)]
+    #[case(hexf64!("0x1.0000_0000_0000_1p0"), 0x1)]
+    #[case(hexf64!("0x0.0000_0000_0000_1p-1022"), 0x0)] // {min,max} pos subnormal numbers
+    #[case(hexf64!("0x0.FFFF_FFFF_FFFF_Fp-1022"), 0x0)]
+    #[case(hexf64!("0x1_0000_0000.p0"), 0xFFFF_FFFF)]
+    #[case(hexf64!("0x1.FFFF_FFFF_FFFF_Fp+1_023"), 0xFFFF_FFFF)]
+    fn f64_as_u32_truncating(#[case] input: f64, #[case] expected: u32) {
+        assert_eq!(f64_as_u32(input), expected);
+    }
+
+    #[rstest]
+    #[case(hexf64!("-0x0.0000_0000_0000_1p-1022"), 0x0)]
+    #[case(hexf64!("-0x1.FFFF_FFFF_FFFF_Fp+1_023"), 0x0)]
+    fn f64_as_u32_sign_losing(#[case] input: f64, #[case] expected: u32) {
+        assert_eq!(f64_as_u32(input), expected);
     }
 }

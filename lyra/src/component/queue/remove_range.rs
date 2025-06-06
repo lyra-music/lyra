@@ -3,7 +3,7 @@ use std::{
     num::{IntErrorKind, NonZeroUsize},
 };
 
-use lyra_ext::num::usize_to_i64_truncating;
+use lyra_ext::num::{i64_as_usize, usize_as_i64};
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -183,7 +183,7 @@ impl BotSlashCommand for RemoveRange {
         super::validate_input_position(self.end, queue_len)?;
 
         if self.end <= self.start {
-            let message = if self.end == usize_to_i64_truncating(queue_len) {
+            let message = if self.end == usize_as_i64(queue_len) {
                 format!(
                     "Invalid starting position: `{}`; Starting position must be from `1` to `{}`.",
                     self.start,
@@ -202,9 +202,7 @@ impl BotSlashCommand for RemoveRange {
             return Ok(());
         }
 
-        #[expect(clippy::cast_possible_truncation)]
-        let positions =
-            (self.start..=self.end).filter_map(|p| NonZeroUsize::new(p.unsigned_abs() as usize));
+        let positions = (self.start..=self.end).filter_map(|p| NonZeroUsize::new(i64_as_usize(p)));
         check::all_users_track(queue, positions, in_voice_with_user)?;
 
         drop(data_r);

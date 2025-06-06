@@ -1,5 +1,4 @@
 use lavalink_rs::{client::LavalinkClient, model::events::TrackStart};
-use lyra_ext::num::u64_to_i64_truncating;
 
 use crate::{
     core::model::{DatabaseAware, OwnedHttpAware},
@@ -41,7 +40,7 @@ pub(super) async fn impl_start(
     let lavalink_data = lavalink.data_unwrapped();
     let rec = sqlx::query!(
         "SELECT now_playing FROM guild_configs WHERE id = $1;",
-        u64_to_i64_truncating(guild_id.0)
+        guild_id.0.cast_signed()
     )
     .fetch_one(lavalink_data.db())
     .await?;

@@ -10,7 +10,7 @@ mod shuffle;
 pub use clear::Clear;
 pub use fair_queue::FairQueue;
 use lyra_ext::{
-    num::usize_to_i64_truncating,
+    num::{i64_as_usize, usize_as_i64},
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
@@ -74,7 +74,7 @@ fn generate_position_choice(
             track_info.corrected_title().pretty_truncate(53)
         ),
         name_localizations: None,
-        value: CommandOptionChoiceValue::Integer(usize_to_i64_truncating(position.get())),
+        value: CommandOptionChoiceValue::Integer(usize_as_i64(position.get())),
     }
 }
 
@@ -166,8 +166,7 @@ pub fn generate_position_choices_from_fuzzy_match<'a>(
 }
 
 fn normalize_queue_position(position: i64, queue_len: NonZeroUsize) -> Option<NonZeroUsize> {
-    #[expect(clippy::cast_possible_truncation)]
-    let position_usize = position.unsigned_abs() as usize;
+    let position_usize = i64_as_usize(position);
 
     (1..=queue_len.get()).contains(&position_usize).then(|| {
         NonZeroUsize::new(if position.is_positive() {
@@ -182,7 +181,7 @@ pub const fn validate_input_position(
     input: i64,
     queue_len: usize,
 ) -> Result<(), PositionOutOfRangeError> {
-    if 1 > input || input > usize_to_i64_truncating(queue_len) {
+    if 1 > input || input > usize_as_i64(queue_len) {
         return Err(if queue_len == 1 {
             PositionOutOfRangeError::OnlyTrack(input)
         } else {
@@ -213,8 +212,7 @@ async fn remove_range(
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
-    #[expect(clippy::cast_possible_truncation)]
-    let (start_usize, end_usize) = (start.unsigned_abs() as usize, end.unsigned_abs() as usize);
+    let (start_usize, end_usize) = (i64_as_usize(start), i64_as_usize(end));
 
     let data = player.data();
     let mut data_w = data.write().await;
