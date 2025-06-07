@@ -259,7 +259,8 @@ impl Context {
             }
             NowPlayingButtonType::Repeat => {
                 let mode = crate::component::queue::get_next_repeat_mode(&ctx).await;
-                crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true).await?;
+                crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true, true)
+                    .await?;
             }
         }
 

@@ -4,11 +4,18 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         SlashCtx, check,
-        model::{BotSlashCommand, CtxKind, GuildCtx, RespondViaMessage},
+        model::{BotSlashCommand, CtxKind, FollowupCtxKind, GuildCtx, RespondViaMessage},
         require,
         util::controller_fmt,
     },
-    core::model::response::initial::message::create::RespondWithMessage,
+    component::playback::{
+        Back,
+        jump::{backward::Backward as JumpBackward, to::To as JumpTo},
+    },
+    core::{
+        http::InteractionClient,
+        model::response::{followup::Followup, initial::message::create::RespondWithMessage},
+    },
     error::CommandResult,
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
@@ -56,7 +63,9 @@ impl BotSlashCommand for Repeat {
         let player = require::player(&ctx)?;
         let data = player.data();
 
-        require::queue_not_empty(&data.read().await)?;
+        let current_track_exists = require::queue_not_empty(&data.read().await)?
+            .current()
+            .is_some();
 
         // TODO: #44
         //
@@ -66,7 +75,7 @@ impl BotSlashCommand for Repeat {
         //    .await?;
         check::user_in(in_voice)?.only()?;
 
-        Ok(repeat(&mut ctx, data, mode, false).await?)
+        Ok(repeat(&mut ctx, data, mode, current_track_exists, false).await?)
     }
 }
 
@@ -79,9 +88,10 @@ pub async fn get_next_repeat_mode(ctx: &GuildCtx<impl CtxKind>) -> LavalinkRepea
 }
 
 pub async fn repeat(
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     data: OwnedPlayerData,
     mode: LavalinkRepeatMode,
+    current_track_exists: bool,
     via_controller: bool,
 ) -> Result<(), crate::error::component::queue::repeat::Error> {
     ctx.get_conn().dispatch(Event::QueueRepeat);
@@ -94,5 +104,18 @@ pub async fn repeat(
     let content = controller_fmt(ctx, via_controller, &message);
     //out_or_upd!(content, ?ctx); TODO: #44
     ctx.out(content).await?;
+
+    if !current_track_exists {
+        ctx.notef(format!(
+            "**Currently not playing anything.** \
+            For the repeat to take effect, play something with {} first.\n\
+            -# **Alternatively**: use {}, {} or {} to play tracks already in the queue, but repeat one will be changed to repeat all.",
+            InteractionClient::mention_command::<super::Play>(),
+            InteractionClient::mention_command::<Back>(),
+            InteractionClient::mention_command::<JumpBackward>(),
+            InteractionClient::mention_command::<JumpTo>(),
+        ))
+        .await?;
+    }
     Ok(())
 }
