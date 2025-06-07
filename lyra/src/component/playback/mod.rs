@@ -1,5 +1,5 @@
 mod back;
-mod jump;
+pub mod jump;
 mod play_pause;
 mod restart;
 mod seek;
