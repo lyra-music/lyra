@@ -20,6 +20,8 @@ use crate::{
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
 
+use super::Play;
+
 #[derive(CommandOption, CreateOption)]
 enum RepeatMode {
     #[option(name = "Off", value = 0)]
@@ -110,7 +112,7 @@ pub async fn repeat(
             "**Currently not playing anything.** \
             For the repeat to take effect, play something with {} first.\n\
             -# **Alternatively**: use {}, {} or {} to play tracks already in the queue, but repeat one will be changed to repeat all.",
-            InteractionClient::mention_command::<super::Play>(),
+            InteractionClient::mention_command::<Play>(),
             InteractionClient::mention_command::<Back>(),
             InteractionClient::mention_command::<JumpBackward>(),
             InteractionClient::mention_command::<JumpTo>(),
