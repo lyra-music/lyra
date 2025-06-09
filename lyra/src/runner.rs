@@ -226,7 +226,7 @@ async fn wait_until_shutdown(
 
     tracing::debug!("deleting all now playing messages...");
     for data in bot.lavalink().iter_player_data() {
-        data.write().await.delete_now_playing_message(bot).await;
+        data.write().await.delete_now_playing_message().await;
     }
 
     tracing::debug!("sending close frames to all shards...");

@@ -55,7 +55,7 @@ impl BotSlashCommand for Bump {
             drop(data_r);
 
             let mut data_w = data.write().await;
-            data_w.delete_now_playing_message(&ctx).await;
+            data_w.delete_now_playing_message().await;
             let http = ctx.http_owned();
             data_w
                 .new_now_playing_message_in(http, msg_data, channel_id)

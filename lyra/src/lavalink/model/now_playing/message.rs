@@ -21,7 +21,11 @@ use twilight_util::builder::embed::{
 };
 
 use crate::{
-    core::{emoji, model::HttpAware, r#static::component::NOW_PLAYING_BUTTON_IDS},
+    core::{
+        emoji,
+        model::{HttpAware, response::EmptyResponseResult},
+        r#static::component::NOW_PLAYING_BUTTON_IDS,
+    },
     error::{
         core::DeserialiseBodyFromHttpError,
         lavalink::{
@@ -204,6 +208,10 @@ impl Message {
         self.data.timestamp = timestamp;
     }
 
+    pub(in super::super) const fn replace_data(&mut self, data: Data) -> Data {
+        std::mem::replace(&mut self.data, data)
+    }
+
     pub async fn apply_update(&self) -> Result<(), UpdateNowPlayingMessageError> {
         self.http
             .update_message(self.channel_id, self.id)
@@ -340,5 +348,10 @@ impl Message {
                 .thumbnail(ImageSource::url(artwork.url())?);
         }
         Ok(embed.build())
+    }
+
+    #[inline]
+    pub(in super::super) async fn delete(self) -> EmptyResponseResult {
+        self.http.delete_message(self.channel_id, self.id).await
     }
 }

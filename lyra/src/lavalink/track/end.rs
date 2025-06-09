@@ -1,6 +1,7 @@
 use lavalink_rs::{client::LavalinkClient, model::events::TrackEnd};
 
 use crate::{
+    command::require::cleanup_now_playing_message_and_play,
     error::lavalink::ProcessResult,
     lavalink::{CorrectTrackInfo, UnwrappedData},
 };
@@ -25,24 +26,21 @@ pub(super) async fn impl_end(
     };
     let data = player.data_unwrapped();
 
-    data.write()
-        .await
-        .delete_now_playing_message(&*lavalink.data_unwrapped())
-        .await;
-
-    let data_r = data.read().await;
-    if data_r.queue().advancing_disabled().await {
+    let advancing_disabled = data.read().await.queue().advancing_disabled().await;
+    if advancing_disabled {
         tracing::debug!(?guild_id, "track ended forcefully");
     } else {
         tracing::debug!(?guild_id, "track ended normally");
-
-        drop(data_r);
         let mut data_w = data.write().await;
-        let queue = data_w.queue_mut();
 
+        let cdata = &*lavalink.data_unwrapped();
+        data_w.cleanup_now_playing_message(cdata).await;
+
+        let queue = data_w.queue_mut();
         queue.advance();
-        if let Some(item) = queue.current() {
-            player.play_now(item.data()).await?;
+        let index = queue.index();
+        if queue.get_mapped(index).is_some() {
+            cleanup_now_playing_message_and_play(&player, cdata, index, &mut data_w).await?;
         }
         drop(data_w);
     }

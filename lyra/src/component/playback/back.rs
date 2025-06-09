@@ -53,20 +53,23 @@ pub async fn back(
     queue.downgrade_repeat_mode();
     if current_track_title.is_some() {
         // CORRECTNESS: the current track is present and will be ending via the
-        // `play_now` call later, so this is correct.
+        // `cleanup_now_playing_message_and_play` call later, so this is correct.
         queue.disable_advancing();
     }
     queue.recede();
 
-    let item = queue.current().expect("queue must be non-empty");
-    player.context.play_now(item.data()).await?;
+    let index = queue.mapped_index().expect("current track exists");
     let message = current_track_title.map_or_else(
-        || format!("⏮️ `{}`.", item.data().info.title),
+        || format!("⏮️ `{}`.", queue[index].data().info.title),
         |title| format!("⏮️ ~~`{title}`~~.",),
     );
-    drop(data_w);
+    ctx.out(controller_fmt(ctx, via_controller, &message))
+        .await?;
 
-    let content = controller_fmt(ctx, via_controller, &message);
-    ctx.out(content).await?;
+    player
+        .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+        .await?;
+
+    drop(data_w);
     Ok(())
 }

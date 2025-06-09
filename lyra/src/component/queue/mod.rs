@@ -282,6 +282,7 @@ async fn impl_remove(
         ),
         _ => ("**`≡-`**", format!("`{removed_len} tracks`")),
     };
+    ctx.out(format!("{minus} Removed {removed_text}.")).await?;
     let current =
         NonZeroUsize::new(queue.index() + 1).expect("1-indexed queue index must be non-zero");
     let before_current = positions.partition_point(|&i| i < current);
@@ -289,25 +290,33 @@ async fn impl_remove(
 
     if positions.binary_search(&current).is_ok() {
         queue.downgrade_repeat_mode();
-        let next = queue.current().map(QueueItem::data);
 
         // CORRECTNESS: the current track is present (and will be removed from the queue) and
-        // will be ending via the `play_now` or `stop_now` call later, so this is correct.
+        // will be ending via the `cleanup_now_playing_message_and_play` or
+        // `stop_and_cleanup_now_playing_message` call later, so this is correct.
         queue.disable_advancing();
 
-        if let Some(next) = next {
-            player.context.play_now(next).await?;
+        if let Some(index) = queue.mapped_index() {
+            player
+                .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+                .await?;
         } else {
-            player.context.stop_now().await?;
+            player
+                .stop_and_delete_now_playing_message(&mut data_w)
+                .await?;
         }
     }
-    let (queue_len, queue_position) = (queue.len(), queue.position());
-    data_w
-        .update_and_apply_now_playing_queue_len_and_position(queue_len, queue_position)
-        .await?;
     drop(data_w);
 
-    ctx.out(format!("{minus} Removed {removed_text}.")).await?;
+    let data_r = data.read().await;
+    let queue = data_r.queue();
+    let (queue_len, queue_position) = (queue.len(), queue.position());
+    drop(data_r);
+
+    data.write()
+        .await
+        .update_and_apply_now_playing_queue_len_and_position(queue_len, queue_position)
+        .await?;
 
     if queue_cleared {
         let clear = InteractionClient::mention_command::<Clear>();

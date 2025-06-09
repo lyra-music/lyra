@@ -41,6 +41,10 @@ pub async fn skip(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
 ) -> Result<(), PlayPauseError> {
+    let message = format!("⏭️ ~~`{current_track_title}`~~.");
+    let content = controller_fmt(ctx, via_controller, &message);
+    ctx.out(content).await?;
+
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
@@ -49,18 +53,20 @@ pub async fn skip(
     // - when called from `/skip`: verified via `queue_not_empty` and `current_track` checks
     // - when called from the skip button on the controller: if the controller exists, then
     //   it must only mean the current track also exists.
-    // and will be ending via the `play_now` call later, so this is correct.
+    // and will be ending via the `cleanup_now_playing_message_and_play` call later,
+    // so this is correct.
     queue.disable_advancing();
 
     queue.advance();
-    if let Some(item) = queue.current() {
-        player.context.play_now(item.data()).await?;
+    if let Some(index) = queue.mapped_index() {
+        player
+            .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+            .await?;
     } else {
-        player.context.stop_now().await?;
+        player
+            .stop_and_delete_now_playing_message(&mut data_w)
+            .await?;
     }
     drop(data_w);
-    let message = format!("⏭️ ~~`{current_track_title}`~~.");
-    let content = controller_fmt(ctx, via_controller, &message);
-    ctx.out(content).await?;
     Ok(())
 }

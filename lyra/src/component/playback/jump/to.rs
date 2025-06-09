@@ -119,18 +119,24 @@ impl BotSlashCommand for To {
         queue.downgrade_repeat_mode();
         if current_track_exist {
             // CORRECTNESS: the current track is present and will be ending via the
-            // `play_now` call later, so this is correct
+            // `cleanup_now_playing_message_and_play` call later, so this is correct
             queue.disable_advancing();
         }
 
         let index = position - 1;
-        let track = queue[index].data();
-        let txt = format!("↔️ Jumped to `{}` (`#{}`).", track.info.title, position);
-        player.context.play_now(track).await?;
-
+        let mapped_index = queue.map_index_expected(index);
+        let track = queue[mapped_index].data();
+        ctx.out(format!(
+            "↔️ Jumped to `{}` (`#{}`).",
+            track.info.title, mapped_index
+        ))
+        .await?;
         *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
+
         drop(data_w);
-        ctx.out(txt).await?;
         Ok(())
     }
 }
