@@ -14,9 +14,12 @@ use twilight_mention::{
     Mention,
     timestamp::{Timestamp, TimestampStyle},
 };
-use twilight_model::id::{
-    Id,
-    marker::{ChannelMarker, GuildMarker},
+use twilight_model::{
+    channel::message::MessageFlags,
+    id::{
+        Id,
+        marker::{ChannelMarker, GuildMarker},
+    },
 };
 
 use self::join::JoinedChannel;
@@ -204,6 +207,7 @@ pub async fn handle_voice_state_update(
                     ctx.http()
                         .create_message(text_channel_id)
                         .content("⚡▶ Paused `(Bot is not used by anyone)`.")
+                        .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
                         .await?;
                 }
 
