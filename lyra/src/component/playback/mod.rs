@@ -11,6 +11,7 @@ pub use play_pause::{PlayPause, play_pause};
 pub use restart::Restart;
 pub use seek::Seek;
 pub use skip::{Skip, skip};
+use twilight_model::channel::message::MessageFlags;
 
 use crate::{
     command::require,
@@ -48,6 +49,7 @@ pub async fn handle_voice_state_update(
         ctx.http()
             .create_message(head.text_channel_id())
             .content("⚡▶ Paused `(Bot was moved to audience).`")
+            .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
             .await?;
     }
 
