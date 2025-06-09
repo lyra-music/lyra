@@ -15,7 +15,7 @@ use crate::{
         model::{BotSlashCommand, CtxKind, GuildCtx},
         require,
     },
-    core::model::{HttpAware, response::initial::message::create::RespondWithMessage},
+    core::model::response::initial::message::create::RespondWithMessage,
     error::{
         CommandResult,
         component::connection::leave::{self, DisconnectCleanupError},
@@ -40,7 +40,7 @@ pub(super) fn disconnect(cx: &(impl SenderAware + GuildIdAware)) -> Result<(), C
 }
 
 pub(super) async fn disconnect_cleanup(
-    cx: &(impl HttpAware + GuildIdAware + LavalinkAware + Sync),
+    cx: &(impl GuildIdAware + LavalinkAware + Sync),
 ) -> Result<(), DisconnectCleanupError> {
     let guild_id = cx.guild_id();
     let lavalink = cx.lavalink();
@@ -51,7 +51,7 @@ pub(super) async fn disconnect_cleanup(
             .data_unwrapped()
             .write()
             .await
-            .delete_now_playing_message(cx)
+            .delete_now_playing_message()
             .await;
     }
     lavalink.drop_connection(guild_id);

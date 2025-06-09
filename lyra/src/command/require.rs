@@ -104,6 +104,36 @@ impl PlayerInterface {
         self.context.set_pause(state).await?;
         Ok(())
     }
+
+    #[inline]
+    pub async fn cleanup_now_playing_message_and_play(
+        &self,
+        cx: &(impl CacheAware + Sync),
+        index: usize,
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> LavalinkResult<()> {
+        cleanup_now_playing_message_and_play(&self.context, cx, index, data_w).await
+    }
+
+    pub async fn stop_and_delete_now_playing_message(
+        &self,
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> LavalinkResult<()> {
+        self.context.stop_now().await?;
+        data_w.delete_now_playing_message().await;
+        Ok(())
+    }
+}
+
+pub async fn cleanup_now_playing_message_and_play(
+    context: &PlayerContext,
+    cx: &(impl CacheAware + Sync),
+    index: usize,
+    data_w: &mut PlayerDataWrite<'_>,
+) -> LavalinkResult<()> {
+    data_w.cleanup_now_playing_message(cx).await;
+    context.play_now(data_w.queue()[index].data()).await?;
+    Ok(())
 }
 
 pub type CachedVoiceStateRef<'a> =

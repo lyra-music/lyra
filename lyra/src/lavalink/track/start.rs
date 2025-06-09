@@ -50,11 +50,19 @@ pub(super) async fn impl_start(
     }
 
     let msg_data = NowPlayingData::new(&lavalink_data, guild_id, &data_r, track).await?;
+    let now_playing_message_exists = data_r.now_playing_message_id().is_some();
     drop(data_r);
 
-    data.write()
-        .await
-        .new_now_playing_message(lavalink_data.http_owned(), msg_data)
-        .await?;
+    let mut data_w = data.write().await;
+    if now_playing_message_exists {
+        data_w
+            .update_and_apply_all_now_playing_data(msg_data)
+            .await?;
+    } else {
+        data_w
+            .new_now_playing_message(lavalink_data.http_owned(), msg_data)
+            .await?;
+    }
+    drop(data_w);
     Ok(())
 }

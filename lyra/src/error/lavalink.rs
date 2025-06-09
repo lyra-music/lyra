@@ -14,6 +14,7 @@ pub enum ProcessError {
     DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
     NewNowPlayingMessage(#[from] NewNowPlayingMessageError),
     NewNowPlayingData(#[from] NewNowPlayingDataError),
+    UpdateNowPlayingMessageError(#[from] UpdateNowPlayingMessageError),
 }
 
 #[derive(Error, Debug)]

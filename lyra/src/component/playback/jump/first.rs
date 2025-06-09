@@ -38,17 +38,24 @@ impl BotSlashCommand for First {
         queue.downgrade_repeat_mode();
         if current_track_exists {
             // CORRECTNESS: the current track is present and will be ending via the
-            // `play_now` call later, so this is correct
+            // `cleanup_now_playing_message_and_play` call later, so this is correct
             queue.disable_advancing();
         }
 
-        let track = queue[0].data();
-        let txt = format!("⬅️ Jumped to `{}` (`#1`).", track.info.title);
-        player.context.play_now(track).await?;
-
-        *queue.index_mut() = 0;
+        let index = 0;
+        let mapped_index = queue.map_index_expected(index);
+        ctx.out(format!(
+            "⬅️ Jumped to `{}` (`#{}`).",
+            queue[mapped_index].data().info.title,
+            mapped_index
+        ))
+        .await?;
+        *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
         drop(data_w);
-        ctx.out(txt).await?;
+
         Ok(())
     }
 }

@@ -1,10 +1,6 @@
 use lavalink_rs::{client::LavalinkClient, model::events::TrackException};
 
-use crate::{
-    core::model::{DatabaseAware, HttpAware},
-    error::lavalink::ProcessResult,
-    lavalink::UnwrappedData,
-};
+use crate::{core::model::HttpAware, error::lavalink::ProcessResult, lavalink::UnwrappedData};
 
 #[tracing::instrument(err, skip_all, name = "track_exception")]
 pub(super) async fn impl_exception(
@@ -19,24 +15,11 @@ pub(super) async fn impl_exception(
         return Ok(());
     };
 
-    let rec = sqlx::query!(
-        "SELECT now_playing FROM guild_configs WHERE id = $1;",
-        guild_id.0.cast_signed()
-    )
-    .fetch_one(lavalink.data_unwrapped().db())
-    .await?;
-
     let data = player.data_unwrapped();
-    if rec.now_playing {
-        let message = data.write().await.take_now_playing_message();
-        if let Some(message) = message {
-            let _ = lavalink
-                .data_unwrapped()
-                .http()
-                .delete_message(message.channel_id(), message.id())
-                .await;
-        }
-    }
+    data.write()
+        .await
+        .cleanup_now_playing_message(&*lavalink.data_unwrapped())
+        .await;
 
     let oauth_enabled = std::env::var("PLUGINS_YOUTUBE_OAUTH_ENABLED")
         .is_ok_and(|x| x.parse::<bool>().is_ok_and(|y| y));

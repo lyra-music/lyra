@@ -427,8 +427,8 @@ async fn handle_load_track_results(
         .await
         .queue_mut()
         .enqueue(total_tracks, ctx.user_id());
-    player.play(first_track.inner()).await?;
     ctx.out_f(format!("{plus} Added {enqueued_text}.")).await?;
+    player.play(first_track.inner()).await?;
     Ok(())
 }
 

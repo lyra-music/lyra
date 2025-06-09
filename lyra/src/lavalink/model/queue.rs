@@ -33,6 +33,7 @@ impl RepeatMode {
             Self::Track => "🔂",
         }
     }
+
     pub const fn description(&self) -> &str {
         match self {
             Self::Off => "Disabled repeat",
@@ -121,7 +122,7 @@ impl Queue {
         &mut self.index
     }
 
-    pub fn mapped_index_from(&self, index: usize) -> Option<usize> {
+    pub fn map_index(&self, index: usize) -> Option<usize> {
         match self.indexer {
             Indexer::Standard => Some(index),
             Indexer::Fair(ref indexer) => indexer.current(index),
@@ -130,25 +131,26 @@ impl Queue {
     }
 
     #[inline]
+    pub fn map_index_expected(&self, index: usize) -> usize {
+        self.map_index(index).expect("track at index exists")
+    }
+
     pub fn mapped_index(&self) -> Option<usize> {
-        self.mapped_index_from(self.index)
+        self.map_index(self.index)
+    }
+
+    pub fn get_mapped(&self, index: usize) -> Option<&Item> {
+        self.inner.get(self.map_index(index)?)
     }
 
     #[inline]
-    pub fn mapped_index_rel(&self, offset: isize) -> Option<usize> {
-        let Some(index) = self.index.checked_add_signed(offset) else {
-            panic!(
-                "index out of range: queue len is {}, index is {}, got offset {}",
-                self.len(),
-                self.index,
-                offset
-            );
-        };
-        self.mapped_index_from(index)
+    pub fn current(&self) -> Option<&Item> {
+        self.get_mapped(self.index)
     }
 
-    pub fn current(&self) -> Option<&Item> {
-        self.inner.get(self.mapped_index()?)
+    #[inline]
+    pub fn next(&self) -> Option<&Item> {
+        self.get_mapped(self.next_index())
     }
 
     pub fn current_and_position(&self) -> (Option<&Item>, NonZeroUsize) {
@@ -243,29 +245,33 @@ impl Queue {
         }
     }
 
-    pub fn advance(&mut self) {
+    fn next_index(&self) -> usize {
         match self.repeat_mode {
-            RepeatMode::Off => {
-                self.index += 1;
-            }
-            RepeatMode::All => {
-                self.index = (self.index + 1) % self.len();
-            }
-            RepeatMode::Track => {}
+            RepeatMode::Off => self.index + 1,
+            RepeatMode::All => (self.index + 1) % self.len(),
+            RepeatMode::Track => self.index,
         }
     }
 
-    pub fn recede(&mut self) {
+    fn prev_index(&self) -> usize {
         match self.repeat_mode {
-            RepeatMode::Off => {
-                self.index = self.index.saturating_sub(1);
-            }
+            RepeatMode::Off => self.index.saturating_sub(1),
             RepeatMode::All => {
                 let len = self.len();
-                self.index = ((self.index + len).saturating_sub(1)) % len;
+                ((self.index + len).saturating_sub(1)) % len
             }
-            RepeatMode::Track => {}
+            RepeatMode::Track => self.index,
         }
+    }
+
+    #[inline]
+    pub fn advance(&mut self) {
+        self.index = self.next_index();
+    }
+
+    #[inline]
+    pub fn recede(&mut self) {
+        self.index = self.prev_index();
     }
 
     pub fn subscribe_to_advance_enabler(&self) -> watch::Receiver<bool> {

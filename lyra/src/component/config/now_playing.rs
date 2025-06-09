@@ -53,7 +53,7 @@ impl BotSlashCommand for Toggle {
         } else {
             if let Ok(data) = maybe_data {
                 if data.read().await.now_playing_message_id().is_some() {
-                    data.write().await.delete_now_playing_message(&ctx).await;
+                    data.write().await.delete_now_playing_message().await;
                 }
             }
             ("🔕", "Not sending")

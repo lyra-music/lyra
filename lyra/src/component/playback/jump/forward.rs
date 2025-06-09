@@ -33,6 +33,7 @@ impl BotSlashCommand for Forward {
 
         let queue_position = queue.position();
         let new_position = queue_position.saturating_add(jump);
+        let index = new_position.get() - 1;
         if new_position.get() > queue_len {
             let maximum_jump = queue_len - queue_position.get();
             if maximum_jump == 0 {
@@ -46,8 +47,7 @@ impl BotSlashCommand for Forward {
             return Ok(());
         }
 
-        let skipped =
-            (current_track.position.get()..new_position.get()).filter_map(NonZeroUsize::new);
+        let skipped = (current_track.position.get()..=index).filter_map(NonZeroUsize::new);
         check::all_users_track(queue, skipped, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
@@ -57,16 +57,23 @@ impl BotSlashCommand for Forward {
         // - queue is empty (which is impossible because of the `queue_not_empty_mut` check)
         // - the current queue index is past the end of the queue (which will early returned as
         //   "no where else to jump to"`)
-        // the current track will be ending via the `play_now` call later, so this is correct.
+        // the current track will be ending via the `cleanup_now_playing_message_and_play` call later,
+        // so this is correct.
         queue.disable_advancing();
 
-        let track = queue[new_position].data();
-        let txt = format!("↪️ Jumped to `{}` (`#{}`).", track.info.title, new_position);
-        player.context.play_now(track).await?;
-
-        *queue.index_mut() = new_position.get() - 1;
+        let mapped_index = queue.map_index_expected(index);
+        let track = queue[mapped_index].data();
+        ctx.out(format!(
+            "↪️ Jumped to `{}` (`#{}`).",
+            track.info.title, mapped_index
+        ))
+        .await?;
+        *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
         drop(data_w);
-        ctx.out(txt).await?;
+
         Ok(())
     }
 }
