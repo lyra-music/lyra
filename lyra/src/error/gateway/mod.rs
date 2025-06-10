@@ -1,4 +1,8 @@
-#[derive(thiserror::Error, Debug)]
+pub mod component;
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
 #[error(transparent)]
 pub enum ProcessError {
     SetGlobalCommands(#[from] super::core::SetGlobalCommandsError),
@@ -14,14 +18,15 @@ pub enum ProcessError {
         #[from] super::component::connection::HandleVoiceStateUpdateError,
     ),
     PlaybackHandleVoiceStateUpdate(#[from] super::component::playback::HandleVoiceStateUpdateError),
-    Lavalink(#[from] lavalink_rs::error::LavalinkError),
-    PlayPause(#[from] super::component::playback::PlayPauseError),
-    Repeat(#[from] super::component::queue::repeat::Error),
-    UpdateNowPlayingMessage(#[from] super::lavalink::UpdateNowPlayingMessageError),
     #[error("error executing command `/{}`: {:?}", .name, .source)]
     CommandExecute {
         name: Box<str>,
         source: super::command::declare::CommandExecuteError,
+    },
+    #[error("error executing controller `{}`: {:?}", .kind, .source)]
+    ControllerExecute {
+        kind: crate::core::r#static::component::NowPlayingButtonType,
+        source: component::ControllerError,
     },
     #[error("error executing autocomplete for command `/{}`: {:?}", .name, .source)]
     AutocompleteExecute {

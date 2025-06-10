@@ -1,5 +1,4 @@
-use lavalink_rs::error::LavalinkError;
-use lyra_ext::pretty::{flags_display::FlagsDisplay, join::PrettyJoiner};
+use lyra_ext::pretty::flags_display::FlagsDisplay;
 use tokio::sync::oneshot;
 use twilight_mention::Mention;
 use twilight_model::application::{command::CommandType, interaction::InteractionData};
@@ -7,10 +6,7 @@ use twilight_model::application::{command::CommandType, interaction::Interaction
 use crate::{
     CommandError, LavalinkAware,
     command::{MessageCtx, SlashCtx, model::NonPingInteraction, require, util::MessageLinkAware},
-    component::{
-        connection::Join,
-        queue::{Play, PlaySource},
-    },
+    component::{connection::Join, queue::Play},
     core::{
         r#const::exit_code::DUBIOUS,
         http::InteractionClient,
@@ -23,7 +19,7 @@ use crate::{
         },
     },
     error::{
-        AutoJoinAttemptFailed, PositionOutOfRange, PrettyErrorDisplay, Suppressed,
+        AutoJoinAttemptFailed, PositionOutOfRange, PrettyErrorDisplay,
         command::{
             FlattenedError as Fe,
             check::{
@@ -34,9 +30,15 @@ use crate::{
             },
             util::AutoJoinSuppressedError,
         },
-        core::{RespondError, RespondOrFollowupError},
         gateway::{ProcessError, ProcessResult},
     },
+};
+
+use super::{
+    SUPPRESSED_MESSAGE, UnitRespondOrFollowupResult, UnitRespondResult, match_cache,
+    match_in_voice_with_someone_else, match_in_voice_without_user, match_lavalink,
+    match_not_in_voice, match_not_playing, match_not_users_track, match_suppressed,
+    match_unrecognised_connection, match_wildcard,
 };
 
 impl super::Context {
@@ -121,10 +123,6 @@ impl super::Context {
     }
 }
 
-type UnitRespondResult = Result<(), RespondError>;
-type UnitRespondOrFollowupResult = Result<(), RespondOrFollowupError>;
-
-#[expect(clippy::too_many_lines)]
 async fn match_error(
     error: CommandError,
     command_name: Box<str>,
@@ -133,50 +131,21 @@ async fn match_error(
     match error.flatten_as() {
         //: possibly deferred from /play {{{
         //:
-        Fe::Cache => {
-            tracing::warn!("cache error: {:#?}", error);
-
-            i.unkn_f("Something isn't working at the moment, try again later.")
-                .await?;
-            Ok(())
-        }
-        Fe::InVoiceWithoutUser(e) => {
-            i.nope_f(format!(
-                "You are not with the bot in {}.\n\
-                    -# Members who are a ***DJ*** bypass this.",
-                e.0.mention(),
-            ))
-            .await?;
-            Ok(())
-        }
+        Fe::Cache => Ok(match_cache(error, i).await?),
+        Fe::InVoiceWithoutUser(e) => Ok(match_in_voice_without_user(e, i).await?),
         Fe::Suppressed(e) => Ok(match_suppressed(e, i).await?),
         Fe::AutoJoinSuppressed(e) => Ok(match_autojoin_suppressed(e, i).await?),
         Fe::AutoJoinAttemptFailed(e) => Ok(match_autojoin_attempt_failed(e, i).await?),
-        Fe::Lavalink(e) => {
-            if let LavalinkError::TrackError(_error) = e {
-                i.hid_f(format!(
-                    // As of Lavalink v4 API, the `severity` doesn't mean much to the user,
-                    // and `message` is almost always "Something went wrong while looking up the track.",
-                    // with `cause` repeating the same message, so the information from the error object
-                    // is entirely ignored.
-                    "💔 **Unable to load track**: \
-                    Please ensure the URL is from a supported audio streaming service and \
-                    the content is publicly accessible.  \n\
-                    -# **Supported streaming services**: {}.",
-                    PlaySource::values().pretty_join_with_and()
-                ))
-                .await?;
-                Ok(())
-            } else {
-                i.erro_f(format!(
-                    "Something went wrong with lavalink: ```rs\n{error:#?}```"
-                ))
-                .await?;
-                Err(ProcessError::CommandExecute {
+        Fe::Lavalink(_) => {
+            match_lavalink(
+                error,
+                move |e| ProcessError::CommandExecute {
                     name: command_name,
-                    source: error.into(),
-                })
-            }
+                    source: e.into(),
+                },
+                &mut i,
+            )
+            .await
         }
         Fe::TwilightHttp
         | Fe::DeserializeBody
@@ -204,19 +173,8 @@ async fn match_error(
         // Fe::UserNotPlaylistManager(_) => {
         //     nope!("You need to be a ***Playlist Manager*** to do that.", i);
         // }
-        Fe::NotInVoice => {
-            let join = InteractionClient::mention_command::<Join>();
-            let play = InteractionClient::mention_command::<Play>();
-            i.warn(format!(
-                "Not currently connected to a voice channel. Use {join} or {play} first.",
-            ))
-            .await?;
-            Ok(())
-        }
-        Fe::InVoiceWithSomeoneElse(e) => {
-            i.nope(e.pretty_display().to_string()).await?;
-            Ok(())
-        }
+        Fe::NotInVoice => Ok(match_not_in_voice(i).await?),
+        Fe::InVoiceWithSomeoneElse(e) => Ok(match_in_voice_with_someone_else(e, i).await?),
         Fe::InVoiceWithoutSomeoneElse(e) => {
             i.wrng(format!("Not enough people are in {}.", e.0.mention()))
                 .await?;
@@ -224,10 +182,7 @@ async fn match_error(
         }
 
         Fe::Stopped => todo!(),
-        Fe::NotPlaying => {
-            i.wrng("Currently not playing anything.").await?;
-            Ok(())
-        }
+        Fe::NotPlaying => Ok(match_not_playing(i).await?),
         Fe::Paused => {
             i.wrng("Currently paused.").await?;
             Ok(())
@@ -241,10 +196,7 @@ async fn match_error(
             Ok(())
         }
         Fe::PositionOutOfRange(e) => Ok(match_position_out_of_range(e, i).await?),
-        Fe::NotUsersTrack(e) => {
-            i.nope(e.pretty_display().to_string()).await?;
-            Ok(())
-        }
+        Fe::NotUsersTrack(e) => Ok(match_not_users_track(e, i).await?),
         Fe::AnotherPollOngoing(e) => Ok(match_another_poll_ongoing(e, i).await?),
         Fe::PollLoss(e) => Ok(match_poll_loss(e, i).await?),
         Fe::PollVoided(_e) => {
@@ -270,37 +222,17 @@ async fn match_error(
                 .await?;
             Ok(())
         }
-        Fe::UnrecognisedConnection => {
-            i.unkn(
-                "The bot wasn't disconnected properly last session. \
-                Please wait for it to automatically leave the voice channel, then try again.",
-            )
-            .await?;
-            Ok(())
-        }
-        _ => {
-            i.erro(format!("Something went wrong: ```rs\n{error:#?}```"));
-            Err(ProcessError::CommandExecute {
+        Fe::UnrecognisedConnection => Ok(match_unrecognised_connection(i).await?),
+        _ => Ok(match_wildcard(
+            error,
+            move |e| ProcessError::CommandExecute {
                 name: command_name,
-                source: error.into(),
-            })
-        }
+                source: e.into(),
+            },
+            &mut i,
+        )
+        .await?),
     }
-}
-
-const SUPPRESSED_MESSAGE: &str = "Currently server muted.";
-
-async fn match_suppressed(error: &Suppressed, mut i: CtxHead) -> UnitRespondOrFollowupResult {
-    match error {
-        Suppressed::Muted => {
-            i.wrng_f(SUPPRESSED_MESSAGE).await?;
-        }
-        Suppressed::NotSpeaker => {
-            i.wrng_f("Not currently a speaker in this stage channel.")
-                .await?;
-        }
-    }
-    Ok(())
 }
 
 async fn match_autojoin_suppressed(

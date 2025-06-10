@@ -21,10 +21,10 @@ use twilight_model::{
 use crate::error::{CommandResult, command::AutocompleteResult};
 
 pub use self::ctx::{
-    AppCtxKind, AppCtxMarker, Autocomplete as AutocompleteCtx, Component as ComponentCtx, Ctx,
-    DeferCtxKind, FollowupCtxKind, Guild as GuildCtx, GuildModal as GuildModalCtx,
-    GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx, RespondViaMessage,
-    Slash as SlashCtx, User,
+    AppCtxKind, AppCtxMarker, Autocomplete as AutocompleteCtx, Component as ComponentCtx,
+    ComponentMarker, Ctx, DeferCtxKind, FollowupCtxKind, Guild as GuildCtx,
+    GuildModal as GuildModalCtx, GuildRef as GuildCtxRef, Kind as CtxKind, Message as MessageCtx,
+    RespondViaMessage, Slash as SlashCtx, User,
 };
 
 pub trait NonPingInteraction {

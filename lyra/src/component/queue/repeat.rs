@@ -16,7 +16,7 @@ use crate::{
         http::InteractionClient,
         model::response::{followup::Followup, initial::message::create::RespondWithMessage},
     },
-    error::CommandResult,
+    error::{CommandResult, component::queue::repeat::RepeatError},
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
 
@@ -61,23 +61,8 @@ impl BotSlashCommand for Repeat {
             }
         };
 
-        let in_voice = require::in_voice(&ctx)?;
         let player = require::player(&ctx)?;
-        let data = player.data();
-
-        let current_track_exists = require::queue_not_empty(&data.read().await)?
-            .current()
-            .is_some();
-
-        // TODO: #44
-        //
-        // check::user_in(in_voice)?.only()
-        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
-        //    .and_then_start(&mut ctx)
-        //    .await?;
-        check::user_in(in_voice)?.only()?;
-
-        Ok(repeat(&mut ctx, data, mode, current_track_exists, false).await?)
+        Ok(repeat(&mut ctx, player.data(), mode, false).await?)
     }
 }
 
@@ -93,9 +78,18 @@ pub async fn repeat(
     ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
     data: OwnedPlayerData,
     mode: LavalinkRepeatMode,
-    current_track_exists: bool,
     via_controller: bool,
-) -> Result<(), crate::error::component::queue::repeat::Error> {
+) -> Result<(), RepeatError> {
+    if matches!(mode, LavalinkRepeatMode::Track) {
+        // TODO: #44
+        //
+        // check::user_in(in_voice)?.only()
+        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
+        //    .and_then_start(&mut ctx)
+        //    .await?;
+        check::user_in(require::in_voice(ctx)?)?.only()?;
+    }
+
     ctx.get_conn().dispatch(Event::QueueRepeat);
     data.write()
         .await
@@ -107,7 +101,7 @@ pub async fn repeat(
     //out_or_upd!(content, ?ctx); TODO: #44
     ctx.out(content).await?;
 
-    if !current_track_exists {
+    if data.read().await.queue().current().is_none() {
         ctx.notef(format!(
             "**Currently not playing anything.** \
             For the repeat to take effect, play something with {} first.\n\

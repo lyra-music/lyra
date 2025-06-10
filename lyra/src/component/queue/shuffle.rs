@@ -8,7 +8,7 @@ use crate::{
         util::controller_fmt,
     },
     core::model::response::initial::message::create::RespondWithMessage,
-    error::{CommandResult, lavalink::UpdateNowPlayingMessageError},
+    error::{CommandResult, component::queue::shuffle::ShuffleError},
     lavalink::{IndexerType, OwnedPlayerData},
 };
 
@@ -20,13 +20,9 @@ pub struct Shuffle;
 impl BotSlashCommand for Shuffle {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        check::user_in(require::in_voice(&ctx)?)?.only()?;
         let player = require::player(&ctx)?;
         let data = player.data();
-
-        let data_r = data.read().await;
-        require::queue_not_empty(&data_r)?;
-        drop(data_r);
+        require::queue_not_empty(&data.read().await)?;
 
         Ok(shuffle(data, &mut ctx, false).await?)
     }
@@ -36,7 +32,13 @@ pub async fn shuffle(
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
-) -> Result<(), UpdateNowPlayingMessageError> {
+) -> Result<(), ShuffleError> {
+    // FAIRNESS: if a member requests to enable or disable shuffle, they need to be
+    // the only person in voice, as modifying the queue indexing order will be
+    // unfair to everyone who queued after this current track: the tracks after the
+    // current track will be delayed for an unspecified amount of time.
+    check::user_in(require::in_voice(ctx)?)?.only()?;
+
     let indexer_type = data.read().await.queue().indexer_type();
     match indexer_type {
         IndexerType::Shuffled => {

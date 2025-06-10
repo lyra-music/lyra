@@ -1,5 +1,6 @@
 pub mod play;
 pub mod repeat;
+pub mod shuffle;
 
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
