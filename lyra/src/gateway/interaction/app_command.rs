@@ -1,27 +1,12 @@
-use std::sync::Arc;
-
 use lavalink_rs::error::LavalinkError;
 use lyra_ext::pretty::{flags_display::FlagsDisplay, join::PrettyJoiner};
 use tokio::sync::oneshot;
-use twilight_gateway::{Latency, MessageSender};
 use twilight_mention::Mention;
-use twilight_model::{
-    application::{
-        command::CommandType,
-        interaction::{InteractionData, InteractionType},
-    },
-    gateway::payload::incoming::InteractionCreate,
-};
+use twilight_model::application::{command::CommandType, interaction::InteractionData};
 
-use super::model::Process;
 use crate::{
     CommandError, LavalinkAware,
-    command::{
-        AutocompleteCtx, MessageCtx, SlashCtx,
-        model::{ComponentCtx, NonPingInteraction},
-        require,
-        util::MessageLinkAware,
-    },
+    command::{MessageCtx, SlashCtx, model::NonPingInteraction, require, util::MessageLinkAware},
     component::{
         connection::Join,
         queue::{Play, PlaySource},
@@ -30,25 +15,23 @@ use crate::{
         r#const::exit_code::DUBIOUS,
         http::InteractionClient,
         model::{
-            BotState, OwnedBotState,
             ctx_head::CtxHead,
             response::{
                 Respond, either::RespondOrFollowup, followup::Followup,
                 initial::message::create::RespondWithMessage,
             },
         },
-        r#static::component::NowPlayingButtonType,
     },
     error::{
-        AutoJoinAttemptFailed as AutoJoinAttemptFailedError,
-        PositionOutOfRange as PositionOutOfRangeError, PrettyErrorDisplay,
-        Suppressed as SuppressedError,
+        AutoJoinAttemptFailed, PositionOutOfRange, PrettyErrorDisplay, Suppressed,
         command::{
-            Fe,
+            FlattenedError as Fe,
             check::{
                 AlternateVoteResponse, AnotherPollOngoingError, PollLossError, PollLossErrorKind,
             },
-            declare::{CommandExecuteError, Fuunacee},
+            declare::{
+                CommandExecuteError, FlattenedUntilUserNotAllowedCommandExecuteError as Fuunacee,
+            },
             util::AutoJoinSuppressedError,
         },
         core::{RespondError, RespondOrFollowupError},
@@ -56,44 +39,8 @@ use crate::{
     },
 };
 
-pub(super) struct Context {
-    inner: Box<InteractionCreate>,
-    bot: OwnedBotState,
-    latency: Latency,
-    sender: MessageSender,
-}
-
-impl BotState {
-    pub(super) const fn into_interaction_create_context(
-        self: Arc<Self>,
-        inner: Box<InteractionCreate>,
-        latency: Latency,
-        sender: MessageSender,
-    ) -> Context {
-        Context {
-            inner,
-            bot: self,
-            sender,
-            latency,
-        }
-    }
-}
-
-impl Process for Context {
-    async fn process(self) -> ProcessResult {
-        match self.inner.kind {
-            InteractionType::ApplicationCommand => self.process_as_app_command().await,
-            InteractionType::ApplicationCommandAutocomplete => self.process_as_autocomplete().await,
-            InteractionType::MessageComponent => self.process_as_component().await,
-            InteractionType::ModalSubmit => self.process_as_modal().await,
-            InteractionType::Ping => Ok(()), // ignored
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl Context {
-    async fn process_as_app_command(mut self) -> ProcessResult {
+impl super::Context {
+    pub(super) async fn process_as_app_command(mut self) -> ProcessResult {
         let bot = self.bot;
         let mut i = bot.interaction().ctx(&self.inner);
 
@@ -171,110 +118,6 @@ impl Context {
                 Err(ProcessError::CommandExecute { name, source })
             }
         }
-    }
-
-    async fn process_as_autocomplete(mut self) -> ProcessResult {
-        let Some(InteractionData::ApplicationCommand(data)) = self.inner.data.take() else {
-            unreachable!()
-        };
-
-        let name = data.name.clone().into();
-        let (tx, _) = oneshot::channel::<()>();
-        let Err(source) = AutocompleteCtx::from_partial_data(
-            self.inner,
-            &data,
-            self.bot,
-            self.latency,
-            self.sender,
-            tx,
-        )
-        .execute(*data)
-        .await
-        else {
-            return Ok(());
-        };
-
-        Err(ProcessError::AutocompleteExecute { name, source })
-    }
-
-    async fn process_as_component(mut self) -> ProcessResult {
-        let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
-            unreachable!()
-        };
-        tracing::trace!(?data);
-
-        let ctx = ComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender);
-        let Ok(mut ctx) = require::guild(ctx) else {
-            return Ok(());
-        };
-        let Ok(player) = require::player(&ctx) else {
-            return Ok(());
-        };
-
-        let player_data = player.data();
-        let player_data_r = player_data.read().await;
-        let now_playing_message_id = player_data_r.now_playing_message_id();
-        if now_playing_message_id.is_none_or(|id| id != ctx.message().id) {
-            return Ok(());
-        }
-        let Some(current_track_title) = player_data_r
-            .queue()
-            .current()
-            .map(|item| item.data().info.title.clone())
-        else {
-            return Ok(());
-        };
-        drop(player_data_r);
-
-        let Some(now_playing_button) = ctx.take_custom_id_into_now_playing_button_type() else {
-            return Ok(());
-        };
-        match now_playing_button {
-            NowPlayingButtonType::Shuffle => {
-                crate::component::queue::shuffle(player_data.clone(), &mut ctx, true).await?;
-            }
-            NowPlayingButtonType::Previous => {
-                crate::component::playback::back(
-                    Some(current_track_title),
-                    player,
-                    player_data.clone(),
-                    &mut ctx,
-                    true,
-                )
-                .await?;
-            }
-            NowPlayingButtonType::PlayPause => {
-                crate::component::playback::play_pause(player, player_data.clone(), &mut ctx, true)
-                    .await?;
-            }
-            NowPlayingButtonType::Next => {
-                crate::component::playback::skip(
-                    &current_track_title,
-                    player,
-                    player_data.clone(),
-                    &mut ctx,
-                    true,
-                )
-                .await?;
-            }
-            NowPlayingButtonType::Repeat => {
-                let mode = crate::component::queue::get_next_repeat_mode(&ctx).await;
-                crate::component::queue::repeat(&mut ctx, player_data.clone(), mode, true, true)
-                    .await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    #[expect(clippy::unused_async)]
-    async fn process_as_modal(mut self) -> ProcessResult {
-        let Some(InteractionData::ModalSubmit(data)) = self.inner.data.take() else {
-            unreachable!()
-        };
-        tracing::trace!(?data);
-
-        Ok(())
     }
 }
 
@@ -447,12 +290,12 @@ async fn match_error(
 
 const SUPPRESSED_MESSAGE: &str = "Currently server muted.";
 
-async fn match_suppressed(error: &SuppressedError, mut i: CtxHead) -> UnitRespondOrFollowupResult {
+async fn match_suppressed(error: &Suppressed, mut i: CtxHead) -> UnitRespondOrFollowupResult {
     match error {
-        SuppressedError::Muted => {
+        Suppressed::Muted => {
             i.wrng_f(SUPPRESSED_MESSAGE).await?;
         }
-        SuppressedError::NotSpeaker => {
+        Suppressed::NotSpeaker => {
             i.wrng_f("Not currently a speaker in this stage channel.")
                 .await?;
         }
@@ -481,25 +324,25 @@ async fn match_autojoin_suppressed(
 }
 
 async fn match_autojoin_attempt_failed(
-    error: &AutoJoinAttemptFailedError,
+    error: &AutoJoinAttemptFailed,
     mut i: CtxHead,
 ) -> UnitRespondOrFollowupResult {
     match error {
-        AutoJoinAttemptFailedError::UserNotInVoice(_) => {
+        AutoJoinAttemptFailed::UserNotInVoice(_) => {
             let join = InteractionClient::mention_command::<Join>();
             i.wrng_f(format!(
                 "Please join a voice channel, or use {join} to connect to a channel.",
             ))
             .await?;
         }
-        AutoJoinAttemptFailedError::UserNotAllowed(_) => {
+        AutoJoinAttemptFailed::UserNotAllowed(_) => {
             i.nope_f(
                 "Attempting to join your currently connected channel failed as \
                 you are not allowed to use the bot here.",
             )
             .await?;
         }
-        AutoJoinAttemptFailedError::Forbidden(e) => {
+        AutoJoinAttemptFailed::Forbidden(e) => {
             i.blck_f(format!(
                 "**Attempting to join {} failed due to insufficient permissions**: \
                 Missing {} permissions.",
@@ -508,7 +351,7 @@ async fn match_autojoin_attempt_failed(
             ))
             .await?;
         }
-        AutoJoinAttemptFailedError::UserNotStageModerator(_) => {
+        AutoJoinAttemptFailed::UserNotStageModerator(_) => {
             i.nope_f(
                 "Attempting to join your currently connected stage failed as \
                 you are not a **Stage Manager**.",
@@ -520,11 +363,11 @@ async fn match_autojoin_attempt_failed(
 }
 
 async fn match_position_out_of_range(
-    error: &PositionOutOfRangeError,
+    error: &PositionOutOfRange,
     mut i: CtxHead,
 ) -> UnitRespondResult {
     let message = match error {
-        PositionOutOfRangeError::OutOfRange {
+        PositionOutOfRange::OutOfRange {
             position,
             queue_len,
         } => {
@@ -533,7 +376,7 @@ async fn match_position_out_of_range(
                 Track position must be from `1` to `{queue_len}`."
             )
         }
-        PositionOutOfRangeError::OnlyTrack(p) => {
+        PositionOutOfRange::OnlyTrack(p) => {
             format!(
                 "Invalid track position: `{p}`; \
                 Track position must be `1` as the queue currently only has one track."
