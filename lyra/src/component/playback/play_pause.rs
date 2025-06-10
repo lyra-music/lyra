@@ -20,14 +20,10 @@ pub struct PlayPause;
 impl BotSlashCommand for PlayPause {
     async fn run(self, ctx: SlashCtx) -> CommandResult {
         let mut ctx = require::guild(ctx)?;
-        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();
+        require::queue_not_empty(&data.read().await)?;
 
-        let data_r = data.read().await;
-        let queue = require::queue_not_empty(&data_r)?;
-        check::current_track_is_users(&require::current_track(queue)?, in_voice_with_user)?;
-        drop(data_r);
         Ok(play_pause(player, data, &mut ctx, false).await?)
     }
 }
@@ -38,8 +34,32 @@ pub async fn play_pause(
     ctx: &mut GuildCtx<impl RespondViaMessage>,
     via_controller: bool,
 ) -> Result<(), PlayPauseError> {
+    let in_voice_with_user = check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?;
+
+    let data_r = data.read().await;
+    let pause = !data_r.paused();
+    if pause {
+        // FAIRNESS: if a member requests to pause, they need to be the only person in voice,
+        // as pausing will be unfair to everyone who queued after this current track: the
+        // tracks after the current track will be delayed indefinitely until the player
+        // unpaused.
+        //
+        // TODO: this only serves as a crude approximation, and it should be improved in the
+        // future in a fairness rework of some sort. Ideally, if current track is `c`, then:
+        // > forall track `x` after `c`: x.requester == c.requester
+        in_voice_with_user.only()?;
+    } else {
+        // FAIRNESS: if a member requests to unpause, it is fair to everyone in voice if the
+        // current track is requested by that member as there will be no delays in upcoming
+        // tracks.
+        check::current_track_is_users(
+            &require::current_track(data_r.queue())?,
+            in_voice_with_user,
+        )?;
+    }
+    drop(data_r);
+
     let mut data_w = data.write().await;
-    let pause = !data_w.paused();
 
     player.set_pause_with(pause, &mut data_w).await?;
     drop(data_w);
