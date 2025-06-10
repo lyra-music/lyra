@@ -203,12 +203,14 @@ pub async fn handle_voice_state_update(
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 if let Ok(player) = require::player(ctx) {
-                    player.set_pause(true).await?;
-                    ctx.http()
-                        .create_message(text_channel_id)
-                        .content("⚡▶ Paused `(Bot is not used by anyone)`.")
-                        .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
-                        .await?;
+                    if !player.paused().await {
+                        player.set_pause(true).await?;
+                        ctx.http()
+                            .create_message(text_channel_id)
+                            .content("⚡▶ Paused `(Bot is not used by anyone)`.")
+                            .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
+                            .await?;
+                    }
                 }
 
                 traced::tokio_spawn(start_inactivity_timeout(
