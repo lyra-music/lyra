@@ -1,4 +1,4 @@
-pub fn main() {
+fn main() {
     println!("cargo:rerun-if-changed=../migrations");
     println!("cargo:rerun-if-changed=../preset");
     if let Err(e) = emit() {
