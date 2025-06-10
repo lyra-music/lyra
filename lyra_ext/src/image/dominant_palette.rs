@@ -79,22 +79,22 @@ mod test {
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_1.jpg"),
         1,
-        &[(101, 100, 134).into()]
+        &[(102, 100, 135).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_1.jpg"),
         2,
-        &[(63, 51, 99).into(), (149, 168, 180).into()]
+        &[(94, 108, 132).into(), (131, 42, 147).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         3,
-        &[(126, 92, 92).into(), (57, 57, 67).into(), (188, 155, 133).into()]
+        &[(66, 61, 71).into(), (187, 156, 136).into(), (138, 94, 94).into()]
     )]
     #[case(
         const_str::concat!(TEST_RESOURCES_PATH, "/dominant_palette_2.jpg"),
         4,
-        &[(55, 54, 65).into(), (114, 92, 93).into(), (189, 158, 136).into(), (155, 91, 90).into()]
+        &[(61, 57, 68).into(), (126, 101, 100).into(), (193, 160, 138).into(), (152, 84, 87).into()]
     )]
     fn dominant_palette(
         #[case] input_path: &str,

@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.9.0"
+version = "0.9.1-rc.1"
 edition = "2024"
 # When bumping, bump in other Cargo.toml files, Dockerfile too
 rust-version = "1.87"
@@ -97,7 +97,7 @@ twilight-util = { version = "0.16.0", features = [
 ] }
 twilight-interactions = { version = "0.16.2" }
 moka = { version = "0.12.10", features = ["future"] }
-reqwest = { version = "0.12.18", default-features = false, features = [
+reqwest = { version = "0.12.19", default-features = false, features = [
     "charset",
     "rustls-tls-native-roots",
 ] }
