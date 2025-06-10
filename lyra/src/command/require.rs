@@ -88,6 +88,11 @@ impl PlayerInterface {
         Ok(())
     }
 
+    #[inline]
+    pub async fn paused(&self) -> bool {
+        self.data().read().await.paused()
+    }
+
     pub async fn set_pause(&self, state: bool) -> Result<(), SetPauseWithError> {
         let data = self.data();
         let mut data_w = data.write().await;

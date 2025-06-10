@@ -44,6 +44,7 @@ pub async fn handle_voice_state_update(
                     })
             }) && !old_state.suppress()
         })
+        && !player.paused().await
     {
         player.set_pause(true).await?;
         ctx.http()
