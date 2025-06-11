@@ -36,13 +36,16 @@ pub enum Error {
     NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
 
+    Skip(Box<super::component::playback::skip::SkipError>),
+    Back(Box<super::component::playback::back::BackError>),
+    Shuffle(Box<super::component::queue::shuffle::ShuffleError>),
     Play(Box<super::component::queue::play::Error>),
     RemoveTracks(Box<super::component::queue::RemoveTracksError>),
     PromptForConfirmation(Box<util::PromptForConfirmationError>),
     TwilightHttp(Box<twilight_http::Error>),
     Join(Box<super::component::connection::join::ResidualError>),
     PlayPause(Box<super::component::playback::PlayPauseError>),
-    Repeat(Box<super::component::queue::repeat::Error>),
+    Repeat(Box<super::component::queue::repeat::RepeatError>),
     UpdateNowPlayingMessage(Box<super::lavalink::UpdateNowPlayingMessageError>),
     SeekToWith(Box<require::SeekToWithError>),
     NewNowPlayingMessage(Box<super::lavalink::NewNowPlayingMessageError>),
@@ -68,7 +71,10 @@ declare_from_box_impls!(
     TwilightHttp => twilight_http::Error,
     Join => super::component::connection::join::ResidualError,
     PlayPause => super::component::playback::PlayPauseError,
-    Repeat => super::component::queue::repeat::Error,
+    Repeat => super::component::queue::repeat::RepeatError,
+    Skip => super::component::playback::skip::SkipError,
+    Back => super::component::playback::back::BackError,
+    Shuffle => super::component::queue::shuffle::ShuffleError,
     UpdateNowPlayingMessage => super::lavalink::UpdateNowPlayingMessageError,
     SeekToWith => require::SeekToWithError,
     NewNowPlayingMessage => super::lavalink::NewNowPlayingMessageError,
@@ -451,22 +457,94 @@ impl<'a> Fe<'a> {
     const fn from_play_pause(error: &'a super::component::playback::PlayPauseError) -> Self {
         match error {
             super::component::playback::PlayPauseError::Lavalink(e) => Self::Lavalink(e),
+            super::component::playback::PlayPauseError::NotInVoice(_) => Self::NotInVoice,
+            super::component::playback::PlayPauseError::NotPlaying(_) => Self::NotPlaying,
+            super::component::playback::PlayPauseError::InVoiceWithoutUser(e) => {
+                Self::InVoiceWithoutUser(e)
+            }
+            super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
             super::component::playback::PlayPauseError::SetPauseWith(e) => {
                 Self::from_set_pause_with(e)
             }
-            super::component::playback::PlayPauseError::Respond(e) => Self::from_respond(e),
+            super::component::playback::PlayPauseError::Unsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
+            }
+            super::component::playback::PlayPauseError::UserOnlyIn(e) => {
+                Self::from_check_user_only_in(e)
+            }
+            super::component::playback::PlayPauseError::UsersTrack(e) => {
+                Self::from_users_track_error(e)
+            }
         }
     }
 
-    const fn from_repeat(error: &'a super::component::queue::repeat::Error) -> Self {
+    const fn from_back(error: &'a super::component::playback::back::BackError) -> Self {
         match error {
-            super::component::queue::repeat::Error::UnrecognisedConnection(_) => {
-                Self::UnrecognisedConnection
+            super::component::playback::back::BackError::NotInVoice(_) => Self::NotInVoice,
+            super::component::playback::back::BackError::InVoiceWithoutUser(e) => {
+                Self::InVoiceWithoutUser(e)
             }
-            super::component::queue::repeat::Error::UpdateNowPlayingMessage(e) => {
+            super::component::playback::back::BackError::Lavalink(e) => Self::Lavalink(e),
+            super::component::playback::back::BackError::UserOnlyIn(e) => {
+                Self::from_check_user_only_in(e)
+            }
+            super::component::playback::back::BackError::Unsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
+            }
+            super::component::playback::back::BackError::Respond(e) => Self::from_respond(e),
+        }
+    }
+
+    const fn from_skip(error: &'a super::component::playback::skip::SkipError) -> Self {
+        match error {
+            super::component::playback::skip::SkipError::NotPlaying(_) => Self::NotPlaying,
+            super::component::playback::skip::SkipError::NotInVoice(_) => Self::NotInVoice,
+            super::component::playback::skip::SkipError::InVoiceWithoutUser(e) => {
+                Self::InVoiceWithoutUser(e)
+            }
+            super::component::playback::skip::SkipError::Lavalink(e) => Self::Lavalink(e),
+            super::component::playback::skip::SkipError::Unsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
+            }
+            super::component::playback::skip::SkipError::UsersTrackError(e) => {
+                Self::from_users_track_error(e)
+            }
+            super::component::playback::skip::SkipError::Respond(e) => Self::from_respond(e),
+        }
+    }
+
+    const fn from_shuffle(error: &'a super::component::queue::shuffle::ShuffleError) -> Self {
+        match error {
+            super::component::queue::shuffle::ShuffleError::NotInVoice(_) => Self::NotInVoice,
+            super::component::queue::shuffle::ShuffleError::InVoiceWithoutUser(e) => {
+                Self::InVoiceWithoutUser(e)
+            }
+            super::component::queue::shuffle::ShuffleError::UserOnlyIn(e) => {
+                Self::from_check_user_only_in(e)
+            }
+            super::component::queue::shuffle::ShuffleError::UpdateNowPlayingMessage(e) => {
                 Self::from_update_now_playing_message(e)
             }
-            super::component::queue::repeat::Error::Respond(e) => Self::from_respond(e),
+            super::component::queue::shuffle::ShuffleError::Respond(e) => Self::from_respond(e),
+        }
+    }
+
+    const fn from_repeat(error: &'a super::component::queue::repeat::RepeatError) -> Self {
+        match error {
+            super::component::queue::repeat::RepeatError::UnrecognisedConnection(_) => {
+                Self::UnrecognisedConnection
+            }
+            super::component::queue::repeat::RepeatError::NotInVoice(_) => Self::NotInVoice,
+            super::component::queue::repeat::RepeatError::InVoiceWithoutUser(e) => {
+                Self::InVoiceWithoutUser(e)
+            }
+            super::component::queue::repeat::RepeatError::UpdateNowPlayingMessage(e) => {
+                Self::from_update_now_playing_message(e)
+            }
+            super::component::queue::repeat::RepeatError::Respond(e) => Self::from_respond(e),
+            super::component::queue::repeat::RepeatError::UserOnlyIn(e) => {
+                Self::from_check_user_only_in(e)
+            }
         }
     }
 
@@ -565,6 +643,9 @@ impl Error {
             Self::RemoveTracks(e) => Fe::from_remove_tracks(e),
             Self::CheckUserOnlyIn(e) => Fe::from_check_user_only_in(e),
             Self::PlayPause(e) => Fe::from_play_pause(e),
+            Self::Skip(e) => Fe::from_skip(e),
+            Self::Back(e) => Fe::from_back(e),
+            Self::Shuffle(e) => Fe::from_shuffle(e),
             Self::Repeat(e) => Fe::from_repeat(e),
             Self::UpdateNowPlayingMessage(e) => Fe::from_update_now_playing_message(e),
             Self::SeekToWith(e) => Fe::from_seek_to_with(e),

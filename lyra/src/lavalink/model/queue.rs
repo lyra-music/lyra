@@ -33,11 +33,12 @@ impl RepeatMode {
             Self::Track => "🔂",
         }
     }
+
     pub const fn description(&self) -> &str {
         match self {
-            Self::Off => "Disabled Repeat",
-            Self::All => "Repeating the entire queue",
-            Self::Track => "Repeating only the current track",
+            Self::Off => "Disabled repeat",
+            Self::All => "Enabled repeat",
+            Self::Track => "Enabled repeat one",
         }
     }
 }
@@ -121,16 +122,35 @@ impl Queue {
         &mut self.index
     }
 
-    pub fn current_index(&self) -> Option<usize> {
+    pub fn map_index(&self, index: usize) -> Option<usize> {
         match self.indexer {
-            Indexer::Standard => Some(self.index),
-            Indexer::Fair(ref indexer) => indexer.current(self.index),
-            Indexer::Shuffled(ref indexer) => indexer.current(self.index),
+            Indexer::Standard => Some(index),
+            Indexer::Fair(ref indexer) => indexer.current(index),
+            Indexer::Shuffled(ref indexer) => indexer.current(index),
         }
     }
 
+    #[inline]
+    pub fn map_index_expected(&self, index: usize) -> usize {
+        self.map_index(index).expect("track at index exists")
+    }
+
+    pub fn mapped_index(&self) -> Option<usize> {
+        self.map_index(self.index)
+    }
+
+    pub fn get_mapped(&self, index: usize) -> Option<&Item> {
+        self.inner.get(self.map_index(index)?)
+    }
+
+    #[inline]
     pub fn current(&self) -> Option<&Item> {
-        self.inner.get(self.current_index()?)
+        self.get_mapped(self.index)
+    }
+
+    #[inline]
+    pub fn next(&self) -> Option<&Item> {
+        self.get_mapped(self.next_index())
     }
 
     pub fn current_and_position(&self) -> (Option<&Item>, NonZeroUsize) {
@@ -225,29 +245,33 @@ impl Queue {
         }
     }
 
-    pub fn advance(&mut self) {
+    fn next_index(&self) -> usize {
         match self.repeat_mode {
-            RepeatMode::Off => {
-                self.index += 1;
-            }
-            RepeatMode::All => {
-                self.index = (self.index + 1) % self.len();
-            }
-            RepeatMode::Track => {}
+            RepeatMode::Off => self.index + 1,
+            RepeatMode::All => (self.index + 1) % self.len(),
+            RepeatMode::Track => self.index,
         }
     }
 
-    pub fn recede(&mut self) {
+    fn prev_index(&self) -> usize {
         match self.repeat_mode {
-            RepeatMode::Off => {
-                self.index = self.index.saturating_sub(1);
-            }
+            RepeatMode::Off => self.index.saturating_sub(1),
             RepeatMode::All => {
                 let len = self.len();
-                self.index = ((self.index + len).saturating_sub(1)) % len;
+                ((self.index + len).saturating_sub(1)) % len
             }
-            RepeatMode::Track => {}
+            RepeatMode::Track => self.index,
         }
+    }
+
+    #[inline]
+    pub fn advance(&mut self) {
+        self.index = self.next_index();
+    }
+
+    #[inline]
+    pub fn recede(&mut self) {
+        self.index = self.prev_index();
     }
 
     pub fn subscribe_to_advance_enabler(&self) -> watch::Receiver<bool> {
@@ -258,6 +282,12 @@ impl Queue {
         self.advancing_enabler.send_replace(state);
     }
 
+    /// Disables the queue advancing
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the current track is ending.
+    /// Otherwise, this will lead to incorrect queue advancing behaviour.
     pub fn disable_advancing(&self) {
         tracing::debug!("disabling queue advancing");
         self.set_advancing_state(false);

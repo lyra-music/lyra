@@ -36,7 +36,7 @@ pub mod application {
 }
 
 pub mod component {
-    use std::sync::LazyLock;
+    use std::{fmt::Display, sync::LazyLock};
 
     use rand::{Rng, distr::Alphanumeric};
 
@@ -48,12 +48,26 @@ pub mod component {
         pub repeat: &'static str,
     }
 
+    #[derive(Clone, Copy, Debug)]
     pub enum NowPlayingButtonType {
         Shuffle,
         Previous,
         PlayPause,
         Next,
         Repeat,
+    }
+
+    impl Display for NowPlayingButtonType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let s = match self {
+                Self::Shuffle => "shuffle",
+                Self::Previous => "previous",
+                Self::PlayPause => "play_pause",
+                Self::Next => "next",
+                Self::Repeat => "repeat",
+            };
+            f.write_str(s)
+        }
     }
 
     impl TryFrom<&str> for NowPlayingButtonType {

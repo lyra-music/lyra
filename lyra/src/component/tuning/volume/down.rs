@@ -1,5 +1,6 @@
 use std::num::NonZeroU16;
 
+use lyra_ext::num::i64_as_u16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -30,10 +31,9 @@ impl BotGuildSlashCommand for Down {
         let data = player.data();
         let old_percent = data.read().await.volume();
 
-        #[expect(clippy::cast_possible_truncation)]
         let maybe_new_percent = old_percent
             .get()
-            .checked_sub(self.percent.unwrap_or(10).unsigned_abs() as u16)
+            .checked_sub(i64_as_u16(self.percent.unwrap_or(10)))
             .and_then(NonZeroU16::new);
 
         let emoji = super::volume_emoji(maybe_new_percent);

@@ -1,5 +1,4 @@
 use lavalink_rs::{client::LavalinkClient, model::events::TrackStart};
-use lyra_ext::num::u64_to_i64_truncating;
 
 use crate::{
     core::model::{DatabaseAware, OwnedHttpAware},
@@ -41,7 +40,7 @@ pub(super) async fn impl_start(
     let lavalink_data = lavalink.data_unwrapped();
     let rec = sqlx::query!(
         "SELECT now_playing FROM guild_configs WHERE id = $1;",
-        u64_to_i64_truncating(guild_id.0)
+        guild_id.0.cast_signed()
     )
     .fetch_one(lavalink_data.db())
     .await?;
@@ -51,11 +50,19 @@ pub(super) async fn impl_start(
     }
 
     let msg_data = NowPlayingData::new(&lavalink_data, guild_id, &data_r, track).await?;
+    let now_playing_message_exists = data_r.now_playing_message_id().is_some();
     drop(data_r);
 
-    data.write()
-        .await
-        .new_now_playing_message(lavalink_data.http_owned(), msg_data)
-        .await?;
+    let mut data_w = data.write().await;
+    if now_playing_message_exists {
+        data_w
+            .update_and_apply_all_now_playing_data(msg_data)
+            .await?;
+    } else {
+        data_w
+            .new_now_playing_message(lavalink_data.http_owned(), msg_data)
+            .await?;
+    }
+    drop(data_w);
     Ok(())
 }

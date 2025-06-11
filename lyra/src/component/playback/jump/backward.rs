@@ -1,3 +1,4 @@
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -26,12 +27,13 @@ impl BotGuildSlashCommand for Backward {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        if let Ok(current_track) = require::current_track(queue) {
-            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        let current_track = require::current_track(queue);
+        if let Ok(ref curr) = current_track {
+            check::current_track_is_users(curr, in_voice_with_user)?;
         }
+        let current_track_exists = current_track.is_ok();
 
-        #[expect(clippy::cast_possible_truncation)]
-        let tracks = self.tracks.unsigned_abs() as usize;
+        let tracks = i64_as_usize(self.tracks);
         let queue_index = queue.index();
         let Some(index) = queue_index.checked_sub(tracks) else {
             if queue_index == 0 {
@@ -47,15 +49,26 @@ impl BotGuildSlashCommand for Backward {
         };
 
         queue.downgrade_repeat_mode();
-        queue.disable_advancing();
+        if current_track_exists {
+            // CORRECTNESS: the current track is present and will be ending via the
+            // `cleanup_now_playing_message_and_play` call later, so this is correct
+            queue.disable_advancing();
+        }
 
-        let track = queue[index].data();
-        let txt = format!("↩️ Jumped to `{}` (`#{}`).", track.info.title, index + 1);
-        player.context.play_now(track).await?;
-
+        let mapped_index = queue.map_index_expected(index);
+        let track = queue[mapped_index].data();
+        ctx.out(format!(
+            "↩️ Jumped to `{}` (`#{}`).",
+            track.info.title,
+            mapped_index + 1
+        ))
+        .await?;
         *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
         drop(data_w);
-        ctx.out(txt).await?;
+
         Ok(())
     }
 }

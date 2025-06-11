@@ -31,9 +31,21 @@ impl BotGuildSlashCommand for Clear {
 
         let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
         check::all_users_track(queue, positions, in_voice_with_user)?;
+        let current_track_exists = require::current_track(queue).is_ok();
 
-        player.disable_advancing_and_stop_with(queue).await?;
-        drop(data_r);
+        if current_track_exists {
+            // CORRECTNESS: the current track is present and will be ending via the
+            // `stop_and_cleanup_now_playing_message` call later, so this is correct
+            queue.disable_advancing();
+
+            drop(data_r);
+            player
+                .stop_and_delete_now_playing_message(&mut data.write().await)
+                .await?;
+        } else {
+            drop(data_r);
+        }
+
         ctx.get_conn().dispatch(Event::QueueClear).await?;
 
         data.write().await.queue_mut().clear();

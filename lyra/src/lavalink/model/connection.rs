@@ -29,11 +29,15 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(channel_id: Id<ChannelMarker>, text_channel_id: Id<ChannelMarker>) -> Self {
+    pub fn new(
+        channel_id: Id<ChannelMarker>,
+        text_channel_id: Id<ChannelMarker>,
+        mute: bool,
+    ) -> Self {
         Self {
             channel_id,
             text_channel_id,
-            mute: false,
+            mute,
             poll: None,
             event_sender: broadcast::channel(0xFF).0,
             vsu_handler_enabler: watch::channel(true).0,
@@ -65,6 +69,11 @@ impl Connection {
     }
 
     /// Disables the voice state update handler and notifies any subscribers.
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the bot received a VSU event.
+    /// Otherwise, this will lead to incorrect voice state update handling.
     pub fn disable_vsu_handler(&self) {
         tracing::debug!("disabled voice state update handler");
         self.set_vsu_handler_state(false);
@@ -379,6 +388,11 @@ impl ConnectionHandle<'_> {
     }
 
     /// Disables the voice state update handler for the current guild.
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the bot received a VSU event.
+    /// Otherwise, this will lead to incorrect voice state update handling.
     #[inline]
     pub fn disable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
         self.set_vsu_handler_state(false)

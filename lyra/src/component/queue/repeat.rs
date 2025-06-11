@@ -5,15 +5,25 @@ use crate::{
     command::{
         check,
         model::{
-            BotGuildSlashCommand, CtxKind, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind,
+            BotGuildSlashCommand, CtxKind, FollowupKind, GuildCtx, GuildSlashCmdCtx,
+            RespondWithMessageKind,
         },
         require,
         util::controller_fmt,
     },
-    core::model::response::initial::message::create::RespondWithMessage,
-    error::CommandResult,
+    component::playback::{
+        Back,
+        jump::{backward::Backward as JumpBackward, to::To as JumpTo},
+    },
+    core::{
+        http::InteractionClient,
+        model::response::{followup::Followup, initial::message::create::RespondWithMessage},
+    },
+    error::{CommandResult, component::queue::repeat::RepeatError},
     lavalink::{Event, OwnedPlayerData, RepeatMode as LavalinkRepeatMode},
 };
+
+use super::Play;
 
 #[derive(CommandOption, CreateOption)]
 enum RepeatMode {
@@ -53,21 +63,8 @@ impl BotGuildSlashCommand for Repeat {
             }
         };
 
-        let in_voice = require::in_voice(&ctx)?;
         let player = require::player(&ctx)?;
-        let data = player.data();
-
-        require::queue_not_empty(&data.read().await)?;
-
-        // TODO: #44
-        //
-        // check::user_in(in_voice)?.only()
-        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
-        //    .and_then_start(&mut ctx)
-        //    .await?;
-        check::user_in(in_voice)?.only()?;
-
-        Ok(repeat(&mut ctx, data, mode, false).await?)
+        Ok(repeat(&mut ctx, player.data(), mode, false).await?)
     }
 }
 
@@ -80,11 +77,21 @@ pub async fn get_next_repeat_mode(ctx: &GuildCtx<impl CtxKind>) -> LavalinkRepea
 }
 
 pub async fn repeat(
-    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     data: OwnedPlayerData,
     mode: LavalinkRepeatMode,
     via_controller: bool,
-) -> Result<(), crate::error::component::queue::repeat::Error> {
+) -> Result<(), RepeatError> {
+    if matches!(mode, LavalinkRepeatMode::Track) {
+        // TODO: #44
+        //
+        // check::user_in(in_voice)?.only()
+        //    .or_else_try_resolve_with(Topic::Repeat(mode))?
+        //    .and_then_start(&mut ctx)
+        //    .await?;
+        check::user_in(require::in_voice(ctx)?)?.only()?;
+    }
+
     ctx.get_conn().dispatch(Event::QueueRepeat);
     data.write()
         .await
@@ -95,5 +102,18 @@ pub async fn repeat(
     let content = controller_fmt(ctx, via_controller, &message);
     //out_or_upd!(content, ?ctx); TODO: #44
     ctx.out(content).await?;
+
+    if data.read().await.queue().current().is_none() {
+        ctx.notef(format!(
+            "**Currently not playing anything.** \
+            For the repeat to take effect, play something with {} first.\n\
+            -# **Alternatively**: use {}, {} or {} to play tracks already in the queue, but repeat one will be changed to repeat all.",
+            InteractionClient::mention_command::<Play>(),
+            InteractionClient::mention_command::<Back>(),
+            InteractionClient::mention_command::<JumpBackward>(),
+            InteractionClient::mention_command::<JumpTo>(),
+        ))
+        .await?;
+    }
     Ok(())
 }

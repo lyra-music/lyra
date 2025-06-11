@@ -1,5 +1,6 @@
 use std::num::NonZeroU16;
 
+use lyra_ext::num::i64_as_u16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -29,8 +30,7 @@ impl BotGuildSlashCommand for Up {
 
         let guild_id = ctx.guild_id();
         let data = player.data();
-        #[expect(clippy::cast_possible_truncation)]
-        let percent_u16 = self.percent.unwrap_or(10).unsigned_abs() as u16;
+        let percent_u16 = i64_as_u16(self.percent.unwrap_or(10));
 
         let conn = ctx.get_conn();
 

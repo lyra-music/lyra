@@ -8,7 +8,7 @@ use crate::{
         util::controller_fmt,
     },
     core::model::response::initial::message::create::RespondWithMessage,
-    error::component::playback::PlayPauseError,
+    error::component::playback::back::BackError,
     lavalink::OwnedPlayerData,
 };
 
@@ -19,47 +19,55 @@ pub struct Back;
 
 impl BotGuildSlashCommand for Back {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
-        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();
+        require::queue_not_empty(&data.read().await)?;
 
-        let data_r = data.read().await;
-        let queue = require::queue_not_empty(&data_r)?;
-        let txt;
-
-        if let Ok(current_track) = require::current_track(queue) {
-            check::current_track_is_users(&current_track, in_voice_with_user)?;
-            txt = Some(current_track.track.data().info.title.clone());
-        } else {
-            txt = None;
-        }
-        drop(data_r);
-
-        Ok(back(txt, player, data, &mut ctx, false).await?)
+        Ok(back(player, data, &mut ctx, false).await?)
     }
 }
 
 pub async fn back(
-    current_track_title: Option<String>,
     player: require::PlayerInterface,
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
-) -> Result<(), PlayPauseError> {
+) -> Result<(), BackError> {
+    // FAIRNESS: if a member requests to back, they need to be the only person in voice,
+    // as backing will be unfair to everyone who queued after this current track: the
+    // tracks after the current track will be delayed for the track's duration.
+    check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?.only()?;
+
+    let current_track_title = data
+        .read()
+        .await
+        .queue()
+        .current()
+        .map(|t| t.data().info.title.clone());
+
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
+
     queue.downgrade_repeat_mode();
-    queue.disable_advancing();
+    if current_track_title.is_some() {
+        // CORRECTNESS: the current track is present and will be ending via the
+        // `cleanup_now_playing_message_and_play` call later, so this is correct.
+        queue.disable_advancing();
+    }
     queue.recede();
-    let item = queue.current().expect("queue must be non-empty");
-    player.context.play_now(item.data()).await?;
+
+    let index = queue.mapped_index().expect("current track exists");
     let message = current_track_title.map_or_else(
-        || format!("⏮️ `{}`.", item.data().info.title),
+        || format!("⏮️ `{}`.", queue[index].data().info.title),
         |title| format!("⏮️ ~~`{title}`~~.",),
     );
-    drop(data_w);
+    ctx.out(controller_fmt(ctx, via_controller, &message))
+        .await?;
 
-    let content = controller_fmt(ctx, via_controller, &message);
-    ctx.out(content).await?;
+    player
+        .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+        .await?;
+
+    drop(data_w);
     Ok(())
 }

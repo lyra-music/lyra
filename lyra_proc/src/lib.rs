@@ -4,6 +4,7 @@ mod command;
 mod config_access;
 mod equaliser_preset;
 mod model;
+mod play_source;
 
 use proc_macro::TokenStream;
 
@@ -47,4 +48,11 @@ pub fn read_equaliser_presets_as(ty: TokenStream) -> TokenStream {
     let ty = syn::parse_macro_input!(ty as syn::Ident);
 
     equaliser_preset::impl_read_equaliser_presets_as(&ty)
+}
+
+#[proc_macro]
+pub fn read_play_sources_as(ty: TokenStream) -> TokenStream {
+    let ty = syn::parse_macro_input!(ty as syn::Ident);
+
+    play_source::impl_read_play_sources_as(&ty)
 }

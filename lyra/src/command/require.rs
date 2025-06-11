@@ -51,12 +51,6 @@ impl PlayerInterface {
         self.context.data_unwrapped()
     }
 
-    pub async fn disable_advancing_and_stop_with(&self, queue: &Queue) -> LavalinkResult<()> {
-        queue.disable_advancing();
-        self.context.stop_now().await?;
-        Ok(())
-    }
-
     pub async fn update_voice_channel(&self, voice_is_empty: bool) -> LavalinkResult<()> {
         let mut update_player = lavalink_rs::model::http::UpdatePlayer {
             voice: Some(
@@ -86,6 +80,11 @@ impl PlayerInterface {
         Ok(())
     }
 
+    #[inline]
+    pub async fn paused(&self) -> bool {
+        self.data().read().await.paused()
+    }
+
     pub async fn set_pause(&self, state: bool) -> Result<(), SetPauseWithError> {
         let data = self.data();
         let mut data_w = data.write().await;
@@ -102,6 +101,36 @@ impl PlayerInterface {
         self.context.set_pause(state).await?;
         Ok(())
     }
+
+    #[inline]
+    pub async fn cleanup_now_playing_message_and_play(
+        &self,
+        cx: &(impl CacheAware + Sync),
+        index: usize,
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> LavalinkResult<()> {
+        cleanup_now_playing_message_and_play(&self.context, cx, index, data_w).await
+    }
+
+    pub async fn stop_and_delete_now_playing_message(
+        &self,
+        data_w: &mut PlayerDataWrite<'_>,
+    ) -> LavalinkResult<()> {
+        self.context.stop_now().await?;
+        data_w.delete_now_playing_message().await;
+        Ok(())
+    }
+}
+
+pub async fn cleanup_now_playing_message_and_play(
+    context: &PlayerContext,
+    cx: &(impl CacheAware + Sync),
+    index: usize,
+    data_w: &mut PlayerDataWrite<'_>,
+) -> LavalinkResult<()> {
+    data_w.cleanup_now_playing_message(cx).await;
+    context.play_now(data_w.queue()[index].data()).await?;
+    Ok(())
 }
 
 pub type CachedVoiceStateRef<'a> =

@@ -14,9 +14,12 @@ use twilight_mention::{
     Mention,
     timestamp::{Timestamp, TimestampStyle},
 };
-use twilight_model::id::{
-    Id,
-    marker::{ChannelMarker, GuildMarker},
+use twilight_model::{
+    channel::message::MessageFlags,
+    id::{
+        Id,
+        marker::{ChannelMarker, GuildMarker},
+    },
 };
 
 use self::join::JoinedChannel;
@@ -144,6 +147,8 @@ async fn start_inactivity_timeout(
         return Ok(());
     }
 
+    // CORRECTNESS: as the bot later leaves the voice channel, it invokes a
+    // voice state update event, so this is correct.
     if ctx.disable_vsu_handler().await.is_err() {
         tracing::debug!(
             "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
@@ -152,6 +157,7 @@ async fn start_inactivity_timeout(
         );
         return Ok(());
     }
+
     let text_channel_id = ctx
         .lavalink()
         .handle_for(guild_id)
@@ -197,11 +203,14 @@ pub async fn handle_voice_state_update(
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
                 if let Ok(player) = require::player(ctx) {
-                    player.set_pause(true).await?;
-                    ctx.http()
-                        .create_message(text_channel_id)
-                        .content("⚡▶ Paused `(Bot is not used by anyone)`.")
-                        .await?;
+                    if !player.paused().await {
+                        player.set_pause(true).await?;
+                        ctx.http()
+                            .create_message(text_channel_id)
+                            .content("⚡▶ Paused `(Bot is not used by anyone)`.")
+                            .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
+                            .await?;
+                    }
                 }
 
                 traced::tokio_spawn(start_inactivity_timeout(
@@ -229,8 +238,15 @@ pub async fn handle_voice_state_update(
                 .await?;
         }
         Some(old_state) => {
-            match_state_channel_id(state.channel_id, old_state, guild_id, text_channel_id, ctx)
-                .await?;
+            match_state_channel_id(
+                state.channel_id,
+                old_state,
+                guild_id,
+                text_channel_id,
+                state.mute,
+                ctx,
+            )
+            .await?;
         }
         None => {}
     }
@@ -243,6 +259,7 @@ async fn match_state_channel_id(
     old_state: &CachedVoiceState,
     guild_id: Id<GuildMarker>,
     text_channel_id: Id<ChannelMarker>,
+    mute: bool,
     ctx: &voice::Context,
 ) -> Result<(), MatchStateChannelIdError> {
     match channel_id {
@@ -255,11 +272,7 @@ async fn match_state_channel_id(
 
             let voice_is_empty = users_in_voice(ctx, channel_id).is_some_and(|n| n == 0);
 
-            let response = join::Response::Moved {
-                from: old_channel_id,
-                to: joined,
-                empty: voice_is_empty,
-            };
+            let response = join::Response::new(Some(old_channel_id), joined, voice_is_empty, mute);
 
             if let Ok(player) = require::player(ctx) {
                 player.update_voice_channel(voice_is_empty).await?;

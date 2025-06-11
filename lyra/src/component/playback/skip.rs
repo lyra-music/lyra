@@ -8,7 +8,7 @@ use crate::{
         util::controller_fmt,
     },
     core::model::response::initial::message::create::RespondWithMessage,
-    error::component::playback::PlayPauseError,
+    error::component::playback::skip::SkipError,
     lavalink::OwnedPlayerData,
 };
 
@@ -19,40 +19,58 @@ pub struct Skip;
 
 impl BotGuildSlashCommand for Skip {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
-        let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();
+        require::queue_not_empty(&data.read().await)?;
 
-        let data_r = data.read().await;
-        let queue = require::queue_not_empty(&data_r)?;
-        let current_track = require::current_track(queue)?;
-        check::current_track_is_users(&current_track, in_voice_with_user)?;
-        let current_track_title = current_track.track.data().info.title.clone();
-        drop(data_r);
-        Ok(skip(&current_track_title, player, data, &mut ctx, false).await?)
+        Ok(skip(player, data, &mut ctx, false).await?)
     }
 }
 
 pub async fn skip(
-    current_track_title: &str,
     player: require::PlayerInterface,
     data: OwnedPlayerData,
     ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
-) -> Result<(), PlayPauseError> {
+) -> Result<(), SkipError> {
+    let data_r = data.read().await;
+    let current_track = require::current_track(data_r.queue())?;
+    let in_voice_with_user = check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?;
+
+    let message = format!("⏭️ ~~`{}`~~.", current_track.track.data().info.title);
+
+    // FAIRNESS: if a member requests to skip, it is fair to everyone in voice if the
+    // current track is requested by that member as there will be no delays in upcoming
+    // tracks.
+    check::current_track_is_users(&current_track, in_voice_with_user)?;
+
+    drop(data_r);
+
+    let content = controller_fmt(ctx, via_controller, &message);
+    ctx.out(content).await?;
+
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();
     queue.downgrade_repeat_mode();
+
+    // CORRECTNESS: the current track is present in both scenarios:
+    // - when called from `/skip`: verified via `queue_not_empty` and `current_track` checks
+    // - when called from the skip button on the controller: if the controller exists, then
+    //   it must only mean the current track also exists.
+    // and will be ending via the `cleanup_now_playing_message_and_play` call later,
+    // so this is correct.
     queue.disable_advancing();
+
     queue.advance();
-    if let Some(item) = queue.current() {
-        player.context.play_now(item.data()).await?;
+    if let Some(index) = queue.mapped_index() {
+        player
+            .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+            .await?;
     } else {
-        player.context.stop_now().await?;
+        player
+            .stop_and_delete_now_playing_message(&mut data_w)
+            .await?;
     }
     drop(data_w);
-    let message = format!("⏭️ ~~`{current_track_title}`~~.");
-    let content = controller_fmt(ctx, via_controller, &message);
-    ctx.out(content).await?;
     Ok(())
 }

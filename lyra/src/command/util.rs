@@ -392,3 +392,13 @@ pub async fn auto_new_player(ctx: &GuildCtx<impl CtxKind>) -> LavalinkResult<Pla
 
     Ok(player)
 }
+
+pub fn is_message_at_bottom(
+    cx: &impl CacheAware,
+    channel_id: Id<ChannelMarker>,
+    message_id: Id<MessageMarker>,
+) -> bool {
+    cx.cache()
+        .channel_messages(channel_id)
+        .is_some_and(|ms| ms.value().front().is_some_and(|&m| m == message_id))
+}

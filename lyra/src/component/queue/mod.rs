@@ -10,13 +10,13 @@ mod shuffle;
 pub use clear::Clear;
 pub use fair_queue::FairQueue;
 use lyra_ext::{
-    num::usize_to_i64_truncating,
+    num::{i64_as_usize, usize_as_i64},
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
 pub use r#move::{Autocomplete as MoveAutocomplete, Move};
 pub use play::AddToQueue;
-pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play};
+pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play, PlaySource};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
 pub use remove_range::{Autocomplete as RemoveRangeAutocomplete, RemoveRange};
 pub use repeat::{Repeat, get_next_repeat_mode, repeat};
@@ -74,7 +74,7 @@ fn generate_position_choice(
             track_info.corrected_title().pretty_truncate(53)
         ),
         name_localizations: None,
-        value: CommandOptionChoiceValue::Integer(usize_to_i64_truncating(position.get())),
+        value: CommandOptionChoiceValue::Integer(usize_as_i64(position.get())),
     }
 }
 
@@ -166,8 +166,7 @@ pub fn generate_position_choices_from_fuzzy_match<'a>(
 }
 
 fn normalize_queue_position(position: i64, queue_len: NonZeroUsize) -> Option<NonZeroUsize> {
-    #[expect(clippy::cast_possible_truncation)]
-    let position_usize = position.unsigned_abs() as usize;
+    let position_usize = i64_as_usize(position);
 
     (1..=queue_len.get()).contains(&position_usize).then(|| {
         NonZeroUsize::new(if position.is_positive() {
@@ -182,7 +181,7 @@ pub const fn validate_input_position(
     input: i64,
     queue_len: usize,
 ) -> Result<(), PositionOutOfRangeError> {
-    if 1 > input || input > usize_to_i64_truncating(queue_len) {
+    if 1 > input || input > usize_as_i64(queue_len) {
         return Err(if queue_len == 1 {
             PositionOutOfRangeError::OnlyTrack(input)
         } else {
@@ -213,8 +212,7 @@ async fn remove_range(
     ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
-    #[expect(clippy::cast_possible_truncation)]
-    let (start_usize, end_usize) = (start.unsigned_abs() as usize, end.unsigned_abs() as usize);
+    let (start_usize, end_usize) = (i64_as_usize(start), i64_as_usize(end));
 
     let data = player.data();
     let mut data_w = data.write().await;
@@ -284,6 +282,7 @@ async fn impl_remove(
         ),
         _ => ("**`≡-`**", format!("`{removed_len} tracks`")),
     };
+    ctx.out(format!("{minus} Removed {removed_text}.")).await?;
     let current =
         NonZeroUsize::new(queue.index() + 1).expect("1-indexed queue index must be non-zero");
     let before_current = positions.partition_point(|&i| i < current);
@@ -291,22 +290,33 @@ async fn impl_remove(
 
     if positions.binary_search(&current).is_ok() {
         queue.downgrade_repeat_mode();
-        let next = queue.current().map(QueueItem::data);
 
-        if let Some(next) = next {
-            queue.disable_advancing();
-            player.context.play_now(next).await?;
+        // CORRECTNESS: the current track is present (and will be removed from the queue) and
+        // will be ending via the `cleanup_now_playing_message_and_play` or
+        // `stop_and_cleanup_now_playing_message` call later, so this is correct.
+        queue.disable_advancing();
+
+        if let Some(index) = queue.mapped_index() {
+            player
+                .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
+                .await?;
         } else {
-            player.disable_advancing_and_stop_with(queue).await?;
+            player
+                .stop_and_delete_now_playing_message(&mut data_w)
+                .await?;
         }
     }
-    let (queue_len, queue_position) = (queue.len(), queue.position());
-    data_w
-        .update_and_apply_now_playing_queue_len_and_position(queue_len, queue_position)
-        .await?;
     drop(data_w);
 
-    ctx.out(format!("{minus} Removed {removed_text}.")).await?;
+    let data_r = data.read().await;
+    let queue = data_r.queue();
+    let (queue_len, queue_position) = (queue.len(), queue.position());
+    drop(data_r);
+
+    data.write()
+        .await
+        .update_and_apply_now_playing_queue_len_and_position(queue_len, queue_position)
+        .await?;
 
     if queue_cleared {
         let clear = InteractionClient::mention_command::<Clear>();

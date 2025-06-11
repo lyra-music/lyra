@@ -1,3 +1,4 @@
+use tokio::sync::oneshot;
 use twilight_gateway::{Latency, MessageSender};
 use twilight_model::{
     application::interaction::message_component::MessageComponentInteractionData, channel::Message,
@@ -26,15 +27,16 @@ impl<C: CtxContext> Ctx<ComponentMarker, C> {
         bot: OwnedBotState,
         latency: Latency,
         sender: MessageSender,
+        acknowledgement: oneshot::Sender<()>,
     ) -> Self {
         Self {
             inner,
             bot,
             latency,
             sender,
+            acknowledgement: Some(acknowledgement),
             data: Some(PartialInteractionData::Component(data)),
             acknowledged: false,
-            acknowledgement: None,
             kind: std::marker::PhantomData,
             context: std::marker::PhantomData,
         }

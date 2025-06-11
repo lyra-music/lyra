@@ -99,23 +99,20 @@ impl Process for Context {
         let get_conn = self.get_conn();
         let disabled = get_conn.vsu_handler_disabled().await;
 
-        let mut vec = Vec::new();
         if let Ok(h) = get_conn.get_head().await {
-            let t = tuning::handle_voice_state_update(&self, h.clone()).map_err(ProcessError::from);
-            vec.push(t.boxed());
-
             if disabled {
                 tracing::debug!("voice state update handler is disabled");
             } else {
-                let c = connection::handle_voice_state_update(&self, h.clone()).map_err(Into::into);
-                let p = playback::handle_voice_state_update(&self, h).map_err(Into::into);
-                vec.extend([c.boxed(), p.boxed()]);
+                let (t, c, p) = (
+                    tuning::handle_voice_state_update(&self, h.clone()).map_err(ProcessError::from),
+                    connection::handle_voice_state_update(&self, h.clone()).map_err(Into::into),
+                    playback::handle_voice_state_update(&self, h).map_err(Into::into),
+                );
+                futures::future::try_join_all([t.boxed(), c.boxed(), p.boxed()]).await?;
             }
         } else {
             tracing::debug!("no active connection");
         }
-
-        futures::future::try_join_all(vec).await?;
         Ok(())
     }
 }

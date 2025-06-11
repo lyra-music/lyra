@@ -4,6 +4,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -142,10 +143,9 @@ impl BotGuildSlashCommand for Remove {
 
         super::validate_input_positions(&inputs, queue.len())?;
 
-        #[expect(clippy::cast_possible_truncation)]
         let mut positions = inputs
             .iter()
-            .filter_map(|&p| NonZeroUsize::new(p.unsigned_abs() as usize))
+            .filter_map(|&p| NonZeroUsize::new(i64_as_usize(p)))
             .collect::<Vec<_>>();
 
         check::all_users_track(queue, positions.iter().copied(), in_voice_with_user)?;

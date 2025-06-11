@@ -53,23 +53,35 @@ use crate::{
     lavalink::Connection,
 };
 
-pub(super) enum Response {
-    Joined {
-        voice: JoinedChannel,
-        empty: bool,
-    },
-    Moved {
-        from: Id<ChannelMarker>,
+pub(super) struct Response {
+    from: Option<Id<ChannelMarker>>,
+    to: JoinedChannel,
+    empty: bool,
+    mute: bool,
+}
+
+impl Response {
+    pub(super) const fn new(
+        from: Option<Id<ChannelMarker>>,
         to: JoinedChannel,
         empty: bool,
-    },
+        mute: bool,
+    ) -> Self {
+        Self {
+            from,
+            to,
+            empty,
+            mute,
+        }
+    }
 }
 
 impl Display for Response {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Joined { voice, .. } => write!(f, "joined {voice}"),
-            Self::Moved { from, to, .. } => write!(f, "moved {from} -> {to}"),
+        if let Some(from) = self.from {
+            write!(f, "moved {from} -> {}", self.to)
+        } else {
+            write!(f, "joined {}", self.to)
         }
     }
 }
@@ -227,25 +239,27 @@ async fn impl_connect_to(
     let voice_is_empty = users_in_voice(ctx, channel_id).ok_or(CacheError)? == 0;
 
     let lavalink = ctx.lavalink();
+    let mute = ctx.bot_member()?.mute().is_some_and(|x| x);
     let response = old_channel_id.map_or_else(
         || {
-            let connection = Connection::new(channel_id, ctx.channel_id());
+            let connection = Connection::new(channel_id, ctx.channel_id(), mute);
+
+            // CORRECTNESS: as the bot later joins a new voice channel, it invokes a
+            // voice state update event, so this is correct.
             connection.disable_vsu_handler();
+
             lavalink.new_connection_with(guild_id, connection);
-            Response::Joined {
-                voice: joined,
-                empty: voice_is_empty,
-            }
+            Response::new(None, joined, voice_is_empty, mute)
         },
         |from| {
             let conn = lavalink.handle_for(guild_id);
             conn.set_channel(channel_id);
+
+            // CORRECTNESS: as the bot later joins a new voice channel, it invokes a
+            // voice state update event, so this is correct.
             conn.disable_vsu_handler();
-            Response::Moved {
-                from,
-                to: joined,
-                empty: voice_is_empty,
-            }
+
+            Response::new(Some(from), joined, voice_is_empty, mute)
         },
     );
 
@@ -343,24 +357,20 @@ fn stage_fmt(txt: &str, stage: bool) -> Cow<'_, str> {
 async fn handle_response(
     response: Response,
     ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
+    send_muted_notice: bool,
 ) -> Result<InVoiceCachedVoiceState, HandleResponseError> {
-    let (joined, empty) = match response {
-        Response::Joined { voice, empty } => {
-            let stage = matches!(voice.kind, JoinedChannelType::Stage);
-            ctx.out_f(stage_fmt(&format!("🖇️ {}.", voice.id.mention()), stage))
-                .await?;
-            (voice, empty)
-        }
-        Response::Moved { from, to, empty } => {
-            let stage = matches!(to.kind, JoinedChannelType::Stage);
-            ctx.out_f(stage_fmt(
-                &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
-                stage,
-            ))
+    let (to, empty) = (response.to, response.empty);
+    let is_stage = matches!(to.kind, JoinedChannelType::Stage);
+    if let Some(from) = response.from {
+        ctx.out_f(stage_fmt(
+            &format!("️📎🖇️ ~~{}~~ ➜ __{}__.", from.mention(), to.id.mention()),
+            is_stage,
+        ))
+        .await?;
+    } else {
+        ctx.out_f(stage_fmt(&format!("🖇️ {}.", to.id.mention()), is_stage))
             .await?;
-            (to, empty)
-        }
-    };
+    }
 
     if empty {
         let duration = unix_time() + INACTIVITY_TIMEOUT;
@@ -372,7 +382,7 @@ async fn handle_response(
 
         traced::tokio_spawn(start_inactivity_timeout(
             super::InactivityTimeoutContext::from(&*ctx),
-            joined.id,
+            to.id,
         ));
 
         let empty_voice_notice = ctx.note_f(empty_voice_notice_txt).await?;
@@ -380,13 +390,12 @@ async fn handle_response(
         traced::tokio_spawn(delete_empty_voice_notice(DeleteEmptyVoiceNotice::new(
             ctx,
             empty_voice_notice_message_id,
-            joined.id,
+            to.id,
         )));
     }
 
     let state = ctx.current_voice_state().ok_or(CacheError)?;
-    let muted = state.mute();
-    if muted {
+    if send_muted_notice && response.mute {
         ctx.suspf("**Currently server muted**; Some features will be limited.")
             .await?;
     }
@@ -396,14 +405,14 @@ async fn handle_response(
 pub async fn auto(
     ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
 ) -> Result<InVoiceCachedVoiceState, AutoJoinError> {
-    Ok(handle_response(impl_auto_join(ctx).await?, ctx).await?)
+    Ok(handle_response(impl_auto_join(ctx).await?, ctx, false).await?)
 }
 
 pub async fn join(
     ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     channel: Option<InteractionChannel>,
 ) -> Result<InVoiceCachedVoiceState, JoinError> {
-    Ok(handle_response(impl_join(ctx, channel).await?, ctx).await?)
+    Ok(handle_response(impl_join(ctx, channel).await?, ctx, true).await?)
 }
 
 /// Joins a voice/stage channel.

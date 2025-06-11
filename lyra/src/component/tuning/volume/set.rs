@@ -1,5 +1,6 @@
 use std::num::NonZeroU16;
 
+use lyra_ext::num::i64_as_u16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -22,9 +23,8 @@ impl BotGuildSlashCommand for Set {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let percent = NonZeroU16::new(self.percent.unsigned_abs() as u16)
-            .expect("percent should be non-zero");
+        let percent =
+            NonZeroU16::new(i64_as_u16(self.percent)).expect("percent should be non-zero");
         player.context.set_volume(percent.get()).await?;
         player.data().write().await.set_volume(percent);
 

@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -30,12 +31,12 @@ impl BotGuildSlashCommand for Forward {
         let queue = require::queue_not_empty_mut(&mut data_w)?;
         let current_track = require::current_track(queue)?;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let jump = self.tracks.unsigned_abs() as usize;
+        let jump = i64_as_usize(self.tracks);
         let queue_len = queue.len();
 
         let queue_position = queue.position();
         let new_position = queue_position.saturating_add(jump);
+        let index = new_position.get() - 1;
         if new_position.get() > queue_len {
             let maximum_jump = queue_len - queue_position.get();
             if maximum_jump == 0 {
@@ -49,20 +50,33 @@ impl BotGuildSlashCommand for Forward {
             return Ok(());
         }
 
-        let skipped =
-            (current_track.position.get()..new_position.get()).filter_map(NonZeroUsize::new);
+        let skipped = (current_track.position.get()..=index).filter_map(NonZeroUsize::new);
         check::all_users_track(queue, skipped, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
+
+        // CORRECTNESS: the current track will always exist as this command cannot be used when the
+        // current track doesn't exist, which is possible in two scenarios:
+        // - queue is empty (which is impossible because of the `queue_not_empty_mut` check)
+        // - the current queue index is past the end of the queue (which will early returned as
+        //   "no where else to jump to"`)
+        // the current track will be ending via the `cleanup_now_playing_message_and_play` call later,
+        // so this is correct.
         queue.disable_advancing();
 
-        let track = queue[new_position].data();
-        let txt = format!("↪️ Jumped to `{}` (`#{}`).", track.info.title, new_position);
-        player.context.play_now(track).await?;
-
-        *queue.index_mut() = new_position.get() - 1;
+        let mapped_index = queue.map_index_expected(index);
+        let track = queue[mapped_index].data();
+        ctx.out(format!(
+            "↪️ Jumped to `{}` (`#{}`).",
+            track.info.title, mapped_index
+        ))
+        .await?;
+        *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
         drop(data_w);
-        ctx.out(txt).await?;
+
         Ok(())
     }
 }

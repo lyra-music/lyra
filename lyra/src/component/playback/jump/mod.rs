@@ -1,10 +1,10 @@
 use lyra_proc::{BotGuildAutocompleteGroup, BotGuildCommandGroup};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
-mod backward;
+pub mod backward;
 mod first;
 mod forward;
-mod to;
+pub mod to;
 
 #[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "jump", desc = ".", contexts = "guild")]

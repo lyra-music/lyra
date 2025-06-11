@@ -30,6 +30,7 @@ use twilight_model::id::{
 };
 
 use crate::{
+    command::util::is_message_at_bottom,
     core::model::{CacheAware, DatabaseAware, HttpAware, OwnedHttpAware},
     error::{
         UnrecognisedConnection,
@@ -76,6 +77,11 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
     }
 
     /// Disables the voice state update handler for the current guild.
+    ///
+    /// # Correctness
+    ///
+    /// This function must only be called when the bot received a VSU event.
+    /// Otherwise, this will lead to incorrect voice state update handling.
     fn disable_vsu_handler(&self) -> Awaitable<Result<(), UnrecognisedConnection>> {
         self.lavalink()
             .handle_for(self.guild_id())
@@ -224,11 +230,30 @@ impl RawPlayerData {
             .await
     }
 
-    pub async fn delete_now_playing_message(&mut self, cx: &(impl HttpAware + Sync)) {
+    pub async fn delete_now_playing_message(&mut self) {
         if let Some(message) = self.take_now_playing_message() {
-            let channel_id = message.channel_id();
-            let _ = cx.http().delete_message(channel_id, message.id()).await;
+            let _ = message.delete().await;
         }
+    }
+
+    pub async fn cleanup_now_playing_message(&mut self, cx: &(impl CacheAware + Sync)) {
+        if let Some(message) = self.now_playing_message.take_if(|m| {
+            !is_message_at_bottom(cx, self.text_channel_id, m.id()) || self.queue.next().is_none()
+        }) {
+            let _ = message.delete().await;
+        }
+    }
+
+    #[inline]
+    pub async fn update_and_apply_all_now_playing_data(
+        &mut self,
+        data: NowPlayingData,
+    ) -> UpdateNowPlayingMessageResult {
+        if let Some(ref mut msg) = self.now_playing_message {
+            msg.replace_data(data);
+            msg.apply_update().await?;
+        }
+        Ok(())
     }
 
     #[inline]

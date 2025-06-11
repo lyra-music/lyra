@@ -3,6 +3,7 @@ use std::{
     num::{IntErrorKind, NonZeroUsize},
 };
 
+use lyra_ext::num::i64_as_usize;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -94,9 +95,11 @@ impl BotGuildSlashCommand for To {
 
         let mut data_w = data.write().await;
         let queue = require::queue_not_empty_mut(&mut data_w)?;
-        if let Ok(current_track) = require::current_track(queue) {
-            check::current_track_is_users(&current_track, in_voice_with_user)?;
+        let current_track = require::current_track(queue);
+        if let Ok(ref curr) = current_track {
+            check::current_track_is_users(curr, in_voice_with_user)?;
         }
+        let current_track_exist = current_track.is_ok();
 
         let queue_len = queue.len();
         if queue_len == 1 {
@@ -107,24 +110,33 @@ impl BotGuildSlashCommand for To {
         let input = self.track;
         validate_input_position(input, queue_len)?;
 
-        #[expect(clippy::cast_possible_truncation)]
-        let position = input.unsigned_abs() as usize;
+        let position = i64_as_usize(input);
         if position == queue.position().get() {
             ctx.wrng("Cannot jump to the current track.").await?;
             return Ok(());
         }
 
         queue.downgrade_repeat_mode();
-        queue.disable_advancing();
+        if current_track_exist {
+            // CORRECTNESS: the current track is present and will be ending via the
+            // `cleanup_now_playing_message_and_play` call later, so this is correct
+            queue.disable_advancing();
+        }
 
         let index = position - 1;
-        let track = queue[index].data();
-        let txt = format!("↔️ Jumped to `{}` (`#{}`).", track.info.title, position);
-        player.context.play_now(track).await?;
-
+        let mapped_index = queue.map_index_expected(index);
+        let track = queue[mapped_index].data();
+        ctx.out(format!(
+            "↔️ Jumped to `{}` (`#{}`).",
+            track.info.title, mapped_index
+        ))
+        .await?;
         *queue.index_mut() = index;
+        player
+            .cleanup_now_playing_message_and_play(&ctx, mapped_index, &mut data_w)
+            .await?;
+
         drop(data_w);
-        ctx.out(txt).await?;
         Ok(())
     }
 }

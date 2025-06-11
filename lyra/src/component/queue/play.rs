@@ -14,9 +14,7 @@ use lyra_ext::{
     as_grapheme::AsGrapheme,
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
-use twilight_interactions::command::{
-    AutocompleteValue, CommandModel, CommandOption, CreateCommand, CreateOption,
-};
+use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::{
     application::command::{Command, CommandOptionChoice, CommandOptionChoiceValue, CommandType},
     channel::{Attachment, Message},
@@ -428,27 +426,12 @@ async fn handle_load_track_results(
         .await
         .queue_mut()
         .enqueue(total_tracks, ctx.user_id());
-    player.play(first_track.inner()).await?;
     ctx.out_f(format!("{plus} Added {enqueued_text}.")).await?;
+    player.play(first_track.inner()).await?;
     Ok(())
 }
 
-#[derive(CommandOption, CreateOption, Default)]
-enum PlaySource {
-    #[default]
-    #[option(name = "Youtube", value = "ytsearch:")]
-    Youtube,
-    #[option(name = "Youtube Music", value = "ytmsearch:")]
-    YoutubeMusic,
-    #[option(name = "SoundCloud", value = "scsearch:")]
-    SoundCloud,
-    #[option(name = "Deezer (Search Query)", value = "dzsearch:")]
-    DeezerQuery,
-    #[option(name = "Deezer (ISRC)", value = "dzisrc:")]
-    DeezerIsrc,
-    #[option(name = "Spotify", value = "spsearch:")]
-    Spotify,
-}
+lyra_proc::read_play_sources_as!(PlaySource);
 
 /// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]

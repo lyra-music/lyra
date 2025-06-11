@@ -19,7 +19,17 @@ pub struct FairQueue;
 impl BotGuildSlashCommand for FairQueue {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         check::user_is_dj(&ctx)?;
+
+        // FAIRNESS: if a member requests to enable or disable shuffle, it needs to be
+        // decided by a poll, as modifying the queue indexing order will be unfair to
+        // everyone who queued after this current track: the tracks after the current
+        // track will be delayed for an unspecified amount of time.
+        //
+        // TODO: this only serves as a crude approximation, and should ideally be
+        // decided by a vote, meanwhile disallowing usage if voice only has the
+        // invoked member.
         let _ = require::in_voice(&ctx)?.and_with_someone_else()?;
+
         let data = require::player(&ctx)?.data();
 
         let data_r = data.read().await;

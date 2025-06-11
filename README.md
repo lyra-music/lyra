@@ -15,8 +15,8 @@ A *featureful*, *self-hostable* **Discord music bot**, made with [`twilight-rs`]
 
 Start by copying the example environment file:
 
-```bash
-cp .env.example .env
+```console
+$ cp .env.example .env
 ```
 
 Then, edit the `.env` file to set your environment variables. The file contains comments to guide you. At a minimum you should provide a valid `BOT_TOKEN`, database credentials, and lavalink credentials.
@@ -25,55 +25,70 @@ Then, edit the `.env` file to set your environment variables. The file contains 
 
 The easiest way to set up Λύρα is to use Docker. Start by creating a copy of the example docker compose file:
 
-```bash
-cp compose.example.yaml compose.yaml
+```console
+$ cp compose.example.yaml compose.yaml
 ```
 
-In addition, you need to set `DOCKER_POSTGRES_PATH` and `DOCKER_PLUGINS_PATH` environment variables in `.env` to point to two empty directories you want to use for the database and plugins respectively. You can create them with:
+In addition, you need to set `DOCKER_POSTGRES_PATH` and `DOCKER_LAVALINK_PLUGINS_PATH` environment variables in `.env` to point to two empty directories you want to use for the database and plugins respectively. You can create them with:
 
-```bash
-mkdir -p /path/to/your/database
-mkdir -p /path/to/your/plugins
-chown -R 322:322 /path/to/your/plugins
+```console
+$ mkdir -p /path/to/your/database
+$ mkdir -p /path/to/your/plugins
+# chown -R 322:322 /path/to/your/plugins
 ```
 
-```bash
+```dotenv
 # File: .env
 DOCKER_POSTGRES_PATH=/path/to/your/database
-DOCKER_PLUGINS_PATH=/path/to/your/plugins
+DOCKER_LAVALINK_PLUGINS_PATH=/path/to/your/plugins
 ```
 
 Then, run the following command to start the bot and the database:
 
-```bash
-docker compose up -d
+```console
+# docker compose up -d
 ```
-This will start the bot and it's associated services in detached mode and run them in the background. To check the logs, run:
+This will start the bot and its associated services in detached mode and run them in the background. To check the logs, run:
 
-```bash
-docker compose logs -f
+```console
+# docker compose logs -f
 ```
 
 To stop the bot, run:
 
-```bash
-docker compose down
+```console
+# docker compose down
 ```
 
-### Nix
+### Nix (For Development)
 
-From the project root, run:
+Start by entering the development shell:
 
-```bash
-nix develop --impure -c devenv up
+```console
+$ nix develop --impure
 ```
 
-This will download all the dependencies and set up the environment, as well as starting the services required for the bot to function.
+This will also download all the dependencies and set up the environment. To start the services required for the bot to function, run:
 
-Then, run the bot:
+```console
+$ devenv up -D
+```
 
-```bash
-nix develop --impure -c cargo run --release
+To check the logs, run:
+```console
+$ process-compose attach
+```
+
+To stop these services, run:
+
+```console
+$ process-compose down
+```
+
+To start the bot, run:
+
+```console
+$ cargo run --release
 ```
 
 ### Manual (Not recommended)
@@ -88,6 +103,6 @@ Follow the official documentation on how to set up and configure these tools.
 
 Then, clone the repository and run the following command:
 
-```bash
-cargo run --release
+```console
+$ cargo run --release
 ```

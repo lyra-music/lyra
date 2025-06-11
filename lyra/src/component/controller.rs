@@ -6,13 +6,12 @@ use crate::{
     command::{
         model::{BotGuildSlashCommand, GuildSlashCmdCtx},
         require,
+        util::is_message_at_bottom,
     },
     component::config::now_playing::Toggle as ConfigNowPlayingToggle,
     core::{
         http::InteractionClient,
-        model::{
-            CacheAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
-        },
+        model::{OwnedHttpAware, response::initial::message::create::RespondWithMessage},
     },
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
@@ -47,11 +46,7 @@ impl BotGuildSlashCommand for Bump {
             return Ok(());
         };
         let channel_id = ctx.channel_id();
-        if ctx
-            .cache()
-            .channel_messages(channel_id)
-            .is_some_and(|ms| ms.value().front().is_some_and(|&m| m == msg_id))
-        {
+        if is_message_at_bottom(&ctx, channel_id, msg_id) {
             ctx.note(
                 "The now-playing track message is already at the bottom of the current text channel.",
             ).await?;
@@ -63,7 +58,7 @@ impl BotGuildSlashCommand for Bump {
             drop(data_r);
 
             let mut data_w = data.write().await;
-            data_w.delete_now_playing_message(&ctx).await;
+            data_w.delete_now_playing_message().await;
             let http = ctx.http_owned();
             data_w
                 .new_now_playing_message_in(http, msg_data, channel_id)
