@@ -2,7 +2,7 @@
 name = "lyra"
 readme = "../README.md"
 description = "A featureful, self-hostable Discord music bot."
-version = "0.9.1-rc.1"
+version = "0.9.1-rc.2"
 edition = "2024"
 # When bumping, bump in other Cargo.toml files, Dockerfile too
 rust-version = "1.87"
