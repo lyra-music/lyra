@@ -1,6 +1,6 @@
 mod ctx;
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use twilight_interactions::command::CreateCommand;
 use twilight_model::{
@@ -99,6 +99,17 @@ pub trait CommandStructureAware: CreateCommand {
 
 pub trait BotSlashCommand: CommandStructureAware {
     async fn run(self, ctx: SlashCmdCtx) -> CommandResult;
+}
+
+pub trait BotSlashCommand2: CommandStructureAware {
+    type Error: Error;
+    type ResidualError: Error;
+
+    async fn run(self, ctx: &mut SlashCmdCtx) -> Result<(), Self::Error>;
+    async fn handle_error(
+        ctx: &mut SlashCmdCtx,
+        error: Self::Error,
+    ) -> Result<(), Self::ResidualError>;
 }
 
 pub trait BotGuildSlashCommand: CommandStructureAware {
