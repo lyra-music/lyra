@@ -111,7 +111,8 @@ where
             "💔 **Unable to load track**: \
                     Please ensure the URL is from a supported audio streaming service and \
                     the content is publicly accessible.  \n\
-                    -# **Supported streaming services**: {}.",
+                    -# **Supported streaming services**: {}. \
+                    If you believe this should be loaded, contact the bot developers to report the issue.",
             PlaySource::values().pretty_join_with_and()
         ))
         .await?;
