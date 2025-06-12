@@ -38,8 +38,7 @@ pub(super) async fn impl_end(
 
         let queue = data_w.queue_mut();
         queue.advance();
-        let index = queue.index();
-        if queue.get_mapped(index).is_some() {
+        if let Some(index) = queue.current_index() {
             cleanup_now_playing_message_and_play(&player, cdata, index, &mut data_w).await?;
         }
         drop(data_w);

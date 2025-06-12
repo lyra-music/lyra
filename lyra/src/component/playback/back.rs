@@ -57,7 +57,7 @@ pub async fn back(
     }
     queue.recede();
 
-    let index = queue.mapped_index().expect("current track exists");
+    let index = queue.current_index().expect("current track exists");
     let message = current_track_title.map_or_else(
         || format!("⏮️ `{}`.", queue[index].data().info.title),
         |title| format!("⏮️ ~~`{title}`~~.",),
