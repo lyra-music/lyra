@@ -296,7 +296,7 @@ async fn impl_remove(
         // `stop_and_cleanup_now_playing_message` call later, so this is correct.
         queue.disable_advancing();
 
-        if let Some(index) = queue.mapped_index() {
+        if let Some(index) = queue.current_index() {
             player
                 .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
                 .await?;

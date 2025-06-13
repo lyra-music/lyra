@@ -122,7 +122,7 @@ impl Queue {
         &mut self.index
     }
 
-    pub fn map_index(&self, index: usize) -> Option<usize> {
+    fn map_index(&self, index: usize) -> Option<usize> {
         match self.indexer {
             Indexer::Standard => Some(index),
             Indexer::Fair(ref indexer) => indexer.current(index),
@@ -135,17 +135,17 @@ impl Queue {
         self.map_index(index).expect("track at index exists")
     }
 
-    pub fn mapped_index(&self) -> Option<usize> {
-        self.map_index(self.index)
-    }
-
-    pub fn get_mapped(&self, index: usize) -> Option<&Item> {
+    fn get_mapped(&self, index: usize) -> Option<&Item> {
         self.inner.get(self.map_index(index)?)
     }
 
     #[inline]
     pub fn current(&self) -> Option<&Item> {
         self.get_mapped(self.index)
+    }
+
+    pub fn current_index(&self) -> Option<usize> {
+        self.current().map(|_| self.index)
     }
 
     #[inline]

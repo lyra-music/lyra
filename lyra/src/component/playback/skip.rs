@@ -62,7 +62,7 @@ pub async fn skip(
     queue.disable_advancing();
 
     queue.advance();
-    if let Some(index) = queue.mapped_index() {
+    if let Some(index) = queue.current_index() {
         player
             .cleanup_now_playing_message_and_play(ctx, index, &mut data_w)
             .await?;
