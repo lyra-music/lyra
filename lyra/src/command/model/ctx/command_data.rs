@@ -14,13 +14,15 @@ use crate::{
     core::model::OwnedBotState,
 };
 
-use super::{AppCtxKind, AppCtxMarker, Ctx, Kind, Location, autocomplete::Marker};
+use super::{
+    CmdInnerMarkerKind, CmdMarker, Ctx, CtxContext, CtxKind, autocomplete::AutocompleteMarker,
+};
 
-pub trait Aware: Kind {}
-impl<T: AppCtxKind> Aware for AppCtxMarker<T> {}
-impl Aware for Marker {}
+pub trait CommandDataAwareKind: CtxKind {}
+impl<T: CmdInnerMarkerKind> CommandDataAwareKind for CmdMarker<T> {}
+impl CommandDataAwareKind for AutocompleteMarker {}
 
-impl<T: Aware> Ctx<T> {
+impl<T: CommandDataAwareKind, C: CtxContext> Ctx<T, C> {
     pub fn from_partial_data(
         inner: Box<InteractionCreate>,
         data: &CommandData,
@@ -40,12 +42,12 @@ impl<T: Aware> Ctx<T> {
             acknowledged: false,
             acknowledgement: Some(acknowledgement),
             kind: PhantomData::<fn(T) -> T>,
-            location: PhantomData,
+            context: PhantomData,
         }
     }
 }
 
-impl<T: Aware, U: Location> Ctx<T, U> {
+impl<T: CommandDataAwareKind, C: CtxContext> Ctx<T, C> {
     pub const fn command_data(&self) -> &PartialCommandData {
         let Some(PartialInteractionData::Command(data)) = self.data.as_ref() else {
             unreachable!()

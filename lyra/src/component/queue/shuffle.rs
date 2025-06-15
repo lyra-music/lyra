@@ -2,8 +2,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        SlashCtx, check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        check,
+        model::{BotGuildSlashCommand, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -17,9 +17,8 @@ use crate::{
 #[command(name = "shuffle", contexts = "guild")]
 pub struct Shuffle;
 
-impl BotSlashCommand for Shuffle {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Shuffle {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let player = require::player(&ctx)?;
         let data = player.data();
         require::queue_not_empty(&data.read().await)?;
@@ -30,7 +29,7 @@ impl BotSlashCommand for Shuffle {
 
 pub async fn shuffle(
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), ShuffleError> {
     // FAIRNESS: if a member requests to enable or disable shuffle, they need to be

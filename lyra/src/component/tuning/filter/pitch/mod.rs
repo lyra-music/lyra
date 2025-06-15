@@ -8,7 +8,7 @@ use lavalink_rs::{
     error::LavalinkResult,
     model::player::{Filters, Timescale},
 };
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{command::require::PlayerInterface, lavalink::Pitch as PitchModel};
@@ -68,7 +68,7 @@ async fn shift_pitch(
     Ok((old_pitch, new_pitch))
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "pitch", desc = ".")]
 pub enum Pitch {
     #[command(name = "up")]

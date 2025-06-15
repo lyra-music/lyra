@@ -3,9 +3,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        SlashCtx,
-        model::BotSlashCommand,
-        require::{self, PlayerInterface},
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require::PlayerInterface,
     },
     component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
     core::model::response::initial::message::create::RespondWithMessage,
@@ -117,9 +116,8 @@ pub struct Speed {
     pitch_shift: Option<bool>,
 }
 
-impl BotSlashCommand for Speed {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Speed {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())

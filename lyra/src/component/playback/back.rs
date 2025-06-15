@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        model::{BotGuildSlashCommand, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -17,9 +17,8 @@ use crate::{
 #[command(name = "back", contexts = "guild")]
 pub struct Back;
 
-impl BotSlashCommand for Back {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Back {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let player = require::player(&ctx)?;
         let data = player.data();
         require::queue_not_empty(&data.read().await)?;
@@ -31,7 +30,7 @@ impl BotSlashCommand for Back {
 pub async fn back(
     player: require::PlayerInterface,
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), BackError> {
     // FAIRNESS: if a member requests to back, they need to be the only person in voice,

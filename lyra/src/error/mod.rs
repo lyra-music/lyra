@@ -216,10 +216,6 @@ pub enum Run {
 pub struct InstallDefaultCryptoProvider(pub std::sync::Arc<rustls::crypto::CryptoProvider>);
 
 #[derive(Error, Debug)]
-#[error("not in a guild")]
-pub struct NotInGuild;
-
-#[derive(Error, Debug)]
 #[error("confirmation timed out")]
 pub struct ConfirmationTimedOut;
 

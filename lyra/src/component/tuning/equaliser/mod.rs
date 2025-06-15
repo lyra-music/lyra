@@ -4,7 +4,7 @@ mod preset;
 
 use lavalink_rs::model::player::{Equalizer, Filters};
 use lyra_ext::num::usize_as_u8;
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 const EQUALISER_N: usize = 15;
@@ -37,7 +37,7 @@ impl super::ApplyFilter for Option<SetEqualiser> {
     }
 }
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "equaliser", desc = ".", contexts = "guild")]
 pub enum Equaliser {
     #[command(name = "preset")]

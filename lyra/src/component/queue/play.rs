@@ -25,10 +25,10 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::{
     LavalinkAware,
     command::{
-        AutocompleteCtx, MessageCtx, SlashCtx,
         model::{
-            BotAutocomplete, BotMessageCommand, BotSlashCommand, DeferCtxKind, FollowupCtxKind,
-            GuildCtx, RespondViaMessage,
+            BotGuildAutocomplete, BotGuildMessageCommand, BotGuildSlashCommand, FollowupKind,
+            GuildAutocompleteCtx, GuildCtx, GuildMessageCmdCtx, GuildSlashCmdCtx,
+            RespondWithDeferKind, RespondWithMessageKind,
         },
         require, util,
     },
@@ -222,9 +222,8 @@ impl AutocompleteResultPrettify for LoadedTracks {
     }
 }
 
-impl BotAutocomplete for Autocomplete {
-    async fn execute(self, ctx: AutocompleteCtx) -> AutocompleteResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildAutocomplete for Autocomplete {
+    async fn execute(self, mut ctx: GuildAutocompleteCtx) -> AutocompleteResult {
         let query = [
             self.query,
             self.query_2,
@@ -320,7 +319,7 @@ impl BotAutocomplete for Autocomplete {
 }
 
 async fn play(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind + DeferCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind + RespondWithDeferKind>,
     queries: impl IntoIterator<Item = Box<str>> + Send,
 ) -> Result<(), play::Error> {
     ctx.defer().await?;
@@ -350,7 +349,7 @@ async fn play(
 }
 
 async fn handle_load_track_results(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     results: LoadTrackResults,
 ) -> Result<(), play::HandleLoadTrackResultsError> {
     let (tracks, playlists) = results.split();
@@ -458,9 +457,8 @@ pub struct Play {
     _source: Option<PlaySource>,
 }
 
-impl BotSlashCommand for Play {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Play {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let queries = [
             Some(self.query),
             self.query_2,
@@ -492,9 +490,8 @@ pub struct File {
     track_5: Option<Attachment>,
 }
 
-impl BotSlashCommand for File {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for File {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let files = [
             Some(self.track),
             self.track_2,
@@ -557,9 +554,8 @@ impl CreateCommand for AddToQueue {
     }
 }
 
-impl BotMessageCommand for AddToQueue {
-    async fn run(ctx: MessageCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildMessageCommand for AddToQueue {
+    async fn run(mut ctx: GuildMessageCmdCtx) -> CommandResult {
         let message = ctx.target_message();
 
         let queries = extract_queries(message);

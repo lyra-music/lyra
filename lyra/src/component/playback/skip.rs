@@ -3,7 +3,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     command::{
         check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        model::{BotGuildSlashCommand, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -17,9 +17,8 @@ use crate::{
 #[command(name = "skip", contexts = "guild")]
 pub struct Skip;
 
-impl BotSlashCommand for Skip {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Skip {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let player = require::player(&ctx)?;
         let data = player.data();
         require::queue_not_empty(&data.read().await)?;
@@ -31,7 +30,7 @@ impl BotSlashCommand for Skip {
 pub async fn skip(
     player: require::PlayerInterface,
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), SkipError> {
     let data_r = data.read().await;

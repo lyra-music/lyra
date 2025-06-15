@@ -24,8 +24,8 @@ use twilight_model::{
 use super::{
     check,
     model::{
-        AppCtxKind, AppCtxMarker, CtxKind, FollowupCtxKind, GuildCtx, GuildModalCtx,
-        RespondViaMessage,
+        CmdInnerMarkerKind, CmdMarker, CtxKind, FollowupKind, GuildCtx, GuildModalCtx,
+        RespondWithMessageKind,
     },
     require::{self, InVoice},
 };
@@ -244,7 +244,7 @@ pub fn controller_fmt<'a>(
 }
 
 pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
 ) -> Result<(), AutoJoinOrCheckInVoiceWithUserError> {
     if let Ok(in_voice) = require::in_voice(ctx) {
         let in_voice = in_voice.and_unsuppressed()?;
@@ -267,7 +267,7 @@ pub async fn auto_join_or_check_in_voice_with_user_and_check_not_suppressed(
 
 async fn handle_suppressed_auto_join(
     error: SuppressedError,
-    ctx: &GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &GuildCtx<impl RespondWithMessageKind + FollowupKind>,
 ) -> Result<(), HandleSuppressedAutoJoinError> {
     let bot_user_id = ctx.bot().user_id();
     match error {
@@ -314,7 +314,7 @@ async fn handle_suppressed_auto_join(
 }
 
 pub async fn prompt_for_confirmation(
-    mut ctx: GuildCtx<AppCtxMarker<impl AppCtxKind>>,
+    mut ctx: GuildCtx<CmdMarker<impl CmdInnerMarkerKind>>,
 ) -> Result<(GuildModalCtx, bool), PromptForConfirmationError> {
     let text_input = TextInput {
         custom_id: String::new(),

@@ -1,4 +1,4 @@
-use lyra_proc::{BotAutocompleteGroup, BotCommandGroup};
+use lyra_proc::{BotGuildAutocompleteGroup, BotGuildCommandGroup};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 pub mod backward;
@@ -6,7 +6,7 @@ mod first;
 mod forward;
 pub mod to;
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "jump", desc = ".", contexts = "guild")]
 pub enum Jump {
     #[command(name = "to")]
@@ -19,7 +19,7 @@ pub enum Jump {
     First(first::First),
 }
 
-#[derive(CommandModel, BotAutocompleteGroup)]
+#[derive(CommandModel, BotGuildAutocompleteGroup)]
 #[command(autocomplete = true)]
 pub enum Autocomplete {
     #[command(name = "to")]

@@ -2,7 +2,10 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::{
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+    },
     core::model::{
         DatabaseAware, OwnedHttpAware, response::initial::message::create::RespondWithMessage,
     },
@@ -10,9 +13,9 @@ use crate::{
     gateway::GuildIdAware,
     lavalink::{DelegateMethods, NowPlayingData},
 };
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "now-playing", desc = ".")]
 pub enum NowPlaying {
     #[command(name = "toggle")]
@@ -24,9 +27,8 @@ pub enum NowPlaying {
 #[command(name = "toggle")]
 pub struct Toggle;
 
-impl BotSlashCommand for Toggle {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Toggle {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let new_now_playing = sqlx::query!(
             "UPDATE guild_configs SET now_playing = NOT now_playing WHERE id = $1 RETURNING now_playing;",
             ctx.guild_id().get().cast_signed(),

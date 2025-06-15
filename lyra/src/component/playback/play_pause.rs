@@ -2,8 +2,8 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::{
-        SlashCtx, check,
-        model::{BotSlashCommand, GuildCtx, RespondViaMessage},
+        check,
+        model::{BotGuildSlashCommand, GuildCtx, GuildSlashCmdCtx, RespondWithMessageKind},
         require,
         util::controller_fmt,
     },
@@ -17,9 +17,8 @@ use crate::{
 #[command(name = "play-pause", contexts = "guild")]
 pub struct PlayPause;
 
-impl BotSlashCommand for PlayPause {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for PlayPause {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let player = require::player(&ctx)?;
         let data = player.data();
         require::queue_not_empty(&data.read().await)?;
@@ -31,7 +30,7 @@ impl BotSlashCommand for PlayPause {
 pub async fn play_pause(
     player: require::PlayerInterface,
     data: OwnedPlayerData,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), PlayPauseError> {
     let in_voice_with_user = check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?;

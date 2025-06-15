@@ -17,7 +17,10 @@ use twilight_model::{
 
 use super::AccessCategoryFlag;
 use crate::{
-    command::{SlashCtx, check, model::BotSlashCommand, require},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+    },
     core::{
         r#const::text::NO_ROWS_AFFECTED_MESSAGE,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
@@ -149,9 +152,8 @@ pub struct MemberRole {
     member_or_role_5: Option<ResolvedMentionable>,
 }
 
-impl BotSlashCommand for MemberRole {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for MemberRole {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let input_mentionables: HashMap<_, HashSet<_>> = [
@@ -259,9 +261,8 @@ pub struct Channel {
     target_5: Option<InteractionChannel>,
 }
 
-impl BotSlashCommand for Channel {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Channel {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let input_channels: HashMap<_, HashSet<_>> = [

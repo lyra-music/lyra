@@ -6,7 +6,10 @@ use twilight_interactions::command::{CommandModel, CommandOption, CreateCommand,
 
 use super::AccessCategory;
 use crate::{
-    command::{SlashCtx, check, model::BotSlashCommand, require},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+    },
     component::config::access::AccessCategoryFlags,
     core::{
         r#const::text::NO_ROWS_AFFECTED_MESSAGE,
@@ -97,9 +100,8 @@ pub struct Mode {
     category: AccessCategory,
 }
 
-impl BotSlashCommand for Mode {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Mode {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         check::user_is_access_manager(&ctx)?;
 
         let access_mode = <Option<bool>>::from(self.mode);

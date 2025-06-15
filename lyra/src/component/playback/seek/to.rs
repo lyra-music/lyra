@@ -4,7 +4,11 @@ use lyra_ext::pretty::duration_display::{DurationDisplay, FromPrettyStr};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{check, model::BotSlashCommand, require},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+    },
     component::playback::Restart,
     core::{
         http::InteractionClient, model::response::initial::message::create::RespondWithMessage,
@@ -20,9 +24,8 @@ pub struct To {
     timestamp: String,
 }
 
-impl BotSlashCommand for To {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for To {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();

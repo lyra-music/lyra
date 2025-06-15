@@ -1,9 +1,13 @@
-use lyra_proc::BotCommandGroup;
+use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAware,
-    command::{model::BotSlashCommand, require, util::is_message_at_bottom},
+    command::{
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+        util::is_message_at_bottom,
+    },
     component::config::now_playing::Toggle as ConfigNowPlayingToggle,
     core::{
         http::InteractionClient,
@@ -13,7 +17,7 @@ use crate::{
     lavalink::{DelegateMethods, NowPlayingData},
 };
 
-#[derive(CommandModel, CreateCommand, BotCommandGroup)]
+#[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
 #[command(name = "now-playing", desc = ".", contexts = "guild")]
 pub enum NowPlaying {
     #[command(name = "bump")]
@@ -25,9 +29,8 @@ pub enum NowPlaying {
 #[command(name = "bump")]
 pub struct Bump;
 
-impl BotSlashCommand for Bump {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Bump {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let player = require::player(&ctx)?;
         let data = player.data();
         let data_r = data.read().await;

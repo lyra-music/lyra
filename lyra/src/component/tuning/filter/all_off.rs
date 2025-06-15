@@ -2,7 +2,8 @@ use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::require, component::tuning::UpdateFilter,
+    command::{model::GuildSlashCmdCtx, require},
+    component::tuning::UpdateFilter,
     core::model::response::initial::message::create::RespondWithMessage,
 };
 
@@ -35,9 +36,8 @@ impl super::ApplyFilter for ResetAllExceptSpeed {
 #[command(name = "all-off")]
 pub struct AllOff;
 
-impl crate::command::model::BotSlashCommand for AllOff {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::command::Result {
-        let mut ctx = require::guild(ctx)?;
+impl crate::command::model::BotGuildSlashCommand for AllOff {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::command::Result {
         let player = require::player(&ctx)?;
 
         player.update_filter(ResetAllExceptSpeed).await?;

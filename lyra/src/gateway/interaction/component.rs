@@ -2,10 +2,7 @@ use tokio::sync::oneshot;
 use twilight_model::application::interaction::InteractionData;
 
 use crate::{
-    command::{
-        model::{ComponentCtx, ComponentMarker, GuildCtx},
-        require,
-    },
+    command::{model::GuildComponentCtx, require},
     core::{
         model::{ctx_head::CtxHead, response::Respond},
         r#static::component::NowPlayingButtonType,
@@ -25,18 +22,28 @@ use super::{
 
 impl super::Context {
     pub(super) async fn process_as_component(mut self) -> ProcessResult {
-        let bot = self.bot;
-        let mut i = bot.interaction().ctx(&self.inner);
+        let i = self.bot.interaction().ctx(&self.inner);
         let Some(InteractionData::MessageComponent(data)) = self.inner.data.take() else {
             unreachable!()
         };
         tracing::trace!(?data);
 
-        let (tx, mut rx) = oneshot::channel::<()>();
-        let ctx = ComponentCtx::from_data(self.inner, data, bot, self.latency, self.sender, tx);
-        let Ok(mut ctx) = require::guild(ctx) else {
-            return Ok(());
-        };
+        let txrx = oneshot::channel::<()>();
+        if self.inner.guild_id.is_some() {
+            self.handle_guild_component(i, data, txrx).await
+        } else {
+            Ok(()) // may expand to `Self::handle_component(...)` if this branch is ever used.
+        }
+    }
+
+    async fn handle_guild_component(
+        self,
+        mut i: CtxHead,
+        data: Box<twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
+        (tx, mut rx): (oneshot::Sender<()>, oneshot::Receiver<()>),
+    ) -> Result<(), ProcessError> {
+        let mut ctx =
+            GuildComponentCtx::from_data(self.inner, data, self.bot, self.latency, self.sender, tx);
         let Ok(player) = require::player(&ctx) else {
             return Ok(());
         };
@@ -66,7 +73,7 @@ impl super::Context {
 }
 
 async fn execute_controller(
-    mut ctx: GuildCtx<ComponentMarker>,
+    mut ctx: GuildComponentCtx,
     player: require::PlayerInterface,
     player_data: OwnedPlayerData,
     now_playing_button: NowPlayingButtonType,

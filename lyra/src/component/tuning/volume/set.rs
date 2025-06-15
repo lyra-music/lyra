@@ -4,7 +4,7 @@ use lyra_ext::num::i64_as_u16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{SlashCtx, model::BotSlashCommand, require},
+    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     component::tuning::check_user_is_dj_and_require_unsuppressed_player,
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
@@ -19,9 +19,8 @@ pub struct Set {
     percent: i64,
 }
 
-impl BotSlashCommand for Set {
-    async fn run(self, ctx: SlashCtx) -> CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for Set {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
 
         let percent =

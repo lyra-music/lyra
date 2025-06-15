@@ -30,7 +30,7 @@ use twilight_model::application::command::{CommandOptionChoice, CommandOptionCho
 
 use crate::{
     command::{
-        model::{FollowupCtxKind, GuildCtx, RespondViaMessage},
+        model::{FollowupKind, GuildCtx, RespondWithMessageKind},
         require::PlayerInterface,
     },
     core::{
@@ -209,7 +209,7 @@ fn validate_input_positions(
 async fn remove_range(
     start: i64,
     end: i64,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let (start_usize, end_usize) = (i64_as_usize(start), i64_as_usize(end));
@@ -238,7 +238,7 @@ async fn remove_range(
 
 async fn remove(
     positions: Box<[NonZeroUsize]>,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();
@@ -262,7 +262,7 @@ async fn impl_remove(
     positions: Box<[NonZeroUsize]>,
     removed: Vec<QueueItem>,
     queue_cleared: bool,
-    ctx: &mut GuildCtx<impl RespondViaMessage + FollowupCtxKind>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind + FollowupKind>,
     player: &PlayerInterface,
 ) -> Result<(), RemoveTracksError> {
     let data = player.data();

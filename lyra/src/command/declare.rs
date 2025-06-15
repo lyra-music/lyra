@@ -70,10 +70,14 @@ macro_rules! declare_slash_commands {
         $(
             impl $crate::command::model::CommandStructureAware for $raw_cmd {}
         )*
+    };
+}
 
+macro_rules! declare_slash_commands_callback {
+    ( $( $raw_cmd:ident ),* $(,)? ) => {
         type Callback = &'static (
             dyn ::std::ops::Fn(
-                $crate::command::SlashCtx,
+                $crate::command::model::SlashCmdCtx,
                 ::twilight_model::application::interaction::application_command::CommandData,
             ) -> ::std::pin::Pin<::std::boxed::Box<
                     dyn ::std::future::Future<
@@ -96,7 +100,7 @@ macro_rules! declare_slash_commands {
                                 {
                                     #[::lavalink_rs::hook]
                                     async fn callback(
-                                        ctx: $crate::command::SlashCtx,
+                                        ctx: $crate::command::model::SlashCmdCtx,
                                         data: ::twilight_model::application::interaction::application_command::CommandData,
                                     ) -> ::std::result::Result<
                                         (),
@@ -122,14 +126,83 @@ macro_rules! declare_slash_commands {
                 )
             });
 
-        impl $crate::command::SlashCtx {
+        impl $crate::command::model::SlashCmdCtx {
+            pub async fn execute(
+                self,
+                data: ::twilight_model::application::interaction::application_command::CommandData,
+            ) -> ::std::result::Result<(), $crate::error::command::declare::CommandExecuteError> {
+                if let ::std::option::Option::Some(callback) = SLASH_COMMAND_CALLBACK.get(&*data.name) {
+                    ::std::result::Result::Ok(callback(self, data).await?)
+                } else {
+                    let cmd_data = self.into_command_data();
+                    ::std::result::Result::Err($crate::error::command::declare::CommandExecuteError::UnknownCommand(cmd_data))
+                }
+            }
+        }
+    };
+}
+
+macro_rules! declare_guild_slash_commands_callback {
+    ( $( $raw_cmd:ident ),* $(,)? ) => {
+        type GuildCallback = &'static (
+            dyn ::std::ops::Fn(
+                $crate::command::model::GuildSlashCmdCtx,
+                ::twilight_model::application::interaction::application_command::CommandData,
+            ) -> ::std::pin::Pin<::std::boxed::Box<
+                    dyn ::std::future::Future<
+                        Output = ::std::result::Result<
+                            (),
+                            $crate::error::command::declare::CommandExecuteError,
+                        >
+                    > + ::std::marker::Send
+                >> + ::std::marker::Send + ::std::marker::Sync
+        );
+
+        static GUILD_SLASH_COMMAND_CALLBACK:
+            ::std::sync::LazyLock<
+                ::std::collections::HashMap<&'static str, GuildCallback>
+            > = ::std::sync::LazyLock::new(|| {
+                ::std::collections::HashMap::from(
+                    ::paste::paste! {
+                        [
+                            $(
+                                {
+                                    #[::lavalink_rs::hook]
+                                    async fn callback(
+                                        ctx: $crate::command::model::GuildSlashCmdCtx,
+                                        data: ::twilight_model::application::interaction::application_command::CommandData,
+                                    ) -> ::std::result::Result<
+                                        (),
+                                        $crate::error::command::declare::CommandExecuteError,
+                                    > {
+                                        ::std::result::Result::Ok(
+                                            $crate::command::model::BotGuildSlashCommand::run(
+                                                <$raw_cmd as ::twilight_interactions::command::CommandModel>
+                                                    ::from_interaction(data.into())?,
+                                                ctx
+                                            ).await?
+                                        )
+                                    }
+
+                                    (
+                                        <$raw_cmd as ::twilight_interactions::command::CreateCommand>::NAME,
+                                        &callback as GuildCallback
+                                    )
+                                },
+                            )*
+                        ]
+                    }
+                )
+            });
+
+        impl $crate::command::model::GuildSlashCmdCtx {
             pub async fn execute(
                 self,
                 data: ::twilight_model::application::interaction::application_command::CommandData,
             ) -> ::std::result::Result<(), $crate::error::command::declare::CommandExecuteError> {
                 $crate::command::check::user_allowed_in(&self).await?;
 
-                if let ::std::option::Option::Some(callback) = SLASH_COMMAND_CALLBACK.get(&*data.name) {
+                if let ::std::option::Option::Some(callback) = GUILD_SLASH_COMMAND_CALLBACK.get(&*data.name) {
                     ::std::result::Result::Ok(callback(self, data).await?)
                 } else {
                     let cmd_data = self.into_command_data();
@@ -181,14 +254,16 @@ macro_rules! declare_message_commands {
                 ]
             }
         }
+    }
+}
 
-        impl $crate::command::MessageCtx {
+macro_rules! declare_message_commands_callback {
+    ( $( $raw_cmd:ident ),* $(,)? ) => {
+        impl $crate::command::model::MessageCmdCtx {
             pub async fn execute(
                 self,
                 data: ::twilight_model::application::interaction::application_command::CommandData,
             ) -> ::std::result::Result<(), $crate::error::command::declare::CommandExecuteError> {
-                $crate::command::check::user_allowed_in(&self).await?;
-
                 match data.name {
                     $(
                         n if n ==
@@ -207,9 +282,36 @@ macro_rules! declare_message_commands {
     };
 }
 
+macro_rules! declare_guild_message_commands_callback {
+    ( $( $raw_cmd:ident ),* $(,)? ) => {
+        impl $crate::command::model::GuildMessageCmdCtx {
+            pub async fn execute(
+                self,
+                data: ::twilight_model::application::interaction::application_command::CommandData,
+            ) -> ::std::result::Result<(), $crate::error::command::declare::CommandExecuteError> {
+                $crate::command::check::user_allowed_in(&self).await?;
+
+                match data.name {
+                    $(
+                        n if n ==
+                            <$raw_cmd as ::twilight_interactions::command::CreateCommand>::NAME
+                        => {
+                            ::std::result::Result::Ok(<$raw_cmd as $crate::command::model::BotGuildMessageCommand>::run(self).await?)
+                        }
+                    )*
+                    _ => {
+                        let cmd_data = self.into_command_data();
+                        ::std::result::Result::Err($crate::error::command::declare::CommandExecuteError::UnknownCommand(cmd_data))
+                    }
+                }
+            }
+        }
+    };
+}
+
 macro_rules! declare_autocomplete {
     ( $( $raw_cmd:ident => $raw_autocomplete:ident ),* $(,)? ) => {
-        impl $crate::command::AutocompleteCtx {
+        impl $crate::command::model::AutocompleteCtx {
             pub async fn execute(
                 self,
                 data: ::twilight_model::application::interaction::application_command::CommandData,
@@ -221,6 +323,37 @@ macro_rules! declare_autocomplete {
                         => {
                             ::std::result::Result::Ok(
                                 $crate::command::model::BotAutocomplete::execute(
+                                    <$raw_autocomplete as ::twilight_interactions::command::CommandModel>
+                                        ::from_interaction(data.into())?,
+                                    self
+                                ).await?
+                            )
+                        }
+                    )*
+                    _ => {
+                        let cmd_data = self.into_command_data();
+                        ::std::result::Result::Err($crate::error::command::declare::AutocompleteExecuteError::UnknownAutocomplete(cmd_data))
+                    }
+                }
+            }
+        }
+    };
+}
+
+macro_rules! declare_guild_autocomplete {
+    ( $( $raw_cmd:ident => $raw_autocomplete:ident ),* $(,)? ) => {
+        impl $crate::command::model::GuildAutocompleteCtx {
+            pub async fn execute(
+                self,
+                data: ::twilight_model::application::interaction::application_command::CommandData,
+            ) -> ::std::result::Result<(), $crate::error::command::declare::AutocompleteExecuteError> {
+                match data.name {
+                    $(
+                        ref n if n ==
+                            <$raw_cmd as ::twilight_interactions::command::CreateCommand>::NAME
+                        => {
+                            ::std::result::Result::Ok(
+                                $crate::command::model::BotGuildAutocomplete::execute(
                                     <$raw_autocomplete as ::twilight_interactions::command::CommandModel>
                                         ::from_interaction(data.into())?,
                                     self
@@ -265,10 +398,41 @@ declare_slash_commands![
     Back,
     NowPlaying,
 ];
+declare_slash_commands_callback![Ping, Uptime];
+declare_guild_slash_commands_callback![
+    Ping,
+    Uptime,
+    Join,
+    Leave,
+    Config,
+    Play,
+    PlayFile,
+    Repeat,
+    Shuffle,
+    FairQueue,
+    Remove,
+    RemoveRange,
+    Clear,
+    Move,
+    Volume,
+    Filter,
+    Speed,
+    Equaliser,
+    PlayPause,
+    Seek,
+    Restart,
+    Jump,
+    Skip,
+    Back,
+    NowPlaying,
+];
 
 declare_message_commands![AddToQueue,];
+declare_message_commands_callback![];
+declare_guild_message_commands_callback![AddToQueue,];
 
-declare_autocomplete![
+declare_autocomplete![];
+declare_guild_autocomplete![
     Play => PlayAutocomplete,
     Remove => RemoveAutocomplete,
     RemoveRange => RemoveRangeAutocomplete,

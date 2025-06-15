@@ -17,8 +17,8 @@ use crate::{
     LavalinkAndGuildIdAware,
     core::model::{CacheAware, UserIdAware, UserPermissionsAware},
     error::{
-        Cache, CacheResult, InVoiceWithoutSomeoneElse, NotInGuild, NotInVoice, NotPlaying,
-        QueueEmpty, Suppressed,
+        Cache, CacheResult, InVoiceWithoutSomeoneElse, NotInVoice, NotPlaying, QueueEmpty,
+        Suppressed,
         command::require::{
             InVoiceWithSomeoneElseError, SeekToWithError, SetPauseWithError, UnsuppressedError,
         },
@@ -31,15 +31,7 @@ use crate::{
     },
 };
 
-use super::model::{Ctx, CtxKind, GuildCtx, GuildCtxRef};
-
-pub fn guild<T: CtxKind>(ctx: Ctx<T>) -> Result<GuildCtx<T>, NotInGuild> {
-    GuildCtx::try_from(ctx)
-}
-
-pub fn guild_ref<T: CtxKind>(ctx: &Ctx<T>) -> Result<GuildCtxRef<T>, NotInGuild> {
-    GuildCtxRef::try_from(ctx)
-}
+use super::model::{CtxKind, GuildCtx};
 
 pub fn player(cx: &impl LavalinkAndGuildIdAware) -> Result<PlayerInterface, NoPlayerError> {
     let context = cx.get_player().ok_or(NoPlayerError)?;

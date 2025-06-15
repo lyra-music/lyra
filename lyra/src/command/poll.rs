@@ -52,7 +52,7 @@ use crate::{
 };
 
 use super::{
-    model::{GuildCtx, GuildInteraction, NonPingInteraction, RespondViaMessage},
+    model::{GuildCtx, GuildInteraction, NonPingInteraction, RespondWithMessageKind},
     require::PartialInVoice,
     util::{GuildIdAndDisplayAvatarUrlAware, GuildIdAndDisplayNameAware, MessageLinkAware},
 };
@@ -297,7 +297,7 @@ fn generate_latent_embed_colours() -> LatentEmbedColours {
 }
 
 async fn get_users_in_voice(
-    ctx: &GuildCtx<impl RespondViaMessage>,
+    ctx: &GuildCtx<impl RespondWithMessageKind>,
     in_voice: &PartialInVoice,
 ) -> Result<HashSet<Id<UserMarker>>, CacheError> {
     let users_in_voice = ctx
@@ -444,7 +444,7 @@ async fn update_embed(
 
 pub async fn start(
     topic: &Topic,
-    ctx: &mut GuildCtx<impl RespondViaMessage>,
+    ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     in_voice: &PartialInVoice,
 ) -> Result<Resolution, StartPollError> {
     let author_name = ctx.guild_display_name();
@@ -548,7 +548,7 @@ fn generate_poll_description(votes: &HashMap<Id<UserMarker>, Vote>, threshold: u
 
 async fn wait_for_votes(
     mut poll_ctx: WaitForPollActionsContext<'_>,
-    ctx: &GuildCtx<impl RespondViaMessage>,
+    ctx: &GuildCtx<impl RespondWithMessageKind>,
     users_in_voice: HashSet<Id<UserMarker>>,
     mut votes: HashMap<Id<UserMarker>, Vote>,
     threshold: usize,

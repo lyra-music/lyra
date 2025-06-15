@@ -7,31 +7,33 @@ use crate::core::model::response::initial::{
     modal::RespondWithModal,
 };
 
-use super::{AppCtxKind, AppCtxMarker, ComponentMarker, Ctx, GuildMarker, Kind, Location};
+use super::{
+    CmdInnerMarkerKind, CmdMarker, ComponentMarker, Ctx, CtxContext, CtxKind, GuildMarker,
+};
 
-pub trait ModalSrcMarker {}
+pub trait ModalInnerMarkerKind {}
 
-pub struct AppCmdSrcMarker;
-impl ModalSrcMarker for AppCmdSrcMarker {}
-pub struct ComponentSrcMarker;
-impl ModalSrcMarker for ComponentSrcMarker {}
+pub struct CmdInnerMarker;
+impl ModalInnerMarkerKind for CmdInnerMarker {}
+pub struct ComponentInnerMarker;
+impl ModalInnerMarkerKind for ComponentInnerMarker {}
 
-pub struct Marker<T: ModalSrcMarker>(PhantomData<fn(T) -> T>);
-pub type ModalFromAppCmd = Marker<AppCmdSrcMarker>;
-pub type ModalFromComponent = Marker<ComponentSrcMarker>;
+pub struct ModalMarker<T: ModalInnerMarkerKind>(PhantomData<fn(T) -> T>);
+pub type CmdModalMarker = ModalMarker<CmdInnerMarker>;
+pub type ComponentModalMarker = ModalMarker<ComponentInnerMarker>;
 
-impl<T: ModalSrcMarker> Kind for Marker<T> {}
+impl<T: ModalInnerMarkerKind> CtxKind for ModalMarker<T> {}
 #[expect(unused)]
-pub type Modal = Ctx<ModalFromAppCmd>;
-pub type Guild = Ctx<ModalFromAppCmd, GuildMarker>;
+pub type ModalCtx = Ctx<CmdModalMarker>;
+pub type GuildModalCtx = Ctx<CmdModalMarker, GuildMarker>;
 
-pub trait RespondVia: Kind {}
-impl<T: AppCtxKind> RespondVia for AppCtxMarker<T> {}
-impl RespondVia for ComponentMarker {}
+pub trait RespondWithModalKind: CtxKind {}
+impl<T: CmdInnerMarkerKind> RespondWithModalKind for CmdMarker<T> {}
+impl RespondWithModalKind for ComponentMarker {}
 
-impl<T: RespondVia, U: Location> RespondWithModal for Ctx<T, U> {}
+impl<T: RespondWithModalKind, C: CtxContext> RespondWithModal for Ctx<T, C> {}
 
-impl<U: Location, S: ModalSrcMarker> Ctx<Marker<S>, U> {
+impl<C: CtxContext, S: ModalInnerMarkerKind> Ctx<ModalMarker<S>, C> {
     pub fn submit_data(&self) -> &ModalInteractionData {
         let Some(InteractionData::ModalSubmit(ref data)) = self.inner.data else {
             unreachable!()
@@ -40,5 +42,5 @@ impl<U: Location, S: ModalSrcMarker> Ctx<Marker<S>, U> {
     }
 }
 
-impl<U: Location> RespondWithDeferUpdate for Ctx<ModalFromComponent, U> {}
-impl<U: Location> RespondWithUpdate for Ctx<ModalFromComponent, U> {}
+impl<C: CtxContext> RespondWithDeferUpdate for Ctx<ComponentModalMarker, C> {}
+impl<C: CtxContext> RespondWithUpdate for Ctx<ComponentModalMarker, C> {}

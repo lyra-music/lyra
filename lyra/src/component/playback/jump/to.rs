@@ -11,7 +11,9 @@ use crate::{
     LavalinkAndGuildIdAware,
     command::{
         check,
-        model::{BotAutocomplete, BotSlashCommand},
+        model::{
+            BotGuildAutocomplete, BotGuildSlashCommand, GuildAutocompleteCtx, GuildSlashCmdCtx,
+        },
         require,
     },
     component::queue::{
@@ -61,12 +63,11 @@ pub struct Autocomplete {
     track: AutocompleteValue<i64>,
 }
 
-impl BotAutocomplete for Autocomplete {
+impl BotGuildAutocomplete for Autocomplete {
     async fn execute(
         self,
-        ctx: crate::command::AutocompleteCtx,
+        mut ctx: GuildAutocompleteCtx,
     ) -> crate::error::command::AutocompleteResult {
-        let mut ctx = require::guild(ctx)?;
         let AutocompleteValue::Focused(track) = self.track else {
             panic!("not exactly one autocomplete option focused")
         };
@@ -86,9 +87,8 @@ pub struct To {
     track: i64,
 }
 
-impl BotSlashCommand for To {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for To {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();

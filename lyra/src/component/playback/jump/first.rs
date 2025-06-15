@@ -1,7 +1,11 @@
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
-    command::{check, model::BotSlashCommand, require},
+    command::{
+        check,
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+    },
     core::model::response::initial::message::create::RespondWithMessage,
 };
 
@@ -10,9 +14,8 @@ use crate::{
 #[command(name = "first")]
 pub struct First;
 
-impl BotSlashCommand for First {
-    async fn run(self, ctx: crate::command::SlashCtx) -> crate::error::CommandResult {
-        let mut ctx = require::guild(ctx)?;
+impl BotGuildSlashCommand for First {
+    async fn run(self, mut ctx: GuildSlashCmdCtx) -> crate::error::CommandResult {
         let in_voice_with_user = check::user_in(require::in_voice(&ctx)?.and_unsuppressed()?)?;
         let player = require::player(&ctx)?;
         let data = player.data();
