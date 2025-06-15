@@ -105,7 +105,10 @@ pub trait BotSlashCommand2: CommandStructureAware {
     type Error: Error;
     type ResidualError: Error;
 
+    #[expect(unused)]
     async fn run(self, ctx: &mut SlashCmdCtx) -> Result<(), Self::Error>;
+
+    #[expect(unused)]
     async fn handle_error(
         ctx: &mut SlashCmdCtx,
         error: Self::Error,
