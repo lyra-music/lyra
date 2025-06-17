@@ -33,7 +33,7 @@ use twilight_util::builder::embed::{
 use crate::{
     LavalinkAware,
     core::{
-        r#const::{
+        konst::{
             colours,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },

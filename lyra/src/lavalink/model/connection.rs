@@ -12,7 +12,7 @@ use twilight_model::id::{
     marker::{ChannelMarker, GuildMarker, UserMarker},
 };
 
-use crate::{command::poll::Poll as PlayerPoll, core::r#const, error::UnrecognisedConnection};
+use crate::{command::poll::Poll as PlayerPoll, core::konst, error::UnrecognisedConnection};
 
 use super::Lavalink;
 
@@ -166,7 +166,7 @@ pub async fn wait_for_with(
     rx: &mut broadcast::Receiver<Event>,
     predicate: impl Fn(&Event) -> bool + Send + Sync,
 ) -> EventRecvResult<Option<Event>> {
-    let event = tokio::time::timeout(r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, async {
+    let event = tokio::time::timeout(konst::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, async {
         loop {
             let event = rx.recv().await?;
             if predicate(&event) {
@@ -421,7 +421,7 @@ impl ConnectionHandle<'_> {
         {
             // Wait up to a timeout duration for the state to change to "disabled".
             tokio::time::timeout(
-                crate::core::r#const::connection::CHANGED_TIMEOUT,
+                crate::core::konst::connection::CHANGED_TIMEOUT,
                 rx.wait_for(|&r| !r),
             )
             .await

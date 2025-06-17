@@ -6,7 +6,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 use crate::{
     command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     core::{
-        r#const::colours::EMBED_DEFAULT,
+        konst::colours::EMBED_DEFAULT,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
     },
     error::CommandResult,

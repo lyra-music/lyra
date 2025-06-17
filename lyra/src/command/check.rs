@@ -22,7 +22,7 @@ use crate::{
             BotState, DatabaseAware, HttpAware, OwnedBotStateAware, PartialMemberAware,
             UserIdAware, UserPermissionsAware,
         },
-        r#static::application,
+        statik::application,
         traced,
     },
     error::{

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::core::r#const::{lavaplayer as const_lavaplayer, text as const_text};
+use crate::core::konst::{lavaplayer as const_lavaplayer, text as const_text};
 
 mod private {
     pub trait CorrectInfo {}

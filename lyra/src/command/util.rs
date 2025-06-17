@@ -33,7 +33,7 @@ use crate::{
     LavalinkAware,
     component::connection::auto_join,
     core::{
-        r#const::{
+        konst::{
             self,
             discord::{BASE_URL, CDN_URL},
         },
@@ -290,7 +290,7 @@ async fn handle_suppressed_auto_join(
                             && !e.suppress
                     });
 
-            let duration = unix_time() + r#const::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT;
+            let duration = unix_time() + konst::misc::WAIT_FOR_NOT_SUPPRESSED_TIMEOUT;
             let timestamp = Timestamp::new(duration.as_secs(), Some(TimestampStyle::RelativeTime));
             let requested_to_speak = ctx
                 .notef(format!(
@@ -300,7 +300,7 @@ async fn handle_suppressed_auto_join(
                 .await?;
             let requested_to_speak_message = requested_to_speak.model().await?;
             let wait_for_speaker =
-                tokio::time::timeout(r#const::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, wait_for_speaker);
+                tokio::time::timeout(konst::misc::WAIT_FOR_BOT_EVENTS_TIMEOUT, wait_for_speaker);
 
             if wait_for_speaker.await.is_err() {
                 return Err(AutoJoinSuppressedError::StillNotSpeaker {
@@ -359,7 +359,7 @@ pub async fn prompt_for_confirmation(
         });
 
     let wait_for_modal_submit = tokio::time::timeout(
-        r#const::misc::DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT,
+        konst::misc::DESTRUCTIVE_COMMAND_CONFIRMATION_TIMEOUT,
         wait_for_modal_submit,
     )
     .await;

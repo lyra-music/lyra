@@ -5,7 +5,7 @@ use crate::{
     command::{model::GuildComponentCtx, require},
     core::{
         model::{ctx_head::CtxHead, response::Respond},
-        r#static::component::NowPlayingButtonType,
+        statik::component::NowPlayingButtonType,
     },
     error::gateway::{
         ProcessError, ProcessResult,

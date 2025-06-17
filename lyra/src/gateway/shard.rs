@@ -6,7 +6,7 @@ use crate::{
     command::declare::COMMANDS,
     core::{
         model::{BotState, BotStateRef, DatabaseAware},
-        r#static::application,
+        statik::application,
     },
     error::gateway::ProcessResult,
 };

@@ -36,7 +36,7 @@ use crate::{
             OwnedBotStateAware, OwnedHttpAware, PartialMemberAware, UserAware,
             UserPermissionsAware, response::Respond,
         },
-        r#static::application,
+        statik::application,
     },
     error::{Cache, CacheResult},
     gateway::{GuildIdAware, OptionallyGuildIdAware, SenderAware},

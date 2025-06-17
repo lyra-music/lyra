@@ -22,7 +22,7 @@ use crate::{
         model::{BotGuildSlashCommand, GuildSlashCmdCtx},
     },
     core::{
-        r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+        konst::text::NO_ROWS_AFFECTED_MESSAGE,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
     },
     error::CommandResult,

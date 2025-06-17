@@ -14,7 +14,7 @@ use crate::{
                 defer_update::RespondWithDeferUpdate, message::update::RespondWithUpdate,
             },
         },
-        r#static::component::NowPlayingButtonType,
+        statik::component::NowPlayingButtonType,
     },
 };
 

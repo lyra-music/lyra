@@ -11,7 +11,7 @@ use crate::{
     },
     component::config::access::AccessCategoryFlags,
     core::{
-        r#const::text::NO_ROWS_AFFECTED_MESSAGE,
+        konst::text::NO_ROWS_AFFECTED_MESSAGE,
         model::{DatabaseAware, response::initial::message::create::RespondWithMessage},
     },
     error::CommandResult,

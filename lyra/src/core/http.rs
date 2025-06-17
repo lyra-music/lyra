@@ -13,7 +13,7 @@ use crate::{
     error::core::SetGlobalCommandsError,
 };
 
-use super::{model::ctx_head::CtxHead, r#static::application};
+use super::{model::ctx_head::CtxHead, statik::application};
 
 pub struct InteractionClient(Arc<twilight_http::Client>);
 

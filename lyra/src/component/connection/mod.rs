@@ -31,7 +31,7 @@ use crate::{
         leave::{LeaveResponse, disconnect, disconnect_cleanup},
     },
     core::{
-        r#const::{
+        konst::{
             connection::{self as const_connection, INACTIVITY_TIMEOUT},
             exit_code::NOTICE,
         },

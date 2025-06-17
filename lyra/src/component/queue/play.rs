@@ -33,7 +33,7 @@ use crate::{
         require, util,
     },
     core::{
-        r#const::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
+        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
         model::{
             UserIdAware,
             response::{

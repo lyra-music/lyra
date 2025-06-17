@@ -20,7 +20,7 @@ macro_rules! generate_hid_variants {
                 where
                     Self: ::std::marker::Sized,
                 {
-                    self.hidf(format!("{} {}", $crate::core::r#const::exit_code::$emoji, content.into()))
+                    self.hidf(format!("{} {}", $crate::core::konst::exit_code::$emoji, content.into()))
                 }
             }
         )+

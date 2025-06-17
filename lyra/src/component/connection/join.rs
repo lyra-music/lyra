@@ -30,7 +30,7 @@ use crate::{
     },
     component::connection::{start_inactivity_timeout, users_in_voice},
     core::{
-        r#const::connection::INACTIVITY_TIMEOUT,
+        konst::connection::INACTIVITY_TIMEOUT,
         model::{
             BotState, BotStateAware, CacheAware, HttpAware, OwnedBotStateAware, UserIdAware,
             response::{
@@ -38,7 +38,7 @@ use crate::{
                 initial::message::create::RespondWithMessage,
             },
         },
-        r#static::application,
+        statik::application,
         traced,
     },
     error::{

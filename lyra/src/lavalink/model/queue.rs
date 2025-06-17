@@ -301,7 +301,7 @@ impl Queue {
     pub async fn advancing_disabled(&self) -> bool {
         let mut rx = self.subscribe_to_advance_enabler();
         let disabled = tokio::time::timeout(
-            crate::core::r#const::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
+            crate::core::konst::misc::QUEUE_ADVANCE_DISABLED_TIMEOUT,
             rx.wait_for(|&r| !r),
         )
         .await

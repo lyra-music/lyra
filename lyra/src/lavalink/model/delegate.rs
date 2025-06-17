@@ -7,7 +7,7 @@ use lavalink_rs::{
 use tokio::sync::RwLock;
 use twilight_model::id::{Id, marker::ChannelMarker};
 
-use crate::core::r#const;
+use crate::core::konst;
 
 use super::{Lavalink, OwnedClientData, OwnedPlayerData, RawPlayerData, UnwrappedData};
 
@@ -58,7 +58,7 @@ pub trait DelegateMethods {
         let info = self
             .get_connection_info(
                 guild_id,
-                r#const::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
+                konst::connection::GET_LAVALINK_CONNECTION_INFO_TIMEOUT,
             )
             .await?;
         tracing::debug!("getting lavalink connection info took {:?}", now.elapsed());

@@ -12,7 +12,7 @@ macro_rules! generate_emojis {
                 }
             }
 
-            let emojis = $crate::core::r#static::application::emojis(cx).await?;
+            let emojis = $crate::core::statik::application::emojis(cx).await?;
             let emoji = emojis.iter().find(|e| e.name == ::std::stringify!($name));
             let reaction = emoji.map_or(
                 {

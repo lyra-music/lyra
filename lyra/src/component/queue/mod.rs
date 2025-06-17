@@ -1,6 +1,6 @@
 mod clear;
 mod fair_queue;
-mod r#move;
+mod mov;
 mod play;
 mod remove;
 mod remove_range;
@@ -14,7 +14,7 @@ use lyra_ext::{
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
-pub use r#move::{Autocomplete as MoveAutocomplete, Move};
+pub use mov::{Autocomplete as MoveAutocomplete, Move};
 pub use play::AddToQueue;
 pub use play::{Autocomplete as PlayAutocomplete, File as PlayFile, Play, PlaySource};
 pub use remove::{Autocomplete as RemoveAutocomplete, Remove};
@@ -34,10 +34,8 @@ use crate::{
         require::PlayerInterface,
     },
     core::{
-        r#const::{
-            discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER,
-        },
         http::InteractionClient,
+        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER},
         model::{
             CacheAware,
             response::{either::RespondOrFollowup, initial::message::create::RespondWithMessage},

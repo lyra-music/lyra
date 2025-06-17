@@ -28,7 +28,7 @@ use crate::{
     lavalink::Lavalink,
 };
 
-use super::r#static::application;
+use super::statik::application;
 
 pub struct Config {
     pub token: &'static str,

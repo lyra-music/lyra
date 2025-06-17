@@ -57,7 +57,7 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
 
         use crate::component::config::access::mode::AccessModeDisplay;
         use crate::gateway::GuildIdAware;
-        use crate::core::r#const::text::EMPTY_EMBED_FIELD;
+        use crate::core::konst::text::EMPTY_EMBED_FIELD;
 
         struct __AccessView {
             id: i64,
@@ -97,7 +97,7 @@ pub fn impl_view_access_ids(Args(categories): &Args) -> TokenStream {
             let embed = embed.field(
                 EmbedFieldBuilder::new(
                     format!(
-                        "{} {}", 
+                        "{} {}",
                         __access_modes.#column_names_ident.display_icon(),
                         #category_names
                     ), #categories.or(EMPTY_EMBED_FIELD)

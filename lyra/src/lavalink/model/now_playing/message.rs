@@ -24,7 +24,7 @@ use crate::{
     core::{
         emoji,
         model::{HttpAware, response::EmptyResponseResult},
-        r#static::component::NOW_PLAYING_BUTTON_IDS,
+        statik::component::NOW_PLAYING_BUTTON_IDS,
     },
     error::{
         core::DeserialiseBodyFromHttpError,

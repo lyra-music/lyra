@@ -25,7 +25,7 @@ pub enum ProcessError {
     },
     #[error("error executing controller `{}`: {:?}", .kind, .source)]
     ControllerExecute {
-        kind: crate::core::r#static::component::NowPlayingButtonType,
+        kind: crate::core::statik::component::NowPlayingButtonType,
         source: component::ControllerError,
     },
     #[error("error executing autocomplete for command `/{}`: {:?}", .name, .source)]

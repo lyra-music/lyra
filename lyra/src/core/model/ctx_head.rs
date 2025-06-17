@@ -3,7 +3,7 @@ use std::sync::Arc;
 use twilight_http::{Client, client::InteractionClient};
 use twilight_model::id::{Id, marker::InteractionMarker};
 
-use crate::core::r#static::application;
+use crate::core::statik::application;
 
 use super::response::{
     Respond,
