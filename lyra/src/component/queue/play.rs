@@ -28,6 +28,7 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::{
     LavalinkAware,
     command::{
+        common::PlaySource,
         model::{
             BotGuildAutocomplete, BotGuildMessageCommand, BotGuildSlashCommand, FollowupKind,
             GuildAutocompleteCtx, GuildCtx, GuildMessageCmdCtx, GuildSlashCmdCtx,
@@ -433,8 +434,6 @@ async fn handle_load_track_results(
     player.play(first_track.inner()).await?;
     Ok(())
 }
-
-lyra_proc::read_play_sources_as!(PlaySource);
 
 /// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]
