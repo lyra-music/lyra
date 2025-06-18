@@ -129,7 +129,7 @@ pub trait BotMessageCommand: CreateCommand {
     async fn run(ctx: MessageCmdCtx) -> CommandResult;
 }
 
-pub trait BotGuildMessageCommand: CreateCommand {
+pub trait BotGuildMessageCommand {
     async fn run(ctx: GuildMessageCmdCtx) -> CommandResult;
 }
 
