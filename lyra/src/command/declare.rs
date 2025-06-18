@@ -294,7 +294,7 @@ macro_rules! declare_guild_message_commands_callback {
                 match data.name {
                     $(
                         n if n ==
-                            <$raw_cmd as ::twilight_interactions::command::CreateCommand>::NAME
+                            <$raw_cmd>::NAME
                         => {
                             ::std::result::Result::Ok(<$raw_cmd as $crate::command::model::BotGuildMessageCommand>::run(self).await?)
                         }

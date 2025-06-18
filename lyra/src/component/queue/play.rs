@@ -16,7 +16,10 @@ use lyra_ext::{
 };
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::{
-    application::command::{Command, CommandOptionChoice, CommandOptionChoiceValue, CommandType},
+    application::{
+        command::{Command, CommandOptionChoice, CommandOptionChoiceValue, CommandType},
+        interaction::InteractionContextType,
+    },
     channel::{Attachment, Message},
     id::{Id, marker::GuildMarker},
 };
@@ -538,19 +541,22 @@ fn extract_queries(message: &Message) -> Vec<Box<str>> {
     content_queries.chain(audio_files).collect()
 }
 
+// TODO: make a derive macro like `twilight_interactions::CreateCommand` for
+// more menu commands in the future. It may look like:
+//
+// ```rust
+// #[derive(CreateMessageCommand)]
+// #[command(name = "➕ Add to queue", contexts = "guild")]
+// pub struct struct AddToQueue;
+// ```
 pub struct AddToQueue;
 
 impl AddToQueue {
-    const NAME: &'static str = "➕ Add to queue";
+    pub const NAME: &'static str = "➕ Add to queue";
     pub fn create_command() -> Command {
-        CommandBuilder::new(Self::NAME, String::new(), CommandType::Message).build()
-    }
-}
-
-impl CreateCommand for AddToQueue {
-    const NAME: &'static str = Self::NAME;
-    fn create_command() -> twilight_interactions::command::ApplicationCommandData {
-        unreachable!()
+        CommandBuilder::new(Self::NAME, String::new(), CommandType::Message)
+            .contexts(std::iter::once(InteractionContextType::Guild))
+            .build()
     }
 }
 
