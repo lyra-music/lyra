@@ -245,7 +245,7 @@ impl BotGuildAutocomplete for Autocomplete {
             if regex::URL.is_match(&q) {
                 q.into_boxed_str()
             } else {
-                format!("{}{}", source.value(), q).into_boxed_str()
+                format!("{}:{}", source.value(), q).into_boxed_str()
             }
         })
         .expect("exactly one autocomplete option should be focused");

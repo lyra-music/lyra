@@ -1,5 +1,6 @@
-use std::env;
+use std::{collections::HashMap, env, sync::LazyLock};
 
+use const_str::concat;
 use twilight_interactions::command::{
     CommandOption, CreateOption,
     internal::{CommandOptionData, CreateOptionData, IntoLocalizationsInternal},
@@ -13,7 +14,30 @@ use twilight_model::application::interaction::{
     InteractionDataResolved, application_command::CommandOptionValue,
 };
 
-#[derive(Default)]
+struct PlaySourceChoice {
+    name: &'static str,
+    value: &'static str,
+}
+
+const YOUTUBE: &str = "Youtube";
+const DEEZER: &str = "Deezer";
+
+impl PlaySourceChoice {
+    const fn new(name: &'static str, value: &'static str) -> Self {
+        Self { name, value }
+    }
+
+    const YOUTUBE: Self = Self::new("Youtube", "ytsearch");
+    const YOUTUBE_MUSIC: Self = Self::new(concat!(YOUTUBE, " Music"), "ytmsearch");
+    const SOUNDCLOUD: Self = Self::new("SoundCloud", "scsearch");
+    const DEEZER_QUERY: Self = Self::new(concat!(DEEZER, " (Search Query)"), "dzsearch");
+    const DEEZER_ISRC: Self = Self::new(concat!(DEEZER, " (ISRC)"), "dzisrc");
+    const SPOTIFY: Self = Self::new("Spotify", "spsearch");
+
+    const DEFAULT_SOURCES: [Self; 3] = [Self::YOUTUBE, Self::YOUTUBE_MUSIC, Self::SOUNDCLOUD];
+}
+
+#[derive(Default, Clone, Copy)]
 pub enum PlaySource {
     #[default]
     Youtube,
@@ -27,33 +51,106 @@ pub enum PlaySource {
     Spotify,
 }
 
+// we can afford to parse the env var without any memoisation, as
+// this will only be called once, in `command::declare::COMMANDS`.
+static DEEZER_ENABLED: LazyLock<bool> = LazyLock::new(|| {
+    env::var("PLUGINS_LAVASRC_SOURCES_DEEZER").is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b))
+});
+static SPOTIFY_ENABLED: LazyLock<bool> = LazyLock::new(|| {
+    env::var("PLUGINS_LAVASRC_SOURCES_SPOTIFY").is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b))
+});
+
+static DISPLAY_NAMES: LazyLock<&'static [&'static str]> = LazyLock::new(|| {
+    let mut names = Vec::with_capacity(PlaySource::N);
+    names.extend_from_slice(&PlaySourceChoice::DEFAULT_SOURCES.map(|x| x.name));
+
+    if *DEEZER_ENABLED {
+        names.push(DEEZER);
+    }
+
+    if *SPOTIFY_ENABLED {
+        names.push(PlaySourceChoice::SPOTIFY.name);
+    }
+
+    // this call is needed because there may not be exactly `PlaySource::N` elements and
+    // `Vec::leak()` does not reallocate or shrink the `Vec` as stated in the method
+    // documentation.
+    names.shrink_to_fit();
+
+    names.leak()
+});
+
+static VALUE_TO_PLAY_SOURCE: LazyLock<HashMap<&'static str, PlaySource>> = LazyLock::new(|| {
+    HashMap::from([
+        (PlaySourceChoice::YOUTUBE.value, PlaySource::Youtube),
+        (
+            PlaySourceChoice::YOUTUBE_MUSIC.value,
+            PlaySource::YoutubeMusic,
+        ),
+        (PlaySourceChoice::SOUNDCLOUD.value, PlaySource::SoundCloud),
+        (
+            PlaySourceChoice::DEEZER_QUERY.value,
+            PlaySource::DeezerQuery,
+        ),
+        (PlaySourceChoice::DEEZER_ISRC.value, PlaySource::DeezerIsrc),
+        (PlaySourceChoice::SPOTIFY.value, PlaySource::Spotify),
+    ])
+});
+
+impl PlaySource {
+    /// Number of supported play sources.
+    const N: usize = 6;
+
+    const fn as_choice(self) -> PlaySourceChoice {
+        match self {
+            Self::Youtube => PlaySourceChoice::YOUTUBE,
+            Self::YoutubeMusic => PlaySourceChoice::YOUTUBE_MUSIC,
+            Self::SoundCloud => PlaySourceChoice::SOUNDCLOUD,
+            Self::DeezerQuery => PlaySourceChoice::DEEZER_QUERY,
+            Self::DeezerIsrc => PlaySourceChoice::DEEZER_ISRC,
+            Self::Spotify => PlaySourceChoice::SPOTIFY,
+        }
+    }
+
+    /// Get the value corresponding to the current variant.
+    #[inline]
+    pub const fn value(self) -> &'static str {
+        self.as_choice().value
+    }
+
+    /// Create a `PlaySource` from its string value.
+    pub fn from_value(value: &str) -> Option<Self> {
+        VALUE_TO_PLAY_SOURCE.get(value).copied()
+    }
+
+    /// Returns the display names for the music services.
+    ///
+    /// There are only up to 5 names for 6 variants since both Deezer
+    /// variants share the same display name.
+    #[inline]
+    pub fn display_names() -> &'static [&'static str] {
+        &DISPLAY_NAMES
+    }
+}
+
 impl CreateOption for PlaySource {
     fn create_option(data: CreateOptionData) -> ModelCommandOption {
-        // we can afford to parse the env var without any memoisation, as
-        // this will only be called once, in `command::declare::COMMANDS`.
-        let (deezer_enabled, spotify_enabled) = (
-            env::var("PLUGINS_LAVASRC_SOURCES_DEEZER")
-                .is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b)),
-            env::var("PLUGINS_LAVASRC_SOURCES_SPOTIFY")
-                .is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b)),
-        );
-
-        let mut choices = Vec::with_capacity(6);
+        let mut choices = Vec::with_capacity(Self::N);
         choices.extend_from_slice(&[
-            create_choice("Youtube", "ytsearch:"),
-            create_choice("Youtube Music", "ytmsearch:"),
-            create_choice("SoundCloud", "scsearch:"),
+            create_choice(&PlaySourceChoice::YOUTUBE),
+            create_choice(&PlaySourceChoice::YOUTUBE_MUSIC),
+            create_choice(&PlaySourceChoice::SOUNDCLOUD),
         ]);
 
-        if deezer_enabled {
+        if *DEEZER_ENABLED {
             choices.extend_from_slice(&[
-                create_choice("Deezer (Search Query)", "dzsearch:"),
-                create_choice("Deezer (ISRC)", "dzisrc:"),
+                create_choice(&PlaySourceChoice::DEEZER_QUERY),
+                create_choice(&PlaySourceChoice::DEEZER_ISRC),
             ]);
         }
 
-        if spotify_enabled {
-            choices.push(create_choice("Spotify", "spsearch:"));
+        if *SPOTIFY_ENABLED {
+            choices.push(create_choice(&PlaySourceChoice::SPOTIFY));
         }
 
         data.builder(CommandOptionType::String)
@@ -74,53 +171,12 @@ impl CommandOption for PlaySource {
     }
 }
 
-impl PlaySource {
-    /// Get the value corresponding to the current variant.
-    pub const fn value(&self) -> &'static str {
-        match self {
-            Self::Youtube => "ytsearch:",
-            Self::YoutubeMusic => "ytmsearch:",
-            Self::SoundCloud => "scsearch:",
-            Self::DeezerQuery => "dzsearch:",
-            Self::DeezerIsrc => "dzisrc:",
-            Self::Spotify => "spsearch:",
-        }
-    }
-
-    /// Create a `PlaySource` from its string value.
-    pub fn from_value(value: &str) -> Option<Self> {
-        match value {
-            "ytsearch:" => Some(Self::Youtube),
-            "ytmsearch:" => Some(Self::YoutubeMusic),
-            "scsearch:" => Some(Self::SoundCloud),
-            "dzsearch:" => Some(Self::DeezerQuery),
-            "dzisrc:" => Some(Self::DeezerIsrc),
-            "spsearch:" => Some(Self::Spotify),
-            _ => None,
-        }
-    }
-
-    /// Returns the display names for the music services.
-    ///
-    /// There are only 5 names for 6 variants since both Deezer variants
-    /// share the same display name.
-    pub const fn display_names() -> [&'static str; 5usize] {
-        [
-            "Youtube",
-            "Youtube Music",
-            "SoundCloud",
-            "Deezer",
-            "Spotify",
-        ]
-    }
-}
-
 // Helper function to reduce repetition in choice creation
-fn create_choice(name: &str, value: &str) -> CommandOptionChoice {
-    let choice_name = IntoLocalizationsInternal::into_localizations((name, None));
+fn create_choice(choice: &PlaySourceChoice) -> CommandOptionChoice {
+    let choice_name = IntoLocalizationsInternal::into_localizations((choice.name, None));
     CommandOptionChoice {
         name: choice_name.fallback,
         name_localizations: choice_name.localizations,
-        value: CommandOptionChoiceValue::String(value.into()),
+        value: CommandOptionChoiceValue::String(choice.value.into()),
     }
 }
