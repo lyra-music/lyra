@@ -3,7 +3,6 @@ name = "lyra_proc"
 version = "0.9.1"
 rust-version = "1.87"
 edition = "2024"
-build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -27,4 +26,3 @@ serde = "1"
 itertools = "*"
 heck = "*"
 toml = "*"
-dotenvy = "0.15.7"

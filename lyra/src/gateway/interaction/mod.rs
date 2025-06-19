@@ -16,10 +16,8 @@ use twilight_model::{
 use super::model::Process;
 use crate::{
     CommandError,
-    component::{
-        connection::Join,
-        queue::{Play, PlaySource},
-    },
+    command::common::PlaySource,
+    component::{connection::Join, queue::Play},
     core::{
         http::InteractionClient,
         model::{
@@ -113,7 +111,7 @@ where
                     the content is publicly accessible.  \n\
                     -# **Supported streaming services**: {}. \
                     If you believe this should be loaded, contact the bot developers to report the issue.",
-            PlaySource::values().pretty_join_with_and()
+            PlaySource::display_names().pretty_join_with_and()
         ))
         .await?;
         Ok(())
