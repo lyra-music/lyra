@@ -8,6 +8,7 @@ mod queue;
 mod queue_indexer;
 
 use std::{
+    env,
     num::{NonZeroU16, NonZeroUsize},
     sync::Arc,
     time::Duration,
@@ -485,6 +486,7 @@ pub struct ClientData {
     http: Arc<Client>,
     cache: Arc<InMemoryCache>,
     artwork_cache: ArtworkCache,
+    oauth_enabled: bool,
 }
 
 impl HttpAware for ClientData {
@@ -518,10 +520,19 @@ impl ClientData {
             cache,
             db,
             artwork_cache: Cache::new(10_000),
+
+            // we can afford to parse the env var without memoisation, as this function
+            // will only be called once when the lavalink client is initialised.
+            oauth_enabled: env::var("PLUGINS_YOUTUBE_OAUTH_ENABLED")
+                .is_ok_and(|x| x.parse::<bool>().is_ok_and(|y| y)),
         }
     }
 
     pub const fn artwork_cache(&self) -> &ArtworkCache {
         &self.artwork_cache
+    }
+
+    pub const fn oauth_enabled(&self) -> bool {
+        self.oauth_enabled
     }
 }

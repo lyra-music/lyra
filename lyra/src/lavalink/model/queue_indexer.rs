@@ -132,7 +132,7 @@ impl ShuffledIndexer {
         let mut rest = (0..size).collect::<Vec<_>>();
         let mut next = rest.drain(starting_index + 1..).collect::<Vec<_>>();
         next.shuffle(&mut rand::rng());
-        rest.extend(next);
+        rest.extend_from_slice(&next);
 
         Self(rest)
     }

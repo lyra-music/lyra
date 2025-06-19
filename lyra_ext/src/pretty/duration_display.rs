@@ -2,6 +2,9 @@ use std::{fmt::Display, sync::LazyLock, time::Duration};
 
 use regex::Regex;
 
+// we cannot afford to initialise the entire regex object without any memoisation,
+// as this will be called more than once: it will be called on every `/seek to`
+// command.
 static TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^(((?<h>[1-9]\d*):(?<m1>[0-5]\d))|(?<m2>[0-5]?\d)):(?<s>[0-5]\d)(\.(?<ms>\d{3}))?$",
@@ -9,6 +12,9 @@ static TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
     .expect("regex is valid")
 });
 
+// we cannot afford to initialise the entire regex object without any memoisation,
+// as this will be called more than once: it will be called on every `/seek to`
+// command.
 static TIMESTAMP_2: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^((?<h>[1-9]\d*)\s?hr?)?\s*((?<m>[1-9]|[1-5]\d)\s?m(in)?)?\s*((?<s>[1-9]|[1-5]\d)\s?s(ec)?)?\s*((?<ms>[1-9]\d{0,2})\s?ms(ec)?)?$"
@@ -37,7 +43,7 @@ pub struct FromPrettyStrError;
 
 pub trait FromPrettyStr: Sized {
     /// # Errors
-    /// if `value` doesn't match `timestamp` or `timestamp_2` regex
+    /// if `value` doesn't match `TIMESTAMP` or `TIMESTAMP_2` regex
     fn from_pretty_str(value: &str) -> Result<Self, FromPrettyStrError>;
 }
 

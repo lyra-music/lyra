@@ -1,8 +1,7 @@
 use std::{
-    env,
     str::FromStr,
     sync::{
-        Arc, LazyLock,
+        Arc,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -31,7 +30,7 @@ use twilight_model::{
 
 use crate::{
     LavalinkAware,
-    core::konst::metadata::BANNER,
+    core::konst::metadata::banner,
     lavalink::{ClientData, handlers},
 };
 
@@ -46,38 +45,22 @@ use super::{
 };
 use super::{gateway::LastCachedStates, lavalink::Lavalink};
 
-static CONFIG: LazyLock<Config> = LazyLock::new(|| Config {
-    token: env::var("BOT_TOKEN").expect("missing BOT_TOKEN").leak(),
-    lavalink_host: format!(
-        "{}:{}",
-        env::var("SERVER_ADDRESS").expect("missing SERVER_ADDRESS"),
-        env::var("SERVER_PORT").expect("missing SERVER_PORT")
-    )
-    .leak(),
-    lavalink_pwd: env::var("LAVALINK_SERVER_PASSWORD")
-        .expect("missing LAVALINK_SERVER_PASSWORD")
-        .leak(),
-    database_url: env::var("DATABASE_URL")
-        .expect("missing DATABASE_URL")
-        .leak(),
-});
-
 const INTENTS: Intents = Intents::GUILDS
     .union(Intents::GUILD_VOICE_STATES)
     .union(Intents::GUILD_MESSAGES);
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
-fn build_http_client() -> Arc<Client> {
+fn build_http_client(token: String) -> Arc<Client> {
     ClientBuilder::default()
         .default_allowed_mentions(AllowedMentions::default())
-        .token(CONFIG.token.to_owned())
+        .token(token)
         .build()
         .into()
 }
 
-fn build_shard_config() -> ShardConfig {
-    ConfigBuilder::new(CONFIG.token.to_owned(), INTENTS)
+fn build_shard_config(token: String) -> ShardConfig {
+    ConfigBuilder::new(token, INTENTS)
         .presence(
             UpdatePresencePayload::new(
                 [Activity::from(MinimalActivity {
@@ -97,23 +80,27 @@ fn build_shard_config() -> ShardConfig {
 pub async fn start() -> Result<(), StartError> {
     tracing::debug!("began starting the bot");
 
+    let mut config = Config::new();
     let db = PgPoolOptions::new()
         .max_connections(20)
         .connect_with(
-            PgConnectOptions::from_str(CONFIG.database_url)?.log_statements(LevelFilter::Debug),
+            PgConnectOptions::from_str(config.database_url())?.log_statements(LevelFilter::Debug),
         )
         .await?;
 
     migrate!("../migrations").run(&db).await?;
 
-    let http = build_http_client();
+    let token = config.take_token();
+    let http = build_http_client(token.clone());
 
     let cache = Arc::new(InMemoryCache::new());
     let data = ClientData::new(http.clone(), cache.clone(), db.clone());
     let user_id = http.current_user().await?.model().await?.id;
-    let lavalink = build_lavalink_client(user_id, data).await;
 
-    let shards = build_and_split_shards(&http).await?;
+    let (lavalink_host, lavalink_pwd) = config.into_lavalink_host_and_pwd();
+    let lavalink = build_lavalink_client(lavalink_host, lavalink_pwd, user_id, data).await;
+
+    let shards = build_and_split_shards(token, &http).await?;
     let shards_len = shards.len();
     let mut senders = Vec::with_capacity(shards_len);
     let mut tasks = Vec::with_capacity(shards_len);
@@ -124,14 +111,15 @@ pub async fn start() -> Result<(), StartError> {
         tasks.push(tokio::spawn(handle_gateway_events(shard, bot.clone())));
     }
 
-    println!("{}", *BANNER);
+    println!("{}", banner());
     Ok(wait_until_shutdown(senders, tasks, &bot).await?)
 }
 
 async fn build_and_split_shards(
+    token: String,
     client: &Client,
 ) -> Result<impl ExactSizeIterator<Item = Shard> + use<>, StartRecommendedError> {
-    let shard_config = build_shard_config();
+    let shard_config = build_shard_config(token);
     let shards =
         twilight_gateway::create_recommended(client, shard_config, |_, builder| builder.build())
             .await?;
@@ -139,12 +127,17 @@ async fn build_and_split_shards(
 }
 
 #[tracing::instrument(skip_all, name = "lavalink")]
-async fn build_lavalink_client(user_id: Id<UserMarker>, data: ClientData) -> Lavalink {
+async fn build_lavalink_client(
+    hostname: String,
+    password: String,
+    user_id: Id<UserMarker>,
+    data: ClientData,
+) -> Lavalink {
     let events = handlers();
 
     let nodes = Vec::from([lavalink_rs::node::NodeBuilder {
-        hostname: CONFIG.lavalink_host.to_owned(),
-        password: CONFIG.lavalink_pwd.to_owned(),
+        hostname,
+        password,
         user_id: user_id.into(),
         ..Default::default()
     }]);

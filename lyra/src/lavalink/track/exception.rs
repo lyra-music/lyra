@@ -16,21 +16,19 @@ pub(super) async fn impl_exception(
     };
 
     let data = player.data_unwrapped();
+    let cdata = lavalink.data_unwrapped();
     data.write()
         .await
-        .cleanup_now_playing_message(&*lavalink.data_unwrapped())
+        .cleanup_now_playing_message(&*cdata)
         .await;
 
-    let oauth_enabled = std::env::var("PLUGINS_YOUTUBE_OAUTH_ENABLED")
-        .is_ok_and(|x| x.parse::<bool>().is_ok_and(|y| y));
-    let note = if oauth_enabled {
+    let note = if cdata.oauth_enabled() {
         "contact the bot developers to report the issue."
     } else {
         "contact the bot host to **enable YouTube OAuth**."
     };
 
-    lavalink
-        .data_unwrapped()
+    cdata
         .http()
         .create_message(data.read().await.text_channel_id())
         .content(&format!(

@@ -112,7 +112,9 @@ pub mod component {
             }
         }
     }
-
+    // we cannot afford to initialise the entire button ids object without any memoisation,
+    // as this will be called more than once: it will be called on nearly every playback
+    // controller action
     pub static NOW_PLAYING_BUTTON_IDS: LazyLock<NowPlayingButtonIds> =
         LazyLock::new(NowPlayingButtonIds::new);
 }
