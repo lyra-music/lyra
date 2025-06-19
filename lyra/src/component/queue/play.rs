@@ -28,6 +28,7 @@ use twilight_util::builder::command::CommandBuilder;
 use crate::{
     LavalinkAware,
     command::{
+        common::PlaySource,
         model::{
             BotGuildAutocomplete, BotGuildMessageCommand, BotGuildSlashCommand, FollowupKind,
             GuildAutocompleteCtx, GuildCtx, GuildMessageCmdCtx, GuildSlashCmdCtx,
@@ -244,7 +245,7 @@ impl BotGuildAutocomplete for Autocomplete {
             if regex::URL.is_match(&q) {
                 q.into_boxed_str()
             } else {
-                format!("{}{}", source.value(), q).into_boxed_str()
+                format!("{}:{}", source.value(), q).into_boxed_str()
             }
         })
         .expect("exactly one autocomplete option should be focused");
@@ -433,8 +434,6 @@ async fn handle_load_track_results(
     player.play(first_track.inner()).await?;
     Ok(())
 }
-
-lyra_proc::read_play_sources_as!(PlaySource);
 
 /// Adds track(s) to the queue.
 #[derive(CreateCommand, CommandModel)]

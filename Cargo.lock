@@ -1671,7 +1671,6 @@ dependencies = [
 name = "lyra_proc"
 version = "0.9.1"
 dependencies = [
- "dotenvy",
  "heck",
  "itertools 0.14.0",
  "quote",
