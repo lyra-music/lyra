@@ -101,5 +101,5 @@ reqwest = { version = "0.12.20", default-features = false, features = [
     "charset",
     "rustls-tls-native-roots",
 ] }
-rustls = "0.23.27"
+rustls = "0.23.28"
 derive_builder = "0.20.2"
