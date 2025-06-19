@@ -1,6 +1,4 @@
 pub mod metadata {
-    use std::sync::LazyLock;
-
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
     const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
@@ -54,7 +52,9 @@ pub mod metadata {
         "%cargo_opt_level",
     ];
 
-    pub static BANNER: LazyLock<&'static str> = LazyLock::new(|| {
+    // we can afford to initialise the entire banner string without any memoisation,
+    // as this will only be called once, in `runner::start()`.
+    pub fn banner() -> String {
         use aho_corasick::AhoCorasick;
 
         let rdr = include_str!("../../../assets/lyra2-ascii.ans");
@@ -63,10 +63,8 @@ pub mod metadata {
         let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS must be valid");
         ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
             .expect("searching must be infallible");
-        String::from_utf8(wtr)
-            .expect("interpolated banner must be utf-8")
-            .leak()
-    });
+        String::from_utf8(wtr).expect("interpolated banner must be utf-8")
+    }
 }
 
 pub mod connection {
@@ -101,6 +99,9 @@ pub mod text {
     pub const EMPTY_EMBED_FIELD: &str = "`-Empty-`";
     pub const NO_ROWS_AFFECTED_MESSAGE: &str = "🔐 No changes were made.";
 
+    // we cannot afford to initialise the entire matcher object without any memoisation,
+    // as this will be called more than once: it will be called on every command autocomplete
+    // where the choices are tracks as queue positions during fuzzy title matching.
     pub static FUZZY_MATCHER: LazyLock<SkimMatcherV2> = LazyLock::new(SkimMatcherV2::default);
 }
 
@@ -109,6 +110,9 @@ pub mod regex {
 
     use regex::Regex;
 
+    // we cannot afford to initialise the entire regex object without any memoisation,
+    // as this will be called more than once: it will be called on every `/play` command
+    // autocomplete.
     pub static URL: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?/[a-zA-Z0-9]{2,}|((https://www\.|http://www\.|https://|http://)?[a-zA-Z]{2,}(\.[a-zA-Z]{2,})(\.[a-zA-Z]{2,})?)|(https://www\.|http://www\.|https://|http://)?[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}\.[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})?"

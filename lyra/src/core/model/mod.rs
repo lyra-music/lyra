@@ -3,6 +3,7 @@ pub mod response;
 
 use std::{
     collections::HashMap,
+    env,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -31,10 +32,38 @@ use crate::{
 use super::statik::application;
 
 pub struct Config {
-    pub token: &'static str,
-    pub lavalink_host: &'static str,
-    pub lavalink_pwd: &'static str,
-    pub database_url: &'static str,
+    token: String,
+    lavalink_host: String,
+    lavalink_pwd: String,
+    database_url: String,
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            token: env::var("BOT_TOKEN").expect("missing BOT_TOKEN"),
+            lavalink_host: format!(
+                "{}:{}",
+                env::var("SERVER_ADDRESS").expect("missing SERVER_ADDRESS"),
+                env::var("SERVER_PORT").expect("missing SERVER_PORT")
+            ),
+            lavalink_pwd: env::var("LAVALINK_SERVER_PASSWORD")
+                .expect("missing LAVALINK_SERVER_PASSWORD"),
+            database_url: env::var("DATABASE_URL").expect("missing DATABASE_URL"),
+        }
+    }
+
+    pub fn database_url(&self) -> &str {
+        &self.database_url
+    }
+
+    pub fn take_token(&mut self) -> String {
+        std::mem::take(&mut self.token)
+    }
+
+    pub fn into_lavalink_host_and_pwd(self) -> (String, String) {
+        (self.lavalink_host, self.lavalink_pwd)
+    }
 }
 
 enum CounterOp {

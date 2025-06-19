@@ -51,8 +51,10 @@ pub enum PlaySource {
     Spotify,
 }
 
-// we can afford to parse the env var without any memoisation, as
-// this will only be called once, in `command::declare::COMMANDS`.
+// we cannot afford to parse the env var without any memoisation, as
+// this will be called more than once: exactly two times in
+// - `PlaySource::create_option()`
+// - `PlaySource::display_names()`
 static DEEZER_ENABLED: LazyLock<bool> = LazyLock::new(|| {
     env::var("PLUGINS_LAVASRC_SOURCES_DEEZER").is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b))
 });
@@ -60,6 +62,9 @@ static SPOTIFY_ENABLED: LazyLock<bool> = LazyLock::new(|| {
     env::var("PLUGINS_LAVASRC_SOURCES_SPOTIFY").is_ok_and(|v| v.parse::<bool>().is_ok_and(|b| b))
 });
 
+// we cannot afford to initialise the entire array object without any memoisation, as
+// this will be called more than once: it will be called on every `PLaySource::display_names()`
+// calls.
 static DISPLAY_NAMES: LazyLock<&'static [&'static str]> = LazyLock::new(|| {
     let mut names = Vec::with_capacity(PlaySource::N);
     names.extend_from_slice(&PlaySourceChoice::DEFAULT_SOURCES.map(|x| x.name));
