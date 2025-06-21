@@ -6,7 +6,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 use crate::{
     LavalinkAndGuildIdAware,
     command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
-    component::tuning::check_user_is_dj_and_require_unsuppressed_player,
+    component::tuning::require_in_voice_unsuppressed_and_player,
     core::model::{
         BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
     },
@@ -25,7 +25,7 @@ pub struct Down {
 
 impl BotGuildSlashCommand for Down {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         let guild_id = ctx.guild_id();
         let data = player.data();

@@ -13,42 +13,22 @@ use std::num::NonZeroU16;
 use lavalink_rs::{error::LavalinkResult, model::player::Filters};
 
 use crate::{
-    CommandError, LavalinkAndGuildIdAware, LavalinkAware,
+    LavalinkAndGuildIdAware, LavalinkAware,
     command::{
-        check,
         model::{CtxKind, GuildCtx},
         require::{self, InVoice, PlayerInterface},
     },
     core::model::{BotStateAware, HttpAware},
+    error::component::tuning::RequireInVoiceUnsuppressedAndPlayerError,
     gateway::{GuildIdAware, voice},
     lavalink::{ConnectionHead, DelegateMethods},
 };
 
 #[inline]
-fn check_user_is_dj_and_require_unsuppressed_player(
+fn require_in_voice_unsuppressed_and_player(
     ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(InVoice, PlayerInterface), CommandError> {
-    check::user_is_dj(ctx)?;
+) -> Result<(InVoice, PlayerInterface), RequireInVoiceUnsuppressedAndPlayerError> {
     let in_voice = require::in_voice(ctx)?.and_unsuppressed()?;
-    let player = require::player(ctx)?;
-
-    Ok((in_voice, player))
-}
-
-#[inline]
-fn unmuting_checks(ctx: &GuildCtx<impl CtxKind>) -> Result<InVoice, CommandError> {
-    check::user_is_dj(ctx)?;
-    let in_voice = require::in_voice(ctx)?;
-
-    Ok(in_voice)
-}
-
-#[inline]
-fn check_user_is_dj_and_require_player(
-    ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(InVoice, PlayerInterface), CommandError> {
-    check::user_is_dj(ctx)?;
-    let in_voice = require::in_voice(ctx)?;
     let player = require::player(ctx)?;
 
     Ok((in_voice, player))

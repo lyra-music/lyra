@@ -12,6 +12,9 @@ use std::marker::PhantomData;
 use lavalink_rs::model::player::{Filters, TremoloVibrato};
 use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::guild::Permissions;
+
+use crate::command::check::DJ_PERMISSIONS;
 
 use super::ApplyFilter;
 
@@ -108,7 +111,12 @@ impl ApplyFilter for Option<SetTremoloVibrato<VibratoMarker>> {
 }
 
 #[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
-#[command(name = "filter", desc = ".", contexts = "guild")]
+#[command(
+    name = "filter",
+    desc = ".",
+    contexts = "guild",
+    default_permissions = "Self::default_permissions"
+)]
 pub enum Filter {
     #[command(name = "tremolo")]
     Tremolo(tremolo::Tremolo),
@@ -126,4 +134,10 @@ pub enum Filter {
     Pitch(pitch::Pitch),
     #[command(name = "all-off")]
     AllOff(all_off::AllOff),
+}
+
+impl Filter {
+    const fn default_permissions() -> Permissions {
+        DJ_PERMISSIONS
+    }
 }

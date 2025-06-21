@@ -5,8 +5,10 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     LavalinkAndGuildIdAware,
-    command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
-    component::tuning::check_user_is_dj_and_require_player,
+    command::{
+        model::{BotGuildSlashCommand, GuildSlashCmdCtx},
+        require,
+    },
     core::model::{
         BotStateAware, HttpAware, response::initial::message::create::RespondWithMessage,
     },
@@ -26,7 +28,8 @@ pub struct Up {
 impl BotGuildSlashCommand for Up {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
         const MAX_PERCENT: NonZeroU16 = NonZeroU16::new(1_000).expect("`1_000 is non-zero");
-        let (_, player) = check_user_is_dj_and_require_player(&ctx)?;
+        let _ = require::in_voice(&ctx)?;
+        let player = require::player(&ctx)?;
 
         let guild_id = ctx.guild_id();
         let data = player.data();

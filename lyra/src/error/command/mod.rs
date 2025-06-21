@@ -35,6 +35,7 @@ pub enum Error {
     UnrecognisedConnection(#[from] super::UnrecognisedConnection),
     NewNowPlayingData(#[from] super::lavalink::NewNowPlayingDataError),
     Lavalink(#[from] lavalink_rs::error::LavalinkError),
+    RequireInVoiceUnsuppressedAndPlayer(#[from] RequireInVoiceUnsuppressedAndPlayerError),
 
     Skip(Box<super::component::playback::skip::SkipError>),
     Back(Box<super::component::playback::back::BackError>),
@@ -123,6 +124,8 @@ pub enum FlattenedError<'a> {
 }
 
 pub use FlattenedError as Fe;
+
+use super::component::tuning::RequireInVoiceUnsuppressedAndPlayerError;
 
 impl<'a> Fe<'a> {
     const fn from_require_unsuppressed_error(error: &'a require::UnsuppressedError) -> Self {
@@ -609,6 +612,18 @@ impl<'a> Fe<'a> {
             }
         }
     }
+
+    const fn from_require_in_voice_unsuppressed_and_player(
+        error: &'a RequireInVoiceUnsuppressedAndPlayerError,
+    ) -> Self {
+        match error {
+            RequireInVoiceUnsuppressedAndPlayerError::NotInVoice(_) => Self::NotInVoice,
+            RequireInVoiceUnsuppressedAndPlayerError::NoPlayer(_) => Self::NoPlayer,
+            RequireInVoiceUnsuppressedAndPlayerError::Unsuppressed(e) => {
+                Self::from_require_unsuppressed_error(e)
+            }
+        }
+    }
 }
 
 impl Error {
@@ -652,6 +667,9 @@ impl Error {
             Self::NewNowPlayingData(e) => Fe::from_new_now_playing_data(e),
             Self::NewNowPlayingMessage(e) => Fe::from_new_now_playing_message(e),
             Self::Respond(e) => Fe::from_respond(e),
+            Self::RequireInVoiceUnsuppressedAndPlayer(e) => {
+                Fe::from_require_in_voice_unsuppressed_and_player(e)
+            }
         }
     }
 }

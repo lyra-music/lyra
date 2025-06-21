@@ -4,9 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
-    component::tuning::{
-        check_user_is_dj_and_require_unsuppressed_player, filter::pitch::shift_pitch,
-    },
+    component::tuning::{filter::pitch::shift_pitch, require_in_voice_unsuppressed_and_player},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
@@ -22,7 +20,7 @@ pub struct Down {
 
 impl BotGuildSlashCommand for Down {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         let half_tones = NonZeroI64::new(self.half_tones.unwrap_or(2))
             .expect("half-tones step should be non-zero");

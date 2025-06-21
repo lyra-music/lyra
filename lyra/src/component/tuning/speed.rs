@@ -1,12 +1,14 @@
 use lavalink_rs::model::player::{Filters, Timescale};
 use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::guild::Permissions;
 
 use crate::{
     command::{
+        check::DJ_PERMISSIONS,
         model::{BotGuildSlashCommand, GuildSlashCmdCtx},
         require::PlayerInterface,
     },
-    component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    component::tuning::{UpdateFilter, require_in_voice_unsuppressed_and_player},
     core::model::response::initial::message::create::RespondWithMessage,
     error::{CommandResult, command::require::SetSpeedError},
 };
@@ -107,7 +109,11 @@ impl PlayerInterface {
 
 /// Sets the playback speed.
 #[derive(CommandModel, CreateCommand)]
-#[command(name = "speed", contexts = "guild")]
+#[command(
+    name = "speed",
+    contexts = "guild",
+    default_permissions = "Self::default_permissions"
+)]
 pub struct Speed {
     /// Sets the speed with what multiplier? [Default: 1.0]
     #[command(min_value = 0)]
@@ -116,9 +122,15 @@ pub struct Speed {
     pitch_shift: Option<bool>,
 }
 
+impl Speed {
+    const fn default_permissions() -> Permissions {
+        DJ_PERMISSIONS
+    }
+}
+
 impl BotGuildSlashCommand for Speed {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         let Some(update) = SpeedFilter::new(self.multiplier, self.pitch_shift.unwrap_or_default())
         else {
