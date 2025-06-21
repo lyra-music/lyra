@@ -5,7 +5,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
-    component::tuning::check_user_is_dj_and_require_unsuppressed_player,
+    component::tuning::require_in_voice_unsuppressed_and_player,
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
@@ -21,7 +21,7 @@ pub struct Set {
 
 impl BotGuildSlashCommand for Set {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         let percent =
             NonZeroU16::new(i64_as_u16(self.percent)).expect("percent should be non-zero");

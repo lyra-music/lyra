@@ -6,6 +6,9 @@ use lavalink_rs::model::player::{Equalizer, Filters};
 use lyra_ext::num::usize_as_u8;
 use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::guild::Permissions;
+
+use crate::command::check::DJ_PERMISSIONS;
 
 const EQUALISER_N: usize = 15;
 
@@ -38,7 +41,12 @@ impl super::ApplyFilter for Option<SetEqualiser> {
 }
 
 #[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
-#[command(name = "equaliser", desc = ".", contexts = "guild")]
+#[command(
+    name = "equaliser",
+    desc = ".",
+    contexts = "guild",
+    default_permissions = "Self::default_permissions"
+)]
 pub enum Equaliser {
     #[command(name = "preset")]
     Preset(preset::Preset),
@@ -46,4 +54,10 @@ pub enum Equaliser {
     Custom(Box<custom::Custom>),
     #[command(name = "off")]
     Off(off::Off),
+}
+
+impl Equaliser {
+    const fn default_permissions() -> Permissions {
+        DJ_PERMISSIONS
+    }
 }

@@ -7,6 +7,7 @@ use std::num::NonZeroU16;
 
 use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
+use twilight_model::guild::Permissions;
 
 pub(super) const fn volume_emoji(percent: Option<NonZeroU16>) -> &'static str {
     let Some(percent) = percent else {
@@ -28,7 +29,12 @@ pub fn clipping_warning(percent: NonZeroU16) -> &'static str {
 }
 
 #[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]
-#[command(name = "volume", desc = ".", contexts = "guild")]
+#[command(
+    name = "volume",
+    desc = ".",
+    contexts = "guild",
+    default_permissions = "Self::default_permissions"
+)]
 pub enum Volume {
     #[command(name = "toggle-mute")]
     ToggleMute(toggle_mute::ToggleMute),
@@ -38,4 +44,10 @@ pub enum Volume {
     Up(up::Up),
     #[command(name = "down")]
     Down(down::Down),
+}
+
+impl Volume {
+    const fn default_permissions() -> Permissions {
+        Permissions::MUTE_MEMBERS
+    }
 }

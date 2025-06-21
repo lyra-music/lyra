@@ -4,7 +4,7 @@ use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
     command::model::{BotGuildSlashCommand, GuildSlashCmdCtx},
-    component::tuning::{UpdateFilter, check_user_is_dj_and_require_unsuppressed_player},
+    component::tuning::{UpdateFilter, require_in_voice_unsuppressed_and_player},
     core::model::response::initial::message::create::RespondWithMessage,
     error::CommandResult,
 };
@@ -81,7 +81,7 @@ pub struct On {
 
 impl BotGuildSlashCommand for On {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         let Some(update) = SetChannelMix::new(
             self.left_to_left,
@@ -112,7 +112,7 @@ pub struct Off;
 
 impl BotGuildSlashCommand for Off {
     async fn run(self, mut ctx: GuildSlashCmdCtx) -> CommandResult {
-        let (_, player) = check_user_is_dj_and_require_unsuppressed_player(&ctx)?;
+        let (_, player) = require_in_voice_unsuppressed_and_player(&ctx)?;
 
         player.update_filter(None::<SetChannelMix>).await?;
         ctx.out("⚗️🔴 Disabled channel mix.").await?;
