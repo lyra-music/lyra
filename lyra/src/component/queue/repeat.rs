@@ -107,7 +107,8 @@ pub async fn repeat(
         ctx.notef(format!(
             "**Currently not playing anything.** \
             For the repeat to take effect, play something with {} first.\n\
-            -# **Alternatively**: use {}, {} or {} to play tracks already in the queue, but repeat one will be changed to repeat all.",
+            -# **Alternatively**: use {}, {} or {} to play tracks already in the\
+            queue, but repeat one (if set) will be changed to repeat all.",
             InteractionClient::mention_command::<Play>(),
             InteractionClient::mention_command::<Back>(),
             InteractionClient::mention_command::<JumpBackward>(),
