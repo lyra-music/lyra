@@ -1,6 +1,6 @@
 [package]
 name = "lyra_ext"
-version = "0.9.2-rc.2"
+version = "0.9.2"
 rust-version = "1.87"
 edition = "2024"
 
