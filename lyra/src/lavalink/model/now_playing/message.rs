@@ -132,17 +132,17 @@ impl std::fmt::Display for Description<'_> {
         DurationLeft::from(data).fmt(f)?;
         f.write_str(" / ")?;
         data.duration.pretty_display().fmt(f)?;
-        if let Some(p) = data.preview() {
-            if p.is_preview || p.url().is_some() {
-                f.write_str("\n-# ")?;
-                if p.is_preview {
-                    f.write_str("This track is a preview. ")?;
-                }
-                if let Some(url) = p.url() {
-                    f.write_str("Listen to the preview of this track [here](")?;
-                    f.write_str(url)?;
-                    f.write_str("). ")?;
-                }
+        if let Some(p) = data.preview()
+            && (p.is_preview || p.url().is_some())
+        {
+            f.write_str("\n-# ")?;
+            if p.is_preview {
+                f.write_str("This track is a preview. ")?;
+            }
+            if let Some(url) = p.url() {
+                f.write_str("Listen to the preview of this track [here](")?;
+                f.write_str(url)?;
+                f.write_str("). ")?;
             }
         }
         Ok(())
