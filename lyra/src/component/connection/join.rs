@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt::Display, sync::Arc};
 
+use lavalink_rs::error::LavalinkResult;
 use lyra_ext::{iso8601_time, pretty::flags_display::FlagsDisplay, unix_time};
 use twilight_gateway::Event;
 use twilight_interactions::command::{CommandModel, CreateCommand};
@@ -61,15 +62,26 @@ pub(super) struct Response {
 }
 
 impl Response {
-    pub(super) const fn new(
-        from: Option<Id<ChannelMarker>>,
+    /// Creates a new voice channel move response.
+    pub(super) const fn new_move(
+        from: Id<ChannelMarker>,
         to: JoinedChannel,
         empty: bool,
         mute: bool,
     ) -> Self {
         Self {
-            from,
+            from: Some(from),
             to,
+            empty,
+            mute,
+        }
+    }
+
+    /// Creates a new voice channel join response.
+    pub(super) const fn new_join(channel: JoinedChannel, empty: bool, mute: bool) -> Self {
+        Self {
+            from: None,
+            to: channel,
             empty,
             mute,
         }
@@ -249,7 +261,7 @@ async fn impl_connect_to(
             connection.disable_vsu_handler();
 
             lavalink.new_connection_with(guild_id, connection);
-            Response::new(None, joined, voice_is_empty, mute)
+            Response::new_join(joined, voice_is_empty, mute)
         },
         |from| {
             let conn = lavalink.handle_for(guild_id);
@@ -259,31 +271,14 @@ async fn impl_connect_to(
             // voice state update event, so this is correct.
             conn.disable_vsu_handler();
 
-            Response::new(Some(from), joined, voice_is_empty, mute)
+            Response::new_move(from, joined, voice_is_empty, mute)
         },
     );
 
     ctx.sender()
         .command(&UpdateVoiceState::new(guild_id, channel_id, true, false))?;
 
-    if let Ok(player) = require::player(ctx) {
-        if old_channel_id.is_some() {
-            tracing::debug!("waiting for voice server update...");
-            let _ = ctx
-                .bot()
-                .standby()
-                .wait_for_event(move |e: &Event| {
-                    if let Event::VoiceServerUpdate(v) = e {
-                        v.guild_id == guild_id
-                    } else {
-                        false
-                    }
-                })
-                .await;
-            tracing::debug!("voice server update received");
-            player.update_voice_channel(voice_is_empty).await?;
-        }
-    }
+    update_player_voice_channel(old_channel_id, guild_id, ctx, voice_is_empty).await?;
 
     if joined.kind == JoinedChannelType::Stage {
         ctx.bot()
@@ -296,6 +291,35 @@ async fn impl_connect_to(
 
     tracing::info!("guild {guild_id} {response}");
     Ok(response)
+}
+
+/// Updates the lavalink player of a matching guild ID's voice channel to be in
+/// sync with the actual currently connected voice channel.
+async fn update_player_voice_channel(
+    old_channel_id: Option<Id<ChannelMarker>>,
+    guild_id: Id<GuildMarker>,
+    ctx: &GuildCtx<impl CtxKind>,
+    voice_is_empty: bool,
+) -> LavalinkResult<()> {
+    if let Ok(player) = require::player(ctx)
+        && old_channel_id.is_some()
+    {
+        tracing::debug!("waiting for voice server update...");
+        let _ = ctx
+            .bot()
+            .standby()
+            .wait_for_event(move |e: &Event| {
+                if let Event::VoiceServerUpdate(v) = e {
+                    v.guild_id == guild_id
+                } else {
+                    false
+                }
+            })
+            .await;
+        tracing::debug!("voice server update received");
+        player.update_voice_channel(voice_is_empty).await?;
+    }
+    Ok(())
 }
 
 struct DeleteEmptyVoiceNotice {

@@ -90,7 +90,7 @@ pub fn impl_bot_command_group(input: &DeriveInput, guild: bool) -> TokenStream {
         _ => panic!("this can only be derived from an enum"),
     };
 
-    let guild_str = guild.then_some(GUILD_STR).unwrap_or_default();
+    let guild_str = if guild { GUILD_STR } else { Default::default() };
     let bot_slash_command_path = syn::parse_str::<Path>(&format!(
         "crate::command::model::Bot{guild_str}SlashCommand"
     ))
@@ -147,7 +147,7 @@ pub fn impl_bot_autocomplete_group(input: &DeriveInput, guild: bool) -> TokenStr
         _ => panic!("this can only be derived from an enum"),
     };
 
-    let guild_str = guild.then_some(GUILD_STR).unwrap_or_default();
+    let guild_str = if guild { GUILD_STR } else { Default::default() };
     let bot_autocomplete_path = syn::parse_str::<Path>(&format!(
         "crate::command::model::Bot{guild_str}Autocomplete"
     ))
