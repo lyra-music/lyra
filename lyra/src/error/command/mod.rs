@@ -488,13 +488,13 @@ impl<'a> Fe<'a> {
                 Self::InVoiceWithoutUser(e)
             }
             super::component::playback::back::BackError::Lavalink(e) => Self::Lavalink(e),
-            super::component::playback::back::BackError::UserOnlyIn(e) => {
-                Self::from_check_user_only_in(e)
-            }
             super::component::playback::back::BackError::Unsuppressed(e) => {
                 Self::from_require_unsuppressed_error(e)
             }
             super::component::playback::back::BackError::Respond(e) => Self::from_respond(e),
+            super::component::playback::back::BackError::UsersTrack(e) => {
+                Self::from_users_track_error(e)
+            }
         }
     }
 

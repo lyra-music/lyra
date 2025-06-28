@@ -52,7 +52,7 @@ mod test {
     use hexf::hexf64;
     use rstest::rstest;
 
-    use crate::num::{
+    use super::{
         f64_as_isize, f64_as_u32, i64_as_u16, i64_as_usize, usize_as_f64, usize_as_i64, usize_as_u8,
     };
 

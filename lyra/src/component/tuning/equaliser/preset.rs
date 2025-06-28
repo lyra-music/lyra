@@ -1,4 +1,4 @@
-use lyra_ext::num::usize_as_u8;
+use lyra_ext::num::cast::usize_as_u8;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
