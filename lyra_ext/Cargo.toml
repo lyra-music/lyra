@@ -22,9 +22,9 @@ regex = "1"
 rayon = "1"
 
 [dev-dependencies]
-const-str = "0.6.2"
+const-str = "0.6.3"
 rstest = "0.25.0"
-mock_instant = "0.5.3"
+mock_instant = "0.6.0"
 hexf = "0.2.1"
 
 [dependencies.kmeans_colors]

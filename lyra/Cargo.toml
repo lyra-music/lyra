@@ -34,7 +34,7 @@ lyra_proc = { path = "../lyra_proc" }
 lyra_ext = { path = "../lyra_ext" }
 
 paste = "1.0.15"
-const-str = "0.6.2"
+const-str = "0.6.3"
 const_panic = { version = "0.2.12", features = ["derive"] }
 bitflags = "2.9.1"
 dotenvy = "0.15.7"
@@ -42,7 +42,7 @@ dotenvy_macro = "0.15.7"
 thiserror = "2.0.12"
 color-eyre = "0.6.5"
 futures = "0.3.31"
-tokio = { version = "1.45.1", features = [
+tokio = { version = "1.46.1", features = [
     "sync",
     "signal",
     "rt-multi-thread",
@@ -97,9 +97,9 @@ twilight-util = { version = "0.16.0", features = [
 ] }
 twilight-interactions = { version = "0.16.2" }
 moka = { version = "0.12.10", features = ["future"] }
-reqwest = { version = "0.12.20", default-features = false, features = [
+reqwest = { version = "0.12.22", default-features = false, features = [
     "charset",
     "rustls-tls-native-roots",
 ] }
-rustls = "0.23.28"
+rustls = "0.23.29"
 derive_builder = "0.20.2"
