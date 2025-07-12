@@ -3,7 +3,7 @@
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     systems.url = "github:nix-systems/default";
     devenv = {
-      url = "github:cachix/devenv";
+      url = "github:cachix/devenv/f19b62ea677ec6046d78243e176fa01d5ef0d55a"; # pinned to 1.6.1 because of https://github.com/cachix/devenv/issues/1981
       inputs.nixpkgs.follows = "nixpkgs";
     };
     fenix = {
