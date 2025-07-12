@@ -59,13 +59,13 @@ impl<'a> Fe<'a> {
                 Self::InVoiceWithoutUser(e)
             }
             crate::error::component::playback::back::BackError::Lavalink(e) => Self::Lavalink(e),
-            crate::error::component::playback::back::BackError::UserOnlyIn(e) => {
-                Self::from_check_user_only_in(e)
-            }
             crate::error::component::playback::back::BackError::Unsuppressed(e) => {
                 Self::from_require_unsuppressed_error(e)
             }
             crate::error::component::playback::back::BackError::Respond(e) => Self::from_respond(e),
+            crate::error::component::playback::back::BackError::UsersTrack(e) => {
+                Self::from_users_track_error(e)
+            }
         }
     }
 
