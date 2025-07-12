@@ -2,5 +2,34 @@
 members = ["lyra", "lyra_proc", "lyra_ext"]
 resolver = "2"
 
+[workspace.package]
+readme = "README.md"
+description = "A featureful, self-hostable Discord music bot."
+version = "0.9.2"
+edition = "2024"
+rust-version = "1.88" # when bumping, bump in `Dockerfile` too.
+license = "GPL-3.0"
+repository = "https://github.com/lyra-music/lyra"
+authors = ["fdnt7"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+enum_glob_use = "forbid"
+unwrap_used = "forbid"
+try_err = "forbid"
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+
+[workspace.dependencies]
+heck = "0.5.0"
+bitflags = "2.9.1"
+itertools = "0.14.0"
+regex = "1.11.1"
+serde = "1.0.219"
+rayon = "1.10.0"
+const-str = "0.6.3"
+
 [profile.release]
 lto = true
