@@ -1,3 +1,4 @@
+pub mod banner;
 pub mod emoji;
 pub mod http;
 pub mod konst;
