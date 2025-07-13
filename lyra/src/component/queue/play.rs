@@ -37,7 +37,7 @@ use crate::{
         require, util,
     },
     core::{
-        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, regex},
+        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT},
         model::{
             UserIdAware,
             response::{
@@ -48,6 +48,7 @@ use crate::{
                 },
             },
         },
+        statik::regex,
     },
     error::{
         CommandResult, LoadFailed as LoadFailedError,

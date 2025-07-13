@@ -5,5 +5,4 @@ pub mod exit_code;
 pub mod lavaplayer;
 pub mod misc;
 pub mod poll;
-pub mod regex;
 pub mod text;

@@ -74,6 +74,7 @@ impl NowPlayingButtonIds {
         }
     }
 }
+
 // we cannot afford to initialise the entire button ids object without any memoisation,
 // as this will be called more than once: it will be called on nearly every playback
 // controller action
