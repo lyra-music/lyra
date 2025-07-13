@@ -1,78 +1,7 @@
-pub mod metadata {
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    const COPYRIGHT: &str = env!("CARGO_PKG_LICENSE");
-    const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
-    const BUILD_TIMESTAMP: &str = env!("VERGEN_BUILD_TIMESTAMP");
-
-    const CARGO_TARGET_TRIPLE: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");
-    const CARGO_OPT_LEVEL: &str = env!("VERGEN_CARGO_OPT_LEVEL");
-
-    const RUSTC_SEMVER: &str = env!("VERGEN_RUSTC_SEMVER");
-    const RUSTC_CHANNEL: &str = env!("VERGEN_RUSTC_CHANNEL");
-    const RUSTC_HOST_TRIPLE: &str = env!("VERGEN_RUSTC_HOST_TRIPLE");
-    const RUSTC_COMMIT_HASH: &str = env!("VERGEN_RUSTC_COMMIT_HASH");
-
-    const GIT_DESCRIBE: &str = env!("VERGEN_GIT_DESCRIBE");
-    const GIT_SHA: &str = env!("VERGEN_GIT_SHA");
-    const GIT_BRANCH: &str = env!("VERGEN_GIT_BRANCH");
-    const GIT_COMMIT_TIMESTAMP: &str = env!("VERGEN_GIT_COMMIT_TIMESTAMP");
-
-    const METADATA_N: usize = 14;
-    const METADATA_REPLACEMENTS: [&str; METADATA_N] = [
-        VERSION,
-        AUTHORS,
-        COPYRIGHT,
-        BUILD_TIMESTAMP,
-        GIT_DESCRIBE,
-        GIT_SHA,
-        GIT_COMMIT_TIMESTAMP,
-        GIT_BRANCH,
-        RUSTC_SEMVER,
-        RUSTC_CHANNEL,
-        RUSTC_HOST_TRIPLE,
-        RUSTC_COMMIT_HASH,
-        CARGO_TARGET_TRIPLE,
-        CARGO_OPT_LEVEL,
-    ];
-
-    const METADATA_PATTERNS: [&str; METADATA_N] = [
-        "%version",
-        "%authors",
-        "%copyright",
-        "%build_timestamp",
-        "%git_describe",
-        "%git_sha",
-        "%git_commit_timestamp",
-        "%git_branch",
-        "%rustc_semver",
-        "%rustc_channel",
-        "%rustc_host",
-        "%rustc_commit_hash",
-        "%cargo_target_triple",
-        "%cargo_opt_level",
-    ];
-
-    // we can afford to initialise the entire banner string without any memoisation,
-    // as this will only be called once, in `runner::start()`.
-    pub fn banner() -> String {
-        use aho_corasick::AhoCorasick;
-
-        let rdr = include_str!("../../../assets/lyra2-ascii.ans");
-        let mut wtr = Vec::new();
-
-        let ac = AhoCorasick::new(METADATA_PATTERNS).expect("METADATA_PATTERNS must be valid");
-        ac.try_stream_replace_all(rdr.as_bytes(), &mut wtr, &METADATA_REPLACEMENTS)
-            .expect("searching must be infallible");
-        String::from_utf8(wtr).expect("interpolated banner must be utf-8")
-    }
-}
-
 pub mod connection {
     use std::time::Duration;
 
-    pub const INACTIVITY_TIMEOUT_SECS: u16 = 600;
-
-    pub const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(INACTIVITY_TIMEOUT_SECS as u64);
+    pub const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(600);
     pub const CHANGED_TIMEOUT: Duration = Duration::from_millis(250);
     pub const GET_LAVALINK_CONNECTION_INFO_TIMEOUT: Duration = Duration::from_millis(2_000);
 }
