@@ -1,4 +1,4 @@
-pub mod colours;
+pub mod colour;
 pub mod connection;
 pub mod discord;
 pub mod exit_code;
