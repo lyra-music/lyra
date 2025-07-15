@@ -1,15 +1,20 @@
-<div align="center">
+<p align="center">
+  <img alt="Λύρα banner" src="assets/lyra-banner.png">
+</p>
 
-# **Λύρα**
+# Λύρα
 
-<img src="assets/lyra2-X.png"  width="256">
+[![Build status](https://github.com/lyra-music/lyra/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/lyra-music/lyra/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/release/lyra-music/lyra.svg)](https://github.com/lyra-music/lyra/releases/latest)
+[![dev chat](https://discordapp.com/api/guilds/1033430025527103568/widget.png?style=shield)](https://discord.gg/d4UerJpvTp)
+[![CodeFactor](https://www.codefactor.io/repository/github/lyra-music/lyra/badge)](https://www.codefactor.io/repository/github/lyra-music/lyra)
 
-A *featureful*, *self-hostable* **Discord music bot**, made with [`twilight-rs`](https://twilight.rs/) and [`Lavalink`](https://github.com/freyacodes/Lavalink), written in [`Rust`](https://www.rust-lang.org/).
+A *self-hostable* **Discord music bot**, focused on *fairness*.
 
-</div>
-
-> [!WARNING]
-> Still in early development!
+> [!NOTE]
+> This project is actively developed with a focus on maintaining stability.
+> Users are encouraged to self-host and test the bot locally.
+> Core functionality is implemented, though some features like queue viewing and polling systems for command fairness are still in development.
 
 ## Setup
 
@@ -106,3 +111,9 @@ Then, clone the repository and run the following command:
 ```console
 $ cargo run --release
 ```
+
+## Attributions
+
+- [`twilight-rs`](https://twilight.rs/) - Powerful, flexible, and scalable ecosystem of Rust libraries for the Discord API.
+- [`Lavalink`](https://lavalink.dev/) - Standalone audio sending node based on Lavaplayer.
+  - [`lavalink-rs`](https://gitlab.com/vicky5124/lavalink-rs/) - Lavalink bindings for asynchronous rust discord libraries.

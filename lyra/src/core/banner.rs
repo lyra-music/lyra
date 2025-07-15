@@ -42,7 +42,7 @@ pub fn banner() -> String {
         env!("VERGEN_CARGO_OPT_LEVEL"),
     ];
 
-    let rdr = include_str!("../../../assets/lyra2-ascii.ans");
+    let rdr = include_str!("../../../assets/lyra-ascii");
     let mut wtr = Vec::new();
 
     let ac = AhoCorasick::new(metadata_patterns).expect("METADATA_PATTERNS must be valid");
