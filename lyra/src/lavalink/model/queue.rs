@@ -94,6 +94,8 @@ pub struct Queue {
     advancing_enabler: watch::Sender<bool>,
 }
 
+pub type PositionsAndItems<'a> = (NonZeroUsize, &'a Item);
+
 impl Queue {
     pub(super) fn new() -> Self {
         Self {
@@ -105,13 +107,13 @@ impl Queue {
         }
     }
 
-    fn position_from(&self, current: Option<&Item>) -> NonZeroUsize {
-        let d = usize::from(current.is_some() || self.index == 0);
+    fn position_from(&self, current_exists: bool) -> NonZeroUsize {
+        let d = usize::from(current_exists || self.index == 0);
         NonZeroUsize::new(self.index + d).expect("normalised queue position must be non-zero")
     }
 
     pub fn position(&self) -> NonZeroUsize {
-        self.position_from(self.current())
+        self.position_from(self.current().is_some())
     }
 
     pub const fn index(&self) -> usize {
@@ -130,6 +132,11 @@ impl Queue {
         }
     }
 
+    fn map_index_checked(&self, index: usize) -> Option<usize> {
+        self.map_index(index)
+            .filter(|&i| self.inner.get(i).is_some())
+    }
+
     #[inline]
     pub fn map_index_expected(&self, index: usize) -> usize {
         self.map_index(index).expect("track at index exists")
@@ -144,18 +151,22 @@ impl Queue {
         self.get_mapped(self.index)
     }
 
+    #[inline]
     pub fn current_index(&self) -> Option<usize> {
-        self.current().map(|_| self.index)
+        self.map_index_checked(self.index)
     }
 
-    #[inline]
-    pub fn next(&self) -> Option<&Item> {
-        self.get_mapped(self.next_index())
+    pub fn prev_index(&self) -> Option<usize> {
+        self.map_index_checked(self.receded_index())
+    }
+
+    pub fn next_index(&self) -> Option<usize> {
+        self.map_index_checked(self.advanced_index())
     }
 
     pub fn current_and_position(&self) -> (Option<&Item>, NonZeroUsize) {
         let current = self.current();
-        let position = self.position_from(current);
+        let position = self.position_from(current.is_some());
         (current, position)
     }
 
@@ -245,7 +256,7 @@ impl Queue {
         }
     }
 
-    fn next_index(&self) -> usize {
+    fn advanced_index(&self) -> usize {
         match self.repeat_mode {
             RepeatMode::Off => self.index + 1,
             RepeatMode::All => (self.index + 1) % self.len(),
@@ -253,7 +264,7 @@ impl Queue {
         }
     }
 
-    fn prev_index(&self) -> usize {
+    fn receded_index(&self) -> usize {
         match self.repeat_mode {
             RepeatMode::Off => self.index.saturating_sub(1),
             RepeatMode::All => {
@@ -266,12 +277,12 @@ impl Queue {
 
     #[inline]
     pub fn advance(&mut self) {
-        self.index = self.next_index();
+        self.index = self.advanced_index();
     }
 
     #[inline]
     pub fn recede(&mut self) {
-        self.index = self.prev_index();
+        self.index = self.receded_index();
     }
 
     pub fn subscribe_to_advance_enabler(&self) -> watch::Receiver<bool> {
@@ -317,7 +328,7 @@ impl Queue {
 
     pub fn iter_positions_and_items(
         &self,
-    ) -> impl DoubleEndedIterator<Item = (NonZeroUsize, &Item)> + Clone {
+    ) -> impl DoubleEndedIterator<Item = PositionsAndItems> + Clone {
         self.iter()
             .enumerate()
             .filter_map(|(i, t)| NonZeroUsize::new(i + 1).map(|i| (i, t)))
@@ -330,6 +341,13 @@ impl Queue {
     #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the queue is empty.
+    pub fn nonzero_len(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.inner.len()).expect("len must be non-zero")
     }
 
     #[inline]

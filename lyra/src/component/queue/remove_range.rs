@@ -3,7 +3,10 @@ use std::{
     num::{IntErrorKind, NonZeroUsize},
 };
 
-use lyra_ext::num::{i64_as_usize, usize_as_i64};
+use lyra_ext::num::{
+    cast::{i64_as_usize, usize_as_i64},
+    range::{nonzero_usize_range_inclusive, nonzero_usize_range_to_inclusive},
+};
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -64,16 +67,14 @@ async fn generate_remove_range_autocomplete_choices(
                 return Vec::new();
             };
 
-            (end.get()..=queue_len.get())
-                .filter_map(NonZeroUsize::new)
-                .collect()
+            nonzero_usize_range_inclusive(end, queue_len).collect()
         }
         RemoveRangeAutocompleteOptionsType::EndFocusedStartCompleted(start) => {
             let Some(start) = super::normalize_queue_position(start, queue_len) else {
                 return Vec::new();
             };
 
-            (1..=start.get()).filter_map(NonZeroUsize::new).collect()
+            nonzero_usize_range_to_inclusive(start).collect()
         }
     };
 
@@ -202,8 +203,10 @@ impl BotGuildSlashCommand for RemoveRange {
             return Ok(());
         }
 
-        let positions = (self.start..=self.end).filter_map(|p| NonZeroUsize::new(i64_as_usize(p)));
-        check::all_users_track(queue, positions, in_voice_with_user)?;
+        let start_position =
+            NonZeroUsize::new(i64_as_usize(self.start)).expect("start must be non-zero");
+        let end_position = NonZeroUsize::new(i64_as_usize(self.end)).expect("end must be non-zero");
+        check::users_tracks_from_to(queue, start_position, end_position, in_voice_with_user)?;
 
         drop(data_r);
         Ok(super::remove_range(self.start, self.end, &mut ctx, &player).await?)
