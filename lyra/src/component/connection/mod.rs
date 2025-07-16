@@ -122,39 +122,11 @@ async fn start_inactivity_timeout(
         channel_id
     );
 
-    let cache = ctx.inner.cache_owned();
-    let bot_user_id = ctx.inner.user_id();
-
-    if tokio::time::timeout(const_connection::INACTIVITY_TIMEOUT, {
-        ctx.inner.standby().wait_for(guild_id, move |e: &Event| {
-            let Event::VoiceStateUpdate(voice_state) = e else {
-                return false;
-            };
-            let vs_channel_id = voice_state.channel_id;
-
-            (voice_state.user_id == bot_user_id && vs_channel_id != Some(channel_id)) // bot changed channel
-                || users_in_voice(&cache, channel_id).is_some_and(|n| n >= 1) // bot not alone
-        })
-    })
-    .await
-    .is_ok()
-    {
-        tracing::debug!(
-            "guild {} stopped channel {} inactivity timeout",
-            guild_id,
-            channel_id,
-        );
+    if has_voice_activity_within_timeout(&ctx, channel_id, guild_id).await {
         return Ok(());
     }
 
-    // CORRECTNESS: as the bot later leaves the voice channel, it invokes a
-    // voice state update event, so this is correct.
-    if ctx.disable_vsu_handler().await.is_err() {
-        tracing::debug!(
-            "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
-            guild_id,
-            channel_id
-        );
+    if failed_to_disable_vsu_handler(&ctx, channel_id, guild_id).await {
         return Ok(());
     }
 
@@ -182,6 +154,64 @@ async fn start_inactivity_timeout(
     Ok(())
 }
 
+/// Returns `true` if disabling the voice state update handler failed, which
+/// happens when awaiting `ClientAndGuildIdAware::disable_vsu_handler` yields
+/// `Err(UnrecognisedConnection)`.
+async fn failed_to_disable_vsu_handler(
+    ctx: &InactivityTimeoutContext,
+    channel_id: Id<ChannelMarker>,
+    guild_id: Id<GuildMarker>,
+) -> bool {
+    // CORRECTNESS: as the bot later leaves the voice channel, it invokes a
+    // voice state update event, so this is correct.
+    let is_conn_unrecognised = ctx.disable_vsu_handler().await.is_err();
+    if is_conn_unrecognised {
+        tracing::debug!(
+            "guild {} stopped channel {} inactivity timeout (unrecognised connection)",
+            guild_id,
+            channel_id
+        );
+    }
+    is_conn_unrecognised
+}
+
+/// Returns `true` if there is voice activity within the inactivity timeout
+/// which warrants the timeout to be stopped.
+///
+/// The timeout-stopping voice activity includes either:
+///  - the bot changing the connected voice channel (via `/join` or manually
+///    being moved)
+///  - the connected voice channel is no longer empty (a non-bot user joined)
+async fn has_voice_activity_within_timeout(
+    ctx: &InactivityTimeoutContext,
+    channel_id: Id<ChannelMarker>,
+    guild_id: Id<GuildMarker>,
+) -> bool {
+    let (cache, bot_user_id) = (ctx.inner.cache_owned(), ctx.inner.user_id());
+
+    let has_activity = tokio::time::timeout(const_connection::INACTIVITY_TIMEOUT, {
+        ctx.inner.standby().wait_for(guild_id, move |e: &Event| {
+            let Event::VoiceStateUpdate(voice_state) = e else {
+                return false;
+            };
+            let vs_channel_id = voice_state.channel_id;
+
+            (voice_state.user_id == bot_user_id && vs_channel_id != Some(channel_id)) // bot changed channel
+                || users_in_voice(&cache, channel_id).is_some_and(|n| n >= 1) // bot not alone
+        })
+    })
+    .await
+    .is_ok();
+    if has_activity {
+        tracing::debug!(
+            "guild {} stopped channel {} inactivity timeout",
+            guild_id,
+            channel_id,
+        );
+    }
+    has_activity
+}
+
 #[tracing::instrument(skip_all, name = "connection")]
 pub async fn handle_voice_state_update(
     ctx: &voice::Context,
@@ -202,15 +232,15 @@ pub async fn handle_voice_state_update(
                 && state.channel_id.is_none_or(|id| id != old_channel_id)
                 && users_in_voice(ctx, connected_channel_id).is_some_and(|n| n == 0)
             {
-                if let Ok(player) = require::player(ctx) {
-                    if !player.paused().await {
-                        player.set_pause(true).await?;
-                        ctx.http()
-                            .create_message(text_channel_id)
-                            .content("⚡▶ Paused `(Bot is not used by anyone)`.")
-                            .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
-                            .await?;
-                    }
+                if let Ok(player) = require::player(ctx)
+                    && !player.paused().await
+                {
+                    player.set_pause(true).await?;
+                    ctx.http()
+                        .create_message(text_channel_id)
+                        .content("⚡▶ Paused `(Bot is not used by anyone)`.")
+                        .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
+                        .await?;
                 }
 
                 traced::tokio_spawn(start_inactivity_timeout(
@@ -272,7 +302,7 @@ async fn match_state_channel_id(
 
             let voice_is_empty = users_in_voice(ctx, channel_id).is_some_and(|n| n == 0);
 
-            let response = join::Response::new(Some(old_channel_id), joined, voice_is_empty, mute);
+            let response = join::Response::new_move(old_channel_id, joined, voice_is_empty, mute);
 
             if let Ok(player) = require::player(ctx) {
                 player.update_voice_channel(voice_is_empty).await?;

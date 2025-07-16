@@ -34,7 +34,7 @@ use crate::{
     LavalinkAware,
     core::{
         konst::{
-            colours,
+            colour,
             poll::{BASE, DOWNVOTE, RATIO_BAR_SIZE, UPVOTE},
         },
         model::{
@@ -285,9 +285,9 @@ fn generate_upvote_button_id_and_row() -> (String, Component) {
 }
 
 fn generate_latent_embed_colours() -> LatentEmbedColours {
-    let upvote = mixbox::rgb_to_latent(&(hex_to_rgb(colours::UPVOTE)));
-    let downvote = mixbox::rgb_to_latent(&hex_to_rgb(colours::DOWNVOTE));
-    let base = mixbox::rgb_to_latent(&hex_to_rgb(colours::POLL_BASE));
+    let upvote = mixbox::rgb_to_latent(&(hex_to_rgb(colour::UPVOTE)));
+    let downvote = mixbox::rgb_to_latent(&hex_to_rgb(colour::DOWNVOTE));
+    let base = mixbox::rgb_to_latent(&hex_to_rgb(colour::POLL_BASE));
 
     LatentEmbedColours {
         base,

@@ -1,30 +1,23 @@
 [package]
 name = "lyra_ext"
-version = "0.9.2-rc.1"
-rust-version = "1.87"
-edition = "2024"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
 
-[lints.rust]
-unsafe_code = "forbid"
-
-[lints.clippy]
-enum_glob_use = "forbid"
-unwrap_used = "forbid"
-try_err = "forbid"
-pedantic = { level = "deny", priority = -1 }
-nursery = { level = "deny", priority = -1 }
+[lints]
+workspace = true
 
 [dependencies]
-heck = "0.5.0"
+heck.workspace = true
+bitflags.workspace = true
+regex.workspace = true
+rayon.workspace = true
 unicode-segmentation = "1"
-bitflags = "2"
-regex = "1"
-rayon = "1"
 
 [dev-dependencies]
-const-str = "0.6.2"
+const-str.workspace = true
 rstest = "0.25.0"
-mock_instant = "0.5.3"
+mock_instant = "0.6.0"
 hexf = "0.2.1"
 
 [dependencies.kmeans_colors]

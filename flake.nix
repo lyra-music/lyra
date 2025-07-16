@@ -3,11 +3,12 @@
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     systems.url = "github:nix-systems/default";
     devenv = {
-      url = "github:cachix/devenv";
+      # pinned to https://github.com/cachix/devenv/pull/2005 to fix the broken rust toolchain in v1.7.0
+      url = "github:cachix/devenv/2b794e17c0bcbb04075b0839abf5f49db0233616";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    fenix = {
-      url = "github:nix-community/fenix";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

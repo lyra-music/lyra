@@ -38,11 +38,12 @@ use crate::{
     },
     core::{
         http::InteractionClient,
-        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT, text::FUZZY_MATCHER},
+        konst::{discord::COMMAND_CHOICES_LIMIT, misc::ADD_TRACKS_WRAP_LIMIT},
         model::{
             CacheAware,
             response::{either::RespondOrFollowup, initial::message::create::RespondWithMessage},
         },
+        statik::fuzzy_matcher::FUZZY_MATCHER,
     },
     error::{PositionOutOfRange as PositionOutOfRangeError, component::queue::RemoveTracksError},
     lavalink::{CorrectTrackInfo, QueueItem},

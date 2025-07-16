@@ -23,9 +23,11 @@ pub(super) const fn volume_emoji(percent: Option<NonZeroU16>) -> &'static str {
 }
 
 pub fn clipping_warning(percent: NonZeroU16) -> &'static str {
-    (percent.get() > 100)
-        .then_some(" (**`Audio quality may be reduced`**)")
-        .unwrap_or_default()
+    if percent.get() > 100 {
+        " (**`Audio quality may be reduced`**)"
+    } else {
+        Default::default()
+    }
 }
 
 #[derive(CommandModel, CreateCommand, BotGuildCommandGroup)]

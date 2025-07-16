@@ -65,9 +65,11 @@ impl BotGuildSlashCommand for Up {
         let emoji = super::volume_emoji(Some(new_percent));
         let warning = super::clipping_warning(new_percent);
 
-        let maxed_note = (new_percent == MAX_PERCENT)
-            .then_some(" (`Max`)")
-            .unwrap_or_default();
+        let maxed_note = if new_percent == MAX_PERCENT {
+            " (`Max`)"
+        } else {
+            Default::default()
+        };
 
         player.context.set_volume(new_percent.get()).await?;
         data.write().await.set_volume(new_percent);

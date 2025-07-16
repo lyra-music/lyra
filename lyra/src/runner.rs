@@ -30,7 +30,7 @@ use twilight_model::{
 
 use crate::{
     LavalinkAware,
-    core::konst::metadata::banner,
+    core::banner::banner,
     lavalink::{ClientData, handlers},
 };
 
