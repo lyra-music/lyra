@@ -16,7 +16,7 @@ unicode-segmentation = "1"
 
 [dev-dependencies]
 const-str.workspace = true
-rstest = "0.25.0"
+rstest = "0.26.1"
 mock_instant = "0.6.0"
 hexf = "0.2.1"
 

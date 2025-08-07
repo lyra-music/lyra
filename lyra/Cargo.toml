@@ -28,25 +28,25 @@ serde.workspace = true
 rayon.workspace = true
 const-str.workspace = true
 paste = "1.0.15"
-const_panic = { version = "0.2.12", features = ["derive"] }
+const_panic = { version = "0.2.13", features = ["derive"] }
 dotenvy = "0.15.7"
 dotenvy_macro = "0.15.7"
 thiserror = "2.0.12"
 color-eyre = "0.6.5"
 futures = "0.3.31"
-tokio = { version = "1.46.1", features = [
+tokio = { version = "1.47.1", features = [
     "sync",
     "signal",
     "rt-multi-thread",
     "macros",
 ] }
-serde_json = "1.0.140"
+serde_json = "1.0.142"
 linkify = "0.10.0"
 fuzzy-matcher = "0.3.7"
 log = "0.4.27"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-rand = "0.9.1"
+rand = "0.9.2"
 sqlx = { version = "0.8.6", features = [
     "postgres",
     "runtime-tokio",
@@ -89,5 +89,5 @@ reqwest = { version = "0.12.22", default-features = false, features = [
     "charset",
     "rustls-tls-native-roots",
 ] }
-rustls = "0.23.29"
+rustls = "0.23.31"
 derive_builder = "0.20.2"

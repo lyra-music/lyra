@@ -29,7 +29,7 @@ itertools = "0.14.0"
 regex = "1.11.1"
 serde = "1.0.219"
 rayon = "1.10.0"
-const-str = "0.6.3"
+const-str = "0.6.4"
 
 [profile.release]
 lto = true
