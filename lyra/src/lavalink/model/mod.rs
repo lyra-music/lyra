@@ -89,7 +89,7 @@ pub trait ClientAndGuildIdAware: ClientAware + GuildIdAware {
             .disable_vsu_handler()
     }
 
-    fn get_conn(&self) -> ConnectionHandle {
+    fn get_conn(&'_ self) -> ConnectionHandle<'_> {
         self.lavalink().handle_for(self.guild_id())
     }
 }

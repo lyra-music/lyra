@@ -7,6 +7,7 @@ use crate::error::core::RespondError;
 pub enum PingError {
     Respond(#[from] RespondError),
     #[error("no heartbeat has been sent")]
+    #[expect(unused)]
     NoHeartbeatSent,
 }
 

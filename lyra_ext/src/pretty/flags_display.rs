@@ -35,14 +35,14 @@ where
 }
 
 pub trait FlagsDisplay: Flags {
-    fn pretty_display(&self) -> PrettyFlagsDisplayer<Self> {
+    fn pretty_display(&'_ self) -> PrettyFlagsDisplayer<'_, Self> {
         PrettyFlagsDisplayer {
             inner: self,
             code: false,
         }
     }
 
-    fn pretty_display_code(&self) -> PrettyFlagsDisplayer<Self> {
+    fn pretty_display_code(&'_ self) -> PrettyFlagsDisplayer<'_, Self> {
         PrettyFlagsDisplayer {
             inner: self,
             code: true,

@@ -5,13 +5,6 @@ pub mod require;
 pub mod util;
 
 #[derive(thiserror::Error, Debug)]
-#[error("creating a followup failed: {}", .0)]
-pub enum FollowupError {
-    DeserialiseBodyFromHttp(#[from] super::core::DeserialiseBodyFromHttpError),
-    Followup(#[from] super::core::FollowupError),
-}
-
-#[derive(thiserror::Error, Debug)]
 #[error("command failed: {}", .0)]
 pub enum Error {
     UserNotAccessManager(#[from] super::UserNotAccessManager),

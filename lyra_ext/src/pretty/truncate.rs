@@ -8,7 +8,7 @@ where
 {
     const EMPTY: &Self;
     const TRAIL: &Self;
-    fn pretty_truncate(&self, new_len: usize) -> Cow<Self>
+    fn pretty_truncate(&'_ self, new_len: usize) -> Cow<'_, Self>
     where
         for<'a> <Self as ToOwned>::Owned: FromIterator<&'a str>,
     {

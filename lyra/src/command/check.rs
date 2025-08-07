@@ -186,11 +186,14 @@ pub fn noone_else_in(
     Ok(())
 }
 
-pub struct PollStarter(PollStarterInfo);
+pub struct PollStarter(#[expect(unused)] PollStarterInfo);
 
 pub struct PollStarterInfo {
+    #[expect(unused)]
     topic: PollTopic,
+    #[expect(unused)]
     error: PollResolvableError,
+    #[expect(unused)]
     in_voice: PartialInVoice,
 }
 
@@ -318,10 +321,10 @@ pub fn track_is_users(
     in_voice_with_user: InVoiceWithUserResult,
 ) -> Result<(), check::UsersTrackError> {
     let author_id = in_voice_with_user.in_voice.author_id;
-    if let Err(user_only_in) = in_voice_with_user.only() {
-        if track.requester() != author_id {
-            return Err(impl_users_track(track, position, user_only_in));
-        }
+    if let Err(user_only_in) = in_voice_with_user.only()
+        && track.requester() != author_id
+    {
+        return Err(impl_users_track(track, position, user_only_in));
     }
 
     Ok(())
@@ -726,6 +729,7 @@ pub fn all_users_track(
 // }
 //
 
+#[expect(unused)]
 async fn handle_poll(
     error: check::PollResolvableError,
     topic: &PollTopic,

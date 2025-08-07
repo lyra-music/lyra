@@ -3,7 +3,7 @@ use std::borrow::Cow;
 pub trait LogicalBind {
     fn is_truthy(&self) -> bool;
 
-    fn or(&self, other: impl Into<<Self as ToOwned>::Owned>) -> Cow<Self>
+    fn or(&'_ self, other: impl Into<<Self as ToOwned>::Owned>) -> Cow<'_, Self>
     where
         Self: ToOwned,
     {
@@ -13,7 +13,7 @@ pub trait LogicalBind {
         Cow::Owned(other.into())
     }
 
-    fn or_else(&self, f: impl FnOnce() -> <Self as ToOwned>::Owned) -> Cow<Self>
+    fn or_else(&'_ self, f: impl FnOnce() -> <Self as ToOwned>::Owned) -> Cow<'_, Self>
     where
         Self: ToOwned,
     {
