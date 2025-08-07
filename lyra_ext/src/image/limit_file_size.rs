@@ -5,11 +5,11 @@ use image::{DynamicImage, GenericImageView, imageops::FilterType};
 use crate::num::f64_as_u32;
 
 pub trait LimitFileSize {
-    fn limit_file_size(&self, limit: u32) -> Cow<DynamicImage>;
+    fn limit_file_size(&'_ self, limit: u32) -> Cow<'_, DynamicImage>;
 }
 
 impl LimitFileSize for DynamicImage {
-    fn limit_file_size(&self, limit: u32) -> Cow<DynamicImage> {
+    fn limit_file_size(&'_ self, limit: u32) -> Cow<'_, DynamicImage> {
         let (x, y) = self.dimensions();
         let bytes_per_pixel = self.color().bytes_per_pixel();
 

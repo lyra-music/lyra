@@ -192,7 +192,7 @@ impl<T: CtxKind> Ctx<T, GuildMarker> {
         }
     }
 
-    pub fn bot_member(&self) -> CacheResult<CachedBotMember> {
+    pub fn bot_member(&'_ self) -> CacheResult<CachedBotMember<'_>> {
         self.cache()
             .member(self.guild_id(), self.bot().user_id())
             .ok_or(Cache)
@@ -238,7 +238,7 @@ impl<T: CtxKind> Ctx<T, GuildMarker> {
         )
     }
 
-    pub fn current_voice_state(&self) -> Option<CachedVoiceStateRef> {
+    pub fn current_voice_state(&'_ self) -> Option<CachedVoiceStateRef<'_>> {
         let user = self.bot().user_id();
         self.cache().voice_state(user, self.guild_id())
     }

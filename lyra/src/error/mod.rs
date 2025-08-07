@@ -40,10 +40,6 @@ pub struct UserNotStageModerator;
 #[error("user is not an access manager")]
 pub struct UserNotAccessManager;
 
-#[derive(Debug, Error)]
-#[error("user is not a playlist manager")]
-pub struct UserNotPlaylistManager;
-
 #[derive(Error, Debug)]
 #[error("user is not allowed to do this")]
 pub struct UserNotAllowed;
@@ -188,20 +184,12 @@ pub enum PositionOutOfRange {
 pub struct Paused;
 
 #[derive(Error, Debug)]
-#[error("player is stopped")]
-pub struct Stopped;
-
-#[derive(Error, Debug)]
 #[error("queue is empty")]
 pub struct QueueEmpty;
 
 #[derive(Error, Debug)]
 #[error("failed to load track: {}", .0)]
 pub struct LoadFailed(pub Box<str>);
-
-#[derive(PartialEq, Eq, Error, Debug)]
-#[error("invalid timestamp")]
-pub struct PrettifiedTimestampParse;
 
 #[derive(Error, Debug)]
 #[error("error running the bot starter: {}", .0)]

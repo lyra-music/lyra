@@ -26,8 +26,8 @@ use crate::{
 
 #[inline]
 fn require_in_voice_unsuppressed_and_player(
-    ctx: &GuildCtx<impl CtxKind>,
-) -> Result<(InVoice, PlayerInterface), RequireInVoiceUnsuppressedAndPlayerError> {
+    ctx: &'_ GuildCtx<impl CtxKind>,
+) -> Result<(InVoice<'_>, PlayerInterface), RequireInVoiceUnsuppressedAndPlayerError> {
     let in_voice = require::in_voice(ctx)?.and_unsuppressed()?;
     let player = require::player(ctx)?;
 

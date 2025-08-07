@@ -1,13 +1,10 @@
 use thiserror::Error;
 
 use crate::error::{
-    self, Cache as CacheError, InVoiceWithoutUser as InVoiceWithoutUserError, NotInVoice,
-    NotUsersTrack as NotUsersTrackError, PrettyErrorDisplay, PrettyInVoiceWithSomeoneElseDisplayer,
-    PrettyNotUsersTrackDisplayer, PrettyQueueNotSeekableDisplayer,
-    QueueNotSeekable as QueueNotSeekableError,
+    self, Cache as CacheError, NotUsersTrack as NotUsersTrackError, PrettyErrorDisplay,
+    PrettyInVoiceWithSomeoneElseDisplayer, PrettyNotUsersTrackDisplayer,
+    PrettyQueueNotSeekableDisplayer, QueueNotSeekable as QueueNotSeekableError,
 };
-
-use super::require::UnsuppressedError;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -28,28 +25,6 @@ pub enum UserAllowedError {
 pub enum UserOnlyInError {
     Cache(#[from] CacheError),
     InVoiceWithSomeoneElse(#[from] crate::error::InVoiceWithSomeoneElse),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum InVoiceWithUserError {
-    NotInVoice(#[from] NotInVoice),
-    InVoiceWithoutUser(#[from] InVoiceWithoutUserError),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum InVoiceWithUserOnlyError {
-    NotInVoice(#[from] NotInVoice),
-    InVoiceWithoutUser(#[from] InVoiceWithoutUserError),
-    UserOnlyIn(#[from] UserOnlyInError),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum CurrentlyPlayingUsersTrackError {
-    NotPlaying(#[from] error::NotPlaying),
-    NotUsersTrack(#[from] NotUsersTrackError),
 }
 
 #[derive(Error, Debug)]
@@ -192,32 +167,4 @@ pub enum PollLossErrorKind {
     UnanimousLoss,
     TimedOut,
     SupersededLossViaDj,
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum HandleInVoiceWithSomeoneElseError {
-    PollResolvable(#[from] PollResolvableError),
-    HandlePoll(#[from] HandlePollError),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum RunError {
-    NotInVoice(#[from] NotInVoice),
-    QueueEmpty(#[from] error::QueueEmpty),
-    NotSuppressed(#[from] UnsuppressedError),
-    NotPlaying(#[from] error::NotPlaying),
-    InVoiceWithoutUser(#[from] InVoiceWithoutUserError),
-    HandleInVoiceWithSomeoneElse(#[from] HandleInVoiceWithSomeoneElseError),
-    Cache(#[from] CacheError),
-    Paused(#[from] error::Paused),
-    Stopped(#[from] error::Stopped),
-}
-
-#[derive(Error, Debug)]
-#[error(transparent)]
-pub enum OnlyElsePoll {
-    Cache(#[from] CacheError),
-    HandlePoll(#[from] HandlePollError),
 }

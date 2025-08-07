@@ -189,7 +189,7 @@ impl GuildIdAware for PartialInVoice {
     }
 }
 
-pub fn in_voice<T: CtxKind>(ctx: &GuildCtx<T>) -> Result<InVoice, NotInVoice> {
+pub fn in_voice<T: CtxKind>(ctx: &'_ GuildCtx<T>) -> Result<InVoice<'_>, NotInVoice> {
     Ok(InVoice::new(
         ctx.current_voice_state().ok_or(NotInVoice)?.into(),
         ctx,
@@ -312,7 +312,7 @@ where
     Ok(queue)
 }
 
-pub fn current_track(queue: &Queue) -> Result<CurrentTrack, NotPlaying> {
+pub fn current_track(queue: &'_ Queue) -> Result<CurrentTrack<'_>, NotPlaying> {
     let (current, position) = queue.current_and_position();
     Ok(CurrentTrack {
         track: current.ok_or(NotPlaying)?,

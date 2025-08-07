@@ -300,7 +300,7 @@ impl<T: UserAware> UserGlobalNameAware for T {
 }
 
 pub trait BotStateAware {
-    fn bot(&self) -> BotStateRef;
+    fn bot(&'_ self) -> BotStateRef<'_>;
 }
 
 pub trait OwnedBotStateAware: BotStateAware {

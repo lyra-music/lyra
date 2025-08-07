@@ -7,7 +7,7 @@ pub trait AsGrapheme: UnicodeSegmentation {
         self.graphemes(true).count()
     }
 
-    fn grapheme_truncate(&self, new_len: usize) -> Cow<Self>
+    fn grapheme_truncate(&'_ self, new_len: usize) -> Cow<'_, Self>
     where
         Self: ToOwned,
         Self::Owned: for<'a> FromIterator<&'a str>,
