@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 
-use lyra_ext::num::i64_as_u16;
+use lyra_ext::num::cast::i64_as_u16;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{

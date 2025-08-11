@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use lyra_ext::num::i64_as_usize;
+use lyra_ext::num::cast::i64_as_usize;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -50,8 +50,17 @@ impl BotGuildSlashCommand for Forward {
             return Ok(());
         }
 
-        let skipped = (current_track.position.get()..=index).filter_map(NonZeroUsize::new);
-        check::all_users_track(queue, skipped, in_voice_with_user)?;
+        // FAIRNESS: if a member requests to forward, it is fair to everyone in voice if the
+        // all tracks from the current to the track before the new position is requested by
+        // that member as there will be no delays in upcoming tracks for everyone else.
+        //
+        // here, `new_position` is the new position, and `index` is the 0-indexed version.
+        // interpreting it as 1-indexed, it will be exactly 1 less than `new_position`,
+        // which is the track before the new position. this ensures that
+        // `current_track.position.get()..=index` is semantically correct.
+        let start_position = current_track.position;
+        let end_position = NonZeroUsize::new(index).expect("index must be non-zero");
+        check::users_tracks_from_to(queue, start_position, end_position, in_voice_with_user)?;
 
         queue.downgrade_repeat_mode();
 

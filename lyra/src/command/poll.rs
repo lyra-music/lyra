@@ -10,7 +10,7 @@ use std::{
 use futures::StreamExt;
 use itertools::Itertools;
 use lyra_ext::{
-    num::{f64_as_isize, usize_as_f64},
+    num::cast::{f64_as_isize, usize_as_f64},
     rgb_hex::{hex_to_rgb, rgb_to_hex},
 };
 use rand::{Rng, distr::Alphanumeric};

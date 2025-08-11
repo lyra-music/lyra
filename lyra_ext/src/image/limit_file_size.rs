@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use image::{DynamicImage, GenericImageView, imageops::FilterType};
 
-use crate::num::f64_as_u32;
+use crate::num::cast::f64_as_u32;
 
 pub trait LimitFileSize {
     fn limit_file_size(&'_ self, limit: u32) -> Cow<'_, DynamicImage>;

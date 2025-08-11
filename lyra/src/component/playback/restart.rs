@@ -25,7 +25,12 @@ impl BotGuildSlashCommand for Restart {
         let data_r = data.read().await;
         let queue = require::queue_not_empty(&data_r)?;
         let current_track = require::current_track(queue)?;
-        check::current_track_is_users(&current_track, in_voice_with_user)?;
+
+        // FAIRNESS: this is only fair if the current track and every track
+        // after it is requested by the member. otherwise, it could possibly
+        // delay someone else's track start time.
+        let start_position = current_track.position;
+        check::users_tracks_from(queue, start_position, in_voice_with_user)?;
 
         drop(data_r);
         player

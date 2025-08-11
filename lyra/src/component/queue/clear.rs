@@ -1,5 +1,3 @@
-use std::num::NonZeroUsize;
-
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -29,8 +27,7 @@ impl BotGuildSlashCommand for Clear {
         let data_r = data.read().await;
         let queue = require::queue_not_empty(&data_r)?;
 
-        let positions = (1..=queue.len()).filter_map(NonZeroUsize::new);
-        check::all_users_track(queue, positions, in_voice_with_user)?;
+        check::users_all_tracks(queue, in_voice_with_user)?;
         let current_track_exists = require::current_track(queue).is_ok();
 
         if current_track_exists {

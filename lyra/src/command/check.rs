@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use lyra_ext::num::range::nonzero_usize_range_inclusive;
 use twilight_model::{
     channel::{ChannelType, message::MessageFlags},
     guild::Permissions,
@@ -33,14 +34,7 @@ use crate::{
         command::check::{self, AlternateVoteResponse, PollResolvableError, UserOnlyInError},
     },
     gateway::GuildIdAware,
-    lavalink::{
-        self,
-        CorrectTrackInfo,
-        // DelegateMethods,
-        Event,
-        // PlayerAware,
-        QueueItem,
-    },
+    lavalink::{self, CorrectTrackInfo, Event, PositionsAndItems, Queue, QueueItem},
 };
 
 use super::{
@@ -341,22 +335,77 @@ pub fn current_track_is_users(
     )
 }
 
-pub fn all_users_track(
-    queue: &lavalink::Queue,
-    positions: impl Iterator<Item = NonZeroUsize>,
+fn impl_users_tracks<'a>(
+    mut positions_and_items: impl Iterator<Item = PositionsAndItems<'a>>,
     in_voice_with_user: InVoiceWithUserResult,
 ) -> Result<(), check::UsersTrackError> {
     let author_id = in_voice_with_user.in_voice.author_id;
     if let (Some((position, track)), Err(user_only_in)) = (
-        positions
-            .map(|p| (p, &queue[p]))
-            .find(|(_, t)| t.requester() != author_id),
+        positions_and_items.find(|(_, t)| t.requester() != author_id),
         in_voice_with_user.only(),
     ) {
         return Err(impl_users_track(track, position, user_only_in));
     }
 
     Ok(())
+}
+
+fn zip_items(
+    queue: &Queue,
+    positions: impl Iterator<Item = NonZeroUsize>,
+) -> impl Iterator<Item = PositionsAndItems> {
+    positions.map(|p| (p, &queue[p]))
+}
+
+/// Iterate through all tracks at each queue positions in `positions` and checks
+/// if all of them are requested by the current user in voice, provided by the
+/// `in_voice_with_user` certificate.
+///
+/// If the certificate proves the user is the only one in voice
+/// (besides the bot) or if they have are considered a DJ, then this check will
+/// be skipped.
+pub fn users_tracks(
+    queue: &Queue,
+    positions: impl Iterator<Item = NonZeroUsize>,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    impl_users_tracks(zip_items(queue, positions), in_voice_with_user)
+}
+
+/// A variant of `users_track` that iterate through all tracks in the provided
+/// `queue`.
+pub fn users_all_tracks(
+    queue: &Queue,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    impl_users_tracks(queue.iter_positions_and_items(), in_voice_with_user)
+}
+
+/// A variant of `users_track` that iterate through all tracks in the provided
+/// `queue` from `start_position` to `end_position`.
+pub fn users_tracks_from_to(
+    queue: &Queue,
+    start_position: NonZeroUsize,
+    end_position: NonZeroUsize,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    let positions = nonzero_usize_range_inclusive(start_position, end_position);
+    users_tracks(queue, positions, in_voice_with_user)
+}
+
+/// A variant of `users_track` that iterate through all tracks in the provided
+/// `queue` from `start_position` to the end of the queue.
+///
+/// # Panics
+///
+/// Panics if the queue is empty.
+pub fn users_tracks_from(
+    queue: &Queue,
+    start_position: NonZeroUsize,
+    in_voice_with_user: InVoiceWithUserResult,
+) -> Result<(), check::UsersTrackError> {
+    let end_position = queue.nonzero_len();
+    users_tracks_from_to(queue, start_position, end_position, in_voice_with_user)
 }
 
 // async fn currently_playing(ctx: &Ctx<impl CtxKind>) -> Result<CurrentlyPlaying, NotPlayingError> {
