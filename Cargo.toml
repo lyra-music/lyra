@@ -24,11 +24,11 @@ nursery = { level = "deny", priority = -1 }
 
 [workspace.dependencies]
 heck = "0.5.0"
-bitflags = "2.9.1"
+bitflags = "2.9.2"
 itertools = "0.14.0"
 regex = "1.11.1"
 serde = "1.0.219"
-rayon = "1.10.0"
+rayon = "1.11.0"
 const-str = "0.6.4"
 
 [profile.release]
