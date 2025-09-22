@@ -7,7 +7,8 @@ lavalink/Lavalink.jar
 lavalink/version.txt
 
 # Devenv
-.devenv
+.devenv*
+devenv.local.nix
 
 # direnv
 .direnv
@@ -20,3 +21,4 @@ compose.yaml
 
 # Default Docker volume mounts
 data
+
