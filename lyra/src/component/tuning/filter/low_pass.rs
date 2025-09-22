@@ -25,7 +25,7 @@ impl SetLowPass {
         let smoothing = self
             .0
             .smoothing
-            .filter(|s| (s - Self::SANE_DEFAULT_SMOOTHING.abs() > Self::ERR_MARGIN));
+            .filter(|s| s - Self::SANE_DEFAULT_SMOOTHING.abs() > Self::ERR_MARGIN);
 
         smoothing.map_or(LowPassSettings::Default, LowPassSettings::Custom)
     }
