@@ -6,3 +6,7 @@ inputs:
     inputs:
       nixpkgs:
         follows: nixpkgs
+secretspec:
+  enable: true
+  provider: dotenv 
+  profile: default
