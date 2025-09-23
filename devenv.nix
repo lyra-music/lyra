@@ -5,7 +5,7 @@
   inputs,
   ...
 }: let
-  configEnv = config.env;
+  configEnv = config.secretspec.secrets;
   lavalinkDir = "./lavalink"; # use `config.git.root` on devenv 1.10
   lavalinkJar = "Lavalink.jar";
 in {
@@ -203,5 +203,5 @@ in {
 
   # See full reference at https://devenv.sh/reference/options/
 
-  dotenv.enable = true;
+  dotenv.disableHint = true; # already managed by secretspec
 }
