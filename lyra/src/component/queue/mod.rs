@@ -10,7 +10,10 @@ mod shuffle;
 pub use clear::Clear;
 pub use fair_queue::FairQueue;
 use lyra_ext::{
-    num::{i64_as_usize, usize_as_i64},
+    num::{
+        cast::{i64_as_usize, usize_as_i64},
+        range::nonzero_usize_range_inclusive,
+    },
     pretty::{duration_display::DurationDisplay, join::PrettyJoiner, truncate::PrettyTruncator},
 };
 
@@ -227,9 +230,7 @@ async fn remove_range(
         queue.drain(range).collect()
     };
 
-    let positions = (start_usize..=end_usize)
-        .filter_map(NonZeroUsize::new)
-        .collect();
+    let positions = nonzero_usize_range_inclusive(start_usize, end_usize).collect();
 
     drop(data_w);
     impl_remove(positions, removed, queue_cleared, ctx, player).await

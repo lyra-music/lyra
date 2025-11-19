@@ -3,7 +3,7 @@ mod off;
 mod preset;
 
 use lavalink_rs::model::player::{Equalizer, Filters};
-use lyra_ext::num::usize_as_u8;
+use lyra_ext::num::cast::usize_as_u8;
 use lyra_proc::BotGuildCommandGroup;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_model::guild::Permissions;

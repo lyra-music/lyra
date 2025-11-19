@@ -1,3 +1,6 @@
+use std::num::NonZeroUsize;
+
+use lyra_ext::num::range::nonzero_usize_range_inclusive;
 use twilight_interactions::command::{CommandModel, CreateCommand};
 
 use crate::{
@@ -33,17 +36,22 @@ pub async fn back(
     ctx: &mut GuildCtx<impl RespondWithMessageKind>,
     via_controller: bool,
 ) -> Result<(), BackError> {
-    // FAIRNESS: if a member requests to back, they need to be the only person in voice,
-    // as backing will be unfair to everyone who queued after this current track: the
-    // tracks after the current track will be delayed for the track's duration.
-    check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?.only()?;
+    let in_voice_with_user = check::user_in(require::in_voice(ctx)?.and_unsuppressed()?)?;
 
-    let current_track_title = data
-        .read()
-        .await
-        .queue()
-        .current()
-        .map(|t| t.data().info.title.clone());
+    let data_r = data.read().await;
+    let queue = data_r.queue();
+    let (current, position) = queue.current_and_position();
+    let current_track_title = current.map(|t| t.data().info.title.clone());
+
+    if let Some(prev) = queue.prev_index() {
+        let make = || NonZeroUsize::new(prev).expect("index + 1 must be non-zero");
+        let positions =
+            std::iter::once_with(make).chain(nonzero_usize_range_inclusive(position, queue.len()));
+        check::users_tracks(queue, positions, in_voice_with_user)?;
+    } else {
+        check::users_tracks_from(queue, position, in_voice_with_user)?;
+    }
+    drop(data_r);
 
     let mut data_w = data.write().await;
     let queue = data_w.queue_mut();

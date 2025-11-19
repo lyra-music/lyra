@@ -49,7 +49,7 @@ pub use self::{
     },
     pitch::Pitch,
     playlist::{PlaylistAwareTrackData, PlaylistMetadata, make_playlist_aware},
-    queue::{Item as QueueItem, Queue, RepeatMode},
+    queue::{Item as QueueItem, PositionsAndItems, Queue, RepeatMode},
     queue_indexer::IndexerType,
 };
 
@@ -239,7 +239,8 @@ impl RawPlayerData {
 
     pub async fn cleanup_now_playing_message(&mut self, cx: &(impl CacheAware + Sync)) {
         if let Some(message) = self.now_playing_message.take_if(|m| {
-            !is_message_at_bottom(cx, self.text_channel_id, m.id()) || self.queue.next().is_none()
+            !is_message_at_bottom(cx, self.text_channel_id, m.id())
+                || self.queue.next_index().is_none()
         }) {
             let _ = message.delete().await;
         }

@@ -4,7 +4,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use lyra_ext::num::i64_as_usize;
+use lyra_ext::num::cast::i64_as_usize;
 use twilight_interactions::command::{AutocompleteValue, CommandModel, CreateCommand};
 use twilight_model::application::command::CommandOptionChoice;
 
@@ -148,7 +148,7 @@ impl BotGuildSlashCommand for Remove {
             .filter_map(|&p| NonZeroUsize::new(i64_as_usize(p)))
             .collect::<Vec<_>>();
 
-        check::all_users_track(queue, positions.iter().copied(), in_voice_with_user)?;
+        check::users_tracks(queue, positions.iter().copied(), in_voice_with_user)?;
 
         positions.sort_unstable();
 
